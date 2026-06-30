@@ -3,15 +3,8 @@
 Status: current-system analysis for human review.
 
 This document describes the current WorkTrace capture path as observed from the
-current worktree. It is analysis only. It does not approve LocalTrace
+committed source tree. It is analysis only. It does not approve LocalTrace
 implementation work.
-
-Important worktree note:
-
-- `core/recorder_core/src/main.rs` is modified in the current worktree.
-- `core/recorder_core/src/activity.rs` is untracked in the current worktree, but
-  `main.rs` imports `mod activity`.
-- This document treats the current worktree as the system being analyzed.
 
 ## Component Map
 
@@ -24,7 +17,6 @@ Chrome/Edge extension
         v
 Rust core HTTP service
   core/recorder_core/src/main.rs
-  core/recorder_core/src/activity.rs
         |
         | SQLite
         v
@@ -73,17 +65,18 @@ Role:
 Key files:
 
 - `core/recorder_core/src/main.rs`
-- `core/recorder_core/src/activity.rs`
 - `core/recorder_core/Cargo.toml`
 
 Evidence:
 
-- Default port and DB args: `core/recorder_core/src/main.rs:101`.
-- `IngestEvent` fields: `core/recorder_core/src/main.rs:215`.
-- HTTP routes: `core/recorder_core/src/main.rs:991`.
-- SQLite schema: `core/recorder_core/src/main.rs:5111`.
-- Event insert: `core/recorder_core/src/main.rs:5668`.
-- Activity derivation: `core/recorder_core/src/activity.rs:26`.
+- Default port: `core/recorder_core/src/main.rs:23`.
+- CLI listen and DB args: `core/recorder_core/src/main.rs:105`.
+- `IngestEvent` fields: `core/recorder_core/src/main.rs:209`.
+- HTTP routes: `core/recorder_core/src/main.rs:985`.
+- SQLite schema: `core/recorder_core/src/main.rs:5110`.
+- Event insert: `core/recorder_core/src/main.rs:5661`.
+- Block derivation: `core/recorder_core/src/main.rs:6350`.
+- Timeline derivation: `core/recorder_core/src/main.rs:6590`.
 
 Current core routes include:
 
@@ -157,10 +150,11 @@ Key files:
 Evidence:
 
 - CLI args and privacy defaults: `collectors/windows_collector/src/main.rs:3`.
-- POST endpoint construction: `collectors/windows_collector/src/main.rs:146`.
-- Foreground `app_active` event: `collectors/windows_collector/src/main.rs:180`.
-- Background `app_audio` and `app_audio_stop` events:
-  `collectors/windows_collector/src/main.rs:218`.
+- POST endpoint construction: `collectors/windows_collector/src/main.rs:147`.
+- Foreground `app_active` event: `collectors/windows_collector/src/main.rs:195`.
+- Background `app_audio` event: `collectors/windows_collector/src/main.rs:251`.
+- Background `app_audio_stop` event:
+  `collectors/windows_collector/src/main.rs:276`.
 - Idle detection: `collectors/windows_collector/src/main.rs:608`.
 - Foreground app detection: `collectors/windows_collector/src/main.rs:628`.
 - CoreAudio session detection: `collectors/windows_collector/src/main.rs:691`.
@@ -224,6 +218,7 @@ Key files:
 
 - `ui_flutter/template/lib/api/core_client.dart`
 - `ui_flutter/template/lib/screens/today_screen.dart`
+- `ui_flutter/template/lib/screens/reports_screen.dart`
 - `ui_flutter/template/lib/screens/settings_screen.dart`
 - `ui_flutter/template/lib/utils/desktop_agent_io.dart`
 - `worktrace_ui/lib/api/core_client.dart`
@@ -234,6 +229,8 @@ Evidence:
 - UI API client routes: `ui_flutter/template/lib/api/core_client.dart:12`.
 - Today screen polls Now, blocks, timeline:
   `ui_flutter/template/lib/screens/today_screen.dart:128`.
+- Reports screen owns reports plus the TODO/planner surface:
+  `ui_flutter/template/lib/screens/reports_screen.dart:57`.
 - Settings screen manages health, privacy, tracking, data, startup, updates:
   `ui_flutter/template/lib/screens/settings_screen.dart:42`.
 - Desktop agent starts `recorder_core.exe` and `windows_collector.exe`:
@@ -267,9 +264,12 @@ Key files:
 
 Evidence:
 
-- Startup: `windows/src/WorkTrace.Windows/App.xaml.cs:18`.
+- Startup: `windows/src/WorkTrace.Windows/App.xaml.cs:23`.
 - Local server: `windows/src/WorkTrace.Windows/Services/LocalIngestServer.cs:25`.
+- `/event` route: `windows/src/WorkTrace.Windows/Services/LocalIngestServer.cs:52`.
 - In-memory store: `windows/src/WorkTrace.Windows/Services/IngestEventStore.cs:5`.
+- Browser-domain model field:
+  `windows/src/WorkTrace.Windows/Models/IngestEvent.cs:22`.
 
 LocalTrace implication:
 
@@ -546,7 +546,7 @@ Current behavior:
 - It does not emit `idle_start` or `idle_end`.
 - Current README says this idle cutoff only affects `app_active`; background
   audio still follows CoreAudio state.
-- Core and `activity.rs` also cap derived durations by `idle_cutoff_seconds`.
+- Core derived activity helpers also cap durations by `idle_cutoff_seconds`.
 - Audio duration gets a shorter cap through `AUDIO_IDLE_CUTOFF_SECONDS`.
 
 LocalTrace decision:
@@ -634,13 +634,13 @@ Core `POST /event` does this:
 
 Evidence:
 
-- `post_event`: `core/recorder_core/src/main.rs:1161`.
-- Validation: `core/recorder_core/src/main.rs:1187`.
-- Entity selection: `core/recorder_core/src/main.rs:1199`.
-- Pause check: `core/recorder_core/src/main.rs:1251`.
-- Privacy rules: `core/recorder_core/src/main.rs:1265`.
-- Global privacy: `core/recorder_core/src/main.rs:1307`.
-- Insert: `core/recorder_core/src/main.rs:1336`.
+- `post_event`: `core/recorder_core/src/main.rs:1154`.
+- Validation: `core/recorder_core/src/main.rs:1174`.
+- Entity selection: `core/recorder_core/src/main.rs:1193`.
+- Pause check: `core/recorder_core/src/main.rs:1244`.
+- Privacy rules: `core/recorder_core/src/main.rs:1259`.
+- Global privacy: `core/recorder_core/src/main.rs:1302`.
+- Insert: `core/recorder_core/src/main.rs:1329`.
 
 ### 4. SQLite Storage
 
@@ -691,8 +691,8 @@ Core derives activity on demand:
 - `/now` scans recent events and reports current focus/tab/audio state.
 - `/blocks/today` loads day events and calls `build_blocks`.
 - `/timeline/day` loads day events and calls `build_timeline_segments`.
-- Report generation loads day or week events, calls `build_day_activity`, and
-  builds an LLM input JSON.
+- Report generation loads day or week events, calls `build_blocks` and
+  `build_timeline_segments`, and builds an LLM input JSON.
 
 Important current rules:
 
@@ -707,12 +707,12 @@ Important current rules:
 
 Evidence:
 
-- `build_day_activity`: `core/recorder_core/src/activity.rs:26`.
-- Event split: `core/recorder_core/src/activity.rs:108`.
-- Browser app/domain resolution: `core/recorder_core/src/activity.rs:193`.
-- Idle gap split: `core/recorder_core/src/activity.rs:258`.
-- Timeline derivation: `core/recorder_core/src/activity.rs:328`.
-- Background audio attachment: `core/recorder_core/src/activity.rs:506`.
+- Browser executable detection: `core/recorder_core/src/main.rs:6288`.
+- Block derivation: `core/recorder_core/src/main.rs:6350`.
+- Block focus/audio split: `core/recorder_core/src/main.rs:6366`.
+- Timeline derivation: `core/recorder_core/src/main.rs:6590`.
+- Timeline focus/audio split: `core/recorder_core/src/main.rs:6609`.
+- Background audio attachment: `core/recorder_core/src/main.rs:6772`.
 
 LocalTrace decision:
 
@@ -747,6 +747,44 @@ LocalTrace decision:
 - LocalTrace v1 Web UI should be settings/privacy/health only.
 - Analysis views should first live in the skill.
 
+### 7. Review, Reports, TODOs, And Planner
+
+These are not raw capture, but they currently share the same Core and UI
+surface:
+
+- Block review notes are stored in `block_reviews`, keyed by derived block ID.
+  Fields include `doing`, `output`, `next`, `tags_json`, skip state, and
+  `updated_at`.
+- `/blocks/today`, `/blocks/due`, exports, and reports derive blocks from raw
+  events, then attach any matching `block_reviews`.
+- Report generation loads raw events for a day or week, derives blocks and
+  timeline segments, reads privacy rules and `report_todos`, builds an
+  `input_json`, calls the configured report provider, then stores the result in
+  `reports`.
+- Report TODOs are stored independently in `report_todos`; they are not derived
+  from raw capture events.
+- The planner UI is a task/calendar view over `report_todos`, not a capture
+  source or capture-derived artifact.
+
+Evidence:
+
+- `block_reviews` schema: `core/recorder_core/src/main.rs:5122`.
+- Block review write path: `core/recorder_core/src/main.rs:2497`.
+- Review attachment to derived blocks:
+  `core/recorder_core/src/main.rs:6950`.
+- `report_todos` APIs: `core/recorder_core/src/main.rs:1801`.
+- `report_todos` schema: `core/recorder_core/src/main.rs:5208`.
+- Daily report generation: `core/recorder_core/src/main.rs:4184`.
+- Weekly report generation: `core/recorder_core/src/main.rs:4659`.
+- Planner/TODO UI: `ui_flutter/template/lib/screens/reports_screen.dart:3346`.
+
+LocalTrace decision:
+
+- Do not carry review notes, report generation, report storage, report TODOs, or
+  planner into LocalTrace v1 capture.
+- Recreate any useful day-summary/report behavior later as skill-side analysis
+  over LocalTrace raw events.
+
 ## Keep, Delete, Defer, Transform
 
 | Area | Decision | Reason |
@@ -766,11 +804,11 @@ LocalTrace decision:
 | `tracking_state` pause/resume | Keep or simplify | Useful operational control. |
 | Flutter desktop client | Delete from v1 | User does not want foreground app/window. |
 | WinUI prototype | Delete | Not main path and in-memory only. |
-| Planner | Delete | Edge feature, not capture. |
-| Report TODOs | Delete | Edge feature, not capture. |
+| Planner | Delete | Task/calendar surface, not capture. |
+| Report TODOs | Delete | CRUD task data, not derived capture. |
 | LLM reports | Delete | Adds cloud/API-key concerns. |
 | Report scheduler | Delete | Edge feature and not local capture. |
-| Block reviews | Delete from v1 | Review workflow is not core capture. |
+| Block reviews / review notes | Delete from v1 | Review workflow is not core capture. |
 | Review reminders/toasts | Delete from v1 | Notification workflow, not capture. |
 | Markdown/CSV exports | Defer | Can be skill-side or later tool. |
 | Web display | Defer | Optional, reuse IA later. |
@@ -811,7 +849,7 @@ Mitigation:
 
 ### 2. Current activity algorithm is valuable but coupled
 
-`activity.rs` contains useful logic:
+`core/recorder_core/src/main.rs` contains useful derived activity logic:
 
 - Focus/audio separation.
 - Browser executable to domain resolution.
@@ -955,7 +993,8 @@ Good candidates:
 
 Copy with caution:
 
-- `activity.rs` algorithms, but into skill scripts first.
+- Current `build_blocks` and `build_timeline_segments` algorithms, but into
+  skill scripts first.
 - Desktop agent startup ideas, but not the visible UI ownership model.
 - Settings UI concepts, but as local Web settings later.
 
@@ -996,7 +1035,9 @@ Privacy defaults:
 
 This baseline matches `localtrace/docs/LOCALTRACE_SPEC.md`.
 
-## Review Checklist
+## Human Review Checklist
+
+These items are intentionally left unchecked for human review.
 
 - [ ] Component roles are accurate.
 - [ ] Windows capture signals are complete.
