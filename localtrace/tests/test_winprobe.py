@@ -70,6 +70,7 @@ def test_probe_state_gates_idle_and_emits_on_change_or_heartbeat() -> None:
     terminal = ForegroundApp(pid=11, title="Terminal", exe_path=r"C:\Terminal.exe")
 
     assert state.next_event(code, idle_seconds=0, observed_at=observed_at) is not None
+    state.mark_sent(code, observed_at=observed_at)
     assert (
         state.next_event(
             code,
@@ -86,6 +87,7 @@ def test_probe_state_gates_idle_and_emits_on_change_or_heartbeat() -> None:
         )
         is not None
     )
+    state.mark_sent(code, observed_at=observed_at + timedelta(seconds=60))
     assert (
         state.next_event(
             terminal,
@@ -94,6 +96,7 @@ def test_probe_state_gates_idle_and_emits_on_change_or_heartbeat() -> None:
         )
         is not None
     )
+    state.mark_sent(terminal, observed_at=observed_at + timedelta(seconds=61))
     assert (
         state.next_event(
             terminal,
@@ -109,6 +112,34 @@ def test_probe_state_gates_idle_and_emits_on_change_or_heartbeat() -> None:
             observed_at=observed_at + timedelta(seconds=63),
         )
         is not None
+    )
+
+
+def test_probe_state_retries_until_post_is_marked_sent() -> None:
+    state = ProbeState(ProbeSettings(heartbeat_seconds=60, idle_cutoff_seconds=300))
+    observed_at = datetime(2026, 7, 1, 10, 30, tzinfo=UTC)
+    code = ForegroundApp(pid=10, title="Code", exe_path=r"C:\Code.exe")
+
+    first = state.next_event(code, idle_seconds=0, observed_at=observed_at)
+    retry = state.next_event(
+        code,
+        idle_seconds=0,
+        observed_at=observed_at + timedelta(seconds=1),
+    )
+
+    assert first is not None
+    assert retry is not None
+    assert first["seq"] == retry["seq"] == 1
+
+    state.mark_sent(code, observed_at=observed_at + timedelta(seconds=1))
+
+    assert (
+        state.next_event(
+            code,
+            idle_seconds=0,
+            observed_at=observed_at + timedelta(seconds=2),
+        )
+        is None
     )
 
 

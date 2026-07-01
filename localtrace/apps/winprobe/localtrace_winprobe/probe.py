@@ -79,15 +79,17 @@ class ProbeState:
         if self._last_key == key and not due_heartbeat:
             return None
 
-        self._seq += 1
-        self._last_key = key
-        self._last_sent_at = observed_at
         return build_app_active_event(
             foreground,
             observed_at=observed_at,
             settings=self._settings,
-            seq=self._seq,
+            seq=self._seq + 1,
         )
+
+    def mark_sent(self, foreground: ForegroundApp, *, observed_at: datetime) -> None:
+        self._seq += 1
+        self._last_key = self._key_for(foreground)
+        self._last_sent_at = observed_at
 
     def _key_for(self, foreground: ForegroundApp) -> tuple[str, int, str]:
         title_key = foreground.title if self._settings.store_titles else ""
@@ -166,8 +168,12 @@ def run_probe(settings: ProbeSettings, reader: ActivityReader) -> None:
             idle_seconds=idle_seconds,
             observed_at=observed_at,
         )
-        if event is not None:
-            _post_with_logging(settings, event)
+        if (
+            event is not None
+            and foreground is not None
+            and _post_with_logging(settings, event)
+        ):
+            state.mark_sent(foreground, observed_at=observed_at)
         time.sleep(settings.poll_ms / 1000)
 
 
@@ -181,7 +187,7 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
-def _post_with_logging(settings: ProbeSettings, event: dict[str, Any]) -> None:
+def _post_with_logging(settings: ProbeSettings, event: dict[str, Any]) -> bool:
     try:
         result = post_event(settings.endpoint, event)
     except OSError as exc:
@@ -191,7 +197,7 @@ def _post_with_logging(settings: ProbeSettings, event: dict[str, Any]) -> None:
             event["entity"],
             exc,
         )
-        return
+        return False
 
     if 200 <= result.status < 300:
         LOGGER.info(
@@ -200,6 +206,7 @@ def _post_with_logging(settings: ProbeSettings, event: dict[str, Any]) -> None:
             event["entity"],
             result.status,
         )
+        return True
     else:
         LOGGER.warning(
             "post failed kind=%s entity=%s status=%s body=%s",
@@ -208,6 +215,7 @@ def _post_with_logging(settings: ProbeSettings, event: dict[str, Any]) -> None:
             result.status,
             result.body,
         )
+        return False
 
 
 def _parse_args(argv: list[str] | None) -> argparse.Namespace:
