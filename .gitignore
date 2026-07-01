@@ -11,6 +11,7 @@ windows/**/obj/
 
 # Node
 node_modules/
+localtrace/node_modules/
 
 # Local data
 data/
@@ -20,6 +21,7 @@ target/
 
 # Dist / packaging
 dist/
+localtrace/site/
 
 # Flutter (when generated)
 ui_flutter/**/.dart_tool/

@@ -39,6 +39,47 @@ P0-012 Set up PR agent review workflow
 
 P0 documentation issues may be completed before implementation approval. P0 infrastructure implementation issues require explicit human approval.
 
+## Approved P0 Infrastructure Issue
+
+### P0-INFRA-001 Enable LocalTrace Docs And Lint Infrastructure
+
+Goal:
+
+- Enable local docs preview.
+- Enable strict docs build.
+- Enable Markdown lint.
+- Enable pre-commit checks.
+- Enable GitHub Actions CI for LocalTrace docs.
+
+Scope:
+
+- Add MkDocs config for `localtrace/docs`.
+- Add Markdown lint config.
+- Add local dev dependency files.
+- Add pre-commit config.
+- Add GitHub Actions workflow for docs and lint.
+
+Non-goals:
+
+- No LocalTrace runtime code.
+- No Python application skeleton.
+- No release packaging.
+- No PR agent review workflow.
+- No Task Master repository files.
+
+Spec links:
+
+- `localtrace/docs/INFRASTRUCTURE.md`
+- `localtrace/docs/WORKFLOW.md`
+- `localtrace/docs/ISSUES.md`
+
+Acceptance:
+
+- `mkdocs build --strict -f localtrace/mkdocs.yml` passes.
+- `npx markdownlint-cli2 --config localtrace/.markdownlint-cli2.yaml "localtrace/**/*.md"` passes.
+- `pre-commit run --all-files` passes.
+- GitHub Actions workflow runs on push and pull request.
+
 ## Tracking Issue Template
 
 ```markdown
@@ -67,7 +108,7 @@ Phase can close only after human review of results.
 
 ## Small Issue Template
 
-```markdown
+````markdown
 # Pn-XXX Short Title
 
 ## Scope
@@ -91,7 +132,7 @@ Commands expected:
 ## Review Gate
 
 No implementation until human approval.
-```
+````
 
 ## Required Fields
 

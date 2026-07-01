@@ -1,0 +1,42 @@
+name: LocalTrace CI
+
+on:
+  push:
+    paths:
+      - "localtrace/**"
+      - ".pre-commit-config.yaml"
+      - ".github/workflows/localtrace-ci.yml"
+  pull_request:
+    paths:
+      - "localtrace/**"
+      - ".pre-commit-config.yaml"
+      - ".github/workflows/localtrace-ci.yml"
+
+jobs:
+  docs-and-lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Python deps
+        run: pip install -r localtrace/requirements-dev.txt
+
+      - name: Install Node deps
+        working-directory: localtrace
+        run: npm install
+
+      - name: Markdown lint
+        working-directory: localtrace
+        run: npm run lint:md
+
+      - name: Build docs
+        run: mkdocs build --strict -f localtrace/mkdocs.yml

@@ -1,0 +1,15 @@
+site_name: LocalTrace Docs
+docs_dir: docs
+site_dir: site
+
+theme:
+  name: material
+
+nav:
+  - WorkTrace Current System: WORKTRACE_CURRENT_SYSTEM.md
+  - LocalTrace Spec: LOCALTRACE_SPEC.md
+  - Architecture: ARCHITECTURE.md
+  - Event Schema: EVENT_SCHEMA.md
+  - Workflow: WORKFLOW.md
+  - Infrastructure: INFRASTRUCTURE.md
+  - Issues: ISSUES.md
