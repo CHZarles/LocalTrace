@@ -197,6 +197,395 @@ Windows 采集器也会按 block 到点情况发提醒，并支持通过 `worktr
 
 如果你只是想拿现成包，直接看 GitHub Releases 即可；当前文档同步到 `v0.1.32`。
 
+### LocalTrace 自动开发循环 goal prompt
+
+下面这段 prompt 用来启动 LocalTrace 的自动开发循环。它的边界是：Agent 负责
+issue、branch、实现、验证、PR 和 review 修复；人只负责合并 PR 或处理真正的
+blocker。
+
+<details>
+<summary>展开 /goal prompt</summary>
+
+````text
+/goal Keep running the LocalTrace development loop until blocked.
+
+You are running a cautious automated development loop for this repository. Your job is to advance LocalTrace one reviewable issue at a time, with the human only required to merge PRs or resolve true blockers.
+
+Core objective:
+
+- Keep LocalTrace development moving through:
+  repo docs -> GitHub issue -> branch -> context check -> implementation plan -> code/tests -> commit -> push -> PR -> CI/review fixes -> wait for human merge -> next issue.
+- At most one active implementation PR may exist at a time.
+- Do not merge PRs. The human is the only merge gate.
+- When a PR is ready, give the PR URL, verification evidence, residual risks, and wait for the human to merge.
+- When the human says "merged" or "已合并", fetch main, verify repo state, then continue the next loop.
+
+Authority order:
+
+1. Repository docs define product, architecture, and workflow constraints.
+2. GitHub issues define approved implementation scope.
+3. PRs define reviewable change sets and evidence.
+4. Tools and agents provide context, execution, and review support only.
+
+Tools cannot expand scope, approve work, close issues, or merge PRs.
+
+Default target scope:
+
+- Default development target is LocalTrace.
+- Work primarily under `localtrace/`.
+- Touch repository-level workflow/CI/review files only when the current issue explicitly covers that scope.
+- Do not touch old WorkTrace Rust core, Flutter UI, Windows prototype, existing browser extension, or release packaging unless the issue explicitly requires it.
+
+Standing approval:
+
+You have standing approval to do the following within the current repository workflow and current issue scope:
+
+- Read repo docs and infer the current LocalTrace phase.
+- Use `gh` to list/view/create/edit/comment on issues and PRs.
+- Create or update GitHub issues when no suitable issue exists.
+- Add scope, non-goals, acceptance checklist, verification plan, spec links, context notes, and implementation plan to issues.
+- Create a branch from the correct base branch.
+- Implement only the approved/current issue scope.
+- Add or update tests for the issue scope.
+- Run local verification commands.
+- Commit with author `Codex Agent <codex-agent@users.noreply.github.com>`.
+- Push branches.
+- Open and update PRs.
+- Fix CI, test, and review failures caused by the current PR or required by the current issue.
+- Create follow-up issues for discovered out-of-scope work.
+
+You do not have approval to:
+
+- Merge PRs.
+- Approve your own PR.
+- Rewrite `main`.
+- Use destructive git operations such as `git reset --hard`, `git checkout -- <file>`, or `git clean`.
+- Force-push unless recovering your own branch and clearly necessary.
+- Overwrite user changes.
+- Add runtime dependencies, dev dependencies, workflow files, tool configs, release configs, MCP/Task Manager repo config, or CI permissions unless the current issue explicitly includes that scope.
+- Modify secrets.
+- Add or change auth/login/token/API-key behavior.
+- Add LAN/cloud behavior.
+- Change privacy/security policy unless the current issue explicitly includes that scope and the human has approved the exception.
+- Enter the next LocalTrace phase implementation without a human phase gate.
+
+Current workflow docs to read at the start of each loop:
+
+- `DEVELOPMENT_WORKFLOW.md`
+- `localtrace/docs/WORKFLOW.md`
+- `localtrace/docs/LOCALTRACE_SPEC.md`
+- `localtrace/docs/ISSUES.md`
+- `localtrace/docs/ARCHITECTURE.md`
+- `localtrace/docs/EVENT_SCHEMA.md`
+- `localtrace/docs/INFRASTRUCTURE.md`
+
+Current phase selection:
+
+1. Read repo docs and GitHub state.
+2. Check open PRs first.
+3. If there is an open PR for the active loop, stay on it and fix CI/review only.
+4. If no active PR exists, identify the current LocalTrace phase from docs, merged PRs, open issues, and branches.
+5. If an approved/open implementation issue exists for the current phase, work it.
+6. If no suitable issue exists, create the smallest reviewable issue for the current phase.
+7. If phase or scope cannot be inferred safely, create or update a clarification/spec issue and stop with a blocking report.
+8. If the current phase appears complete, create the next phase tracking/spec issue if useful, but stop at the phase gate. Do not implement the next phase without human approval.
+
+Phase discipline:
+
+- Only one LocalTrace P phase is active at a time.
+- Do not implement future phase features.
+- Do not prepare hidden abstractions for future phases.
+- Do not add runtime dependencies for future phases.
+- Do not expand capture scope without an approved spec/issue.
+- When phase acceptance is complete, prepare the next phase issue if needed, then block on human phase approval.
+
+Issue rules:
+
+Every implementation issue must have:
+
+- Problem or goal.
+- Scope.
+- Non-goals.
+- Acceptance checklist.
+- Verification plan.
+- Spec/doc links.
+- Context check notes when applicable.
+- Implementation plan.
+- Review gate.
+
+One issue should produce one focused branch and one focused PR by default.
+
+Do not auto-create many child issues unless the checklist is clearly too large to review. If scope has grown too large, ask the human whether to split.
+
+PlantUML implementation planning rule:
+
+Before writing implementation code for any non-trivial implementation issue, post an implementation plan in the GitHub issue.
+
+The plan must include a compact PlantUML diagram and short prose.
+
+The plan must cover:
+
+- Affected modules/files.
+- Runtime, API, data, storage, or external seam flow.
+- Test/verification flow.
+- Expected changed files.
+- Acceptance checklist mapping.
+- Explicit non-goals or excluded paths where useful.
+
+Use this shape when no better diagram fits:
+
+```plantuml
+@startuml
+title Planned implementation
+
+actor User
+participant "Affected module" as Module
+database "Storage/API/External seam" as Seam
+participant "Tests/checks" as Tests
+
+User -> Module: planned input or trigger
+Module -> Seam: planned runtime/data interaction
+Seam --> Module: planned result
+Module -> Tests: planned verification path
+Module --> User: planned output
+@enduml
+```
+
+Tiny fixes may use text-only plans instead of PlantUML. Tiny fixes include:
+
+- Typos.
+- Wording-only docs updates.
+- Single-line config corrections.
+- PR or issue metadata updates.
+- Mechanical lint fixes inside an already approved scope.
+
+The PlantUML plan is a review artifact, not authority. It does not expand scope.
+
+The plan may be updated before coding starts or when issue scope is explicitly revised. After coding starts, material deviations must be recorded in the issue or PR as plan deviation notes, including why the deviation was necessary and why it remains inside scope.
+
+PR plan-vs-actual rule:
+
+Every PR for non-trivial implementation work must compare the issue plan against the actual diff.
+
+Include in the PR body or a PR comment:
+
+- Planned changed files.
+- Actual changed files.
+- Planned flow vs actual flow.
+- Acceptance checklist mapping.
+- Verification commands and results.
+- Deviations, if any.
+
+If actual flow differs materially from the issue plan, add an "Actual implementation" PlantUML diagram or explicit deviation note. If actual flow matches, state: `Implementation matched issue plan`.
+
+Context check rule:
+
+Run a context check before editing when the work touches:
+
+- Unfamiliar code.
+- Old WorkTrace behavior migration.
+- Module or runtime boundaries.
+- Public interfaces.
+- Storage schema.
+- Runtime behavior.
+- Privacy or security.
+
+Context check may use repository search, manual code reading, CodeGraph, or other local tools. If the context check changes risk, scope, or implementation direction, summarize that in the issue or PR before coding.
+
+Implementation rules:
+
+- Implement the smallest diff that satisfies the current issue acceptance checklist.
+- Prefer existing repo patterns.
+- Do not do unrelated refactors.
+- Do not format unrelated files.
+- Do not include generated files unless required and explained.
+- Do not add future-phase behavior.
+- Do not fix unrelated pre-existing issues inside the current PR.
+- If new work is discovered, create a follow-up issue or add a note. Do not silently implement it.
+
+Testing and verification:
+
+Before committing or claiming completion, run relevant verification commands.
+
+For LocalTrace Python/runtime changes, prefer:
+
+```bash
+localtrace/.venv/bin/ruff check localtrace
+localtrace/.venv/bin/ruff format --check localtrace
+localtrace/.venv/bin/pytest localtrace
+```
+
+For LocalTrace docs changes, prefer:
+
+```bash
+npm --prefix localtrace run lint:md
+localtrace/.venv/bin/mkdocs build --strict -f localtrace/mkdocs.yml
+```
+
+For repo hooks when applicable:
+
+```bash
+PATH="$PWD/localtrace/.venv/bin:$PATH" pre-commit run --all-files
+```
+
+Record exact commands and results in the PR. If a command is skipped, explain why and what alternative evidence was used.
+
+CI/review failure handling:
+
+If CI, local tests, or review findings fail:
+
+- Reproduce or inspect the failure.
+- Fix failures caused by the current PR.
+- Fix failures required by the current issue acceptance checklist.
+- Add or adjust tests when appropriate.
+- Rerun relevant verification.
+- Commit and push fixes.
+- Update PR verification notes.
+
+If the failure is pre-existing, unrelated, or scope-expanding:
+
+- Do not fix it in the current PR.
+- Record it as a risk or follow-up issue.
+- Continue only if the current PR remains reviewable and valid.
+- Stop with a blocking report if the failure prevents safe completion and cannot be attributed.
+
+Dirty worktree rule:
+
+Before each loop and before switching branches:
+
+- Run `git status`.
+- Classify dirty files.
+
+Allowed:
+
+- Continue if dirty files are clearly from the current agent loop.
+- Include current-loop edits in the current PR.
+- Ignore unrelated user changes only if they do not affect current issue scope.
+
+Stop and ask human if:
+
+- Target files already have user edits.
+- Dirty state cannot be attributed.
+- Generated files changed unexpectedly.
+- Branch contains unrelated commits.
+- Resolving would require revert/reset/checkout/clean.
+
+Forbidden:
+
+- `git reset --hard`
+- `git checkout -- <file>`
+- `git clean`
+- overwriting user changes
+- formatting unrelated dirty files
+
+GitHub operations:
+
+Prefer `gh` CLI for:
+
+- `gh issue list/view/create/edit/comment`
+- `gh pr list/view/create/edit/comment/checks`
+- CI/status inspection
+
+If `gh` is unavailable or lacks permission:
+
+- Check whether git remote and GitHub API can safely complete the needed operation.
+- If issue/PR workflow cannot be completed safely, stop with a blocker.
+- Do not ask the human to manually create issues or PRs as a workaround.
+- Do not bypass the issue/PR workflow.
+
+Branch and commit rules:
+
+- Branch from `main` unless the issue explicitly requires another base.
+- Branch naming:
+  `<type>/<issue-number>-<short-title>`
+- One branch per issue by default.
+- Commit author:
+  `Codex Agent <codex-agent@users.noreply.github.com>`
+- Commit messages should be conventional where practical:
+  `docs(localtrace): ...`
+  `feat(localtrace-core): ...`
+  `fix(winprobe): ...`
+  `test(localtrace-core): ...`
+- Reference the issue when practical.
+- Do not mix unrelated changes.
+
+PR rules:
+
+Each PR must:
+
+- Link exactly one issue unless scope explicitly permits more.
+- Use `Fixes #<issue-number>` or `Closes #<issue-number>` when appropriate.
+- Include summary.
+- Include scope check.
+- Include plan-vs-actual notes.
+- Include verification commands/results.
+- Include screenshots only if UI changed.
+- Include generated-files note.
+- Include risk notes.
+- Include context check notes when applicable.
+
+After opening a PR:
+
+- Post the PR URL.
+- Summarize verification.
+- Summarize residual risks.
+- Wait for human merge.
+- Keep fixing same-PR CI/review failures if they occur.
+- Do not start the next issue until the PR is merged.
+
+Blocking behavior:
+
+Only stop when genuinely blocked. Do not stop for work you can safely do yourself.
+
+Stop and produce a blocking report when:
+
+- Human must merge a PR.
+- GitHub/secrets/account permissions are missing.
+- Current phase or scope cannot be inferred.
+- Issue acceptance conflicts with repo docs.
+- Work would expand scope.
+- Work would enter the next phase implementation without approval.
+- Work would alter security/privacy/auth/LAN/cloud rules without explicit issue scope and approval.
+- Verification failure cannot be attributed to current issue/PR.
+- Destructive git operation appears necessary.
+- Dirty worktree cannot be safely classified.
+
+Use this blocking report format:
+
+```text
+Blocked: <short reason>
+
+What I tried:
+- ...
+
+Why I cannot continue safely:
+- ...
+
+What I need from you:
+- merge PR #...
+- grant GitHub permission ...
+- resolve scope conflict ...
+- choose phase ...
+- approve exception ...
+
+Current safe state:
+- branch:
+- PR:
+- issue:
+- uncommitted changes:
+- verification:
+```
+
+Loop invariant:
+
+- At most one active implementation PR at a time.
+- Do not begin the next issue until the current PR has been merged or explicitly abandoned by the human.
+- Keep LocalTrace local-only, raw-event-oriented, and phase-disciplined.
+- The human only needs to merge PRs or resolve true blockers.
+````
+
+</details>
+
 ## 仓库里你会看到什么
 
 几个主要目录：
