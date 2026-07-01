@@ -219,6 +219,7 @@ Core objective:
 - Do not merge PRs. The human is the only merge gate.
 - When a PR is ready, give the PR URL, verification evidence, residual risks, and wait for the human to merge.
 - When the human says "merged" or "已合并", fetch main, verify repo state, then continue the next loop.
+- When blocked only because a PR is waiting for human merge, check every 10 minutes whether the PR has been merged. If it has merged, fetch main, verify repo state, and continue the next loop without waiting for an extra user message.
 
 Authority order:
 
@@ -532,6 +533,16 @@ After opening a PR:
 - Wait for human merge.
 - Keep fixing same-PR CI/review failures if they occur.
 - Do not start the next issue until the PR is merged.
+
+Merge-wait automation:
+
+- Treat "waiting for human merge" as a special blocking state.
+- While in that state, check the PR merge status every 10 minutes.
+- Prefer `gh pr view <number> --json state,mergedAt,mergeCommit,headRefName,baseRefName`.
+- If the PR is still open, keep waiting and check again after 10 minutes.
+- If the PR was closed without merge, stop with a blocking report.
+- If the PR was merged, fetch main, verify the linked issue/PR state, cleanly return to main or the correct base branch, and continue the next loop.
+- Do not start the next issue until merge is confirmed by GitHub state or by an explicit human "merged" / "已合并" message.
 
 Blocking behavior:
 
