@@ -328,7 +328,7 @@ def test_browser_executables_are_excluded_from_app_audio() -> None:
     assert is_browser_exe("spotify.exe") is False
 
 
-def test_audio_candidates_skip_unknown_paths_without_poll_failure(
+def test_audio_candidates_fall_back_to_pid_when_paths_are_unknown(
     monkeypatch,
     caplog,
 ) -> None:
@@ -339,7 +339,7 @@ def test_audio_candidates_skip_unknown_paths_without_poll_failure(
     monkeypatch.setattr(reader, "_process_exe_path", lambda pid: paths[pid])
     caplog.set_level(logging.DEBUG, logger="localtrace_winprobe")
 
-    assert reader._audio_candidates([10]) == []
+    assert reader._audio_candidates([10]) == [AudioApp(pid=10, exe_path=None)]
     assert "executable path could not be resolved" in caplog.text
 
 

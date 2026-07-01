@@ -839,6 +839,7 @@ class WindowsActivityReader:
 
     def _audio_candidates(self, pids: list[int]) -> list[AudioApp]:
         candidates: list[AudioApp] = []
+        unresolved_pids: list[int] = []
         for pid in pids:
             exe_path = self._process_exe_path(pid)
             if exe_path is None:
@@ -847,11 +848,14 @@ class WindowsActivityReader:
                     "resolved",
                     pid,
                 )
+                unresolved_pids.append(pid)
                 continue
             app_name = _process_name(pid, exe_path)
             if _is_excluded_audio_exe(app_name):
                 continue
             candidates.append(AudioApp(pid=pid, exe_path=exe_path))
+        if not candidates:
+            return [AudioApp(pid=pid, exe_path=None) for pid in unresolved_pids]
         return candidates
 
     def _select_audio_app(
