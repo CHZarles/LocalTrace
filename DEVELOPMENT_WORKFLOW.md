@@ -234,6 +234,8 @@ Branch 需要做到：
 - 从当前 main 分支切出。
 - 一个 branch 绑定一个 issue。
 - commit message 在合适时引用 issue。
+- 不使用长期聚合分支连续承载多个阶段。
+- 当前 issue merge 后，下一项工作从 main 新切 branch。
 
 Commit 示例：
 
@@ -266,6 +268,54 @@ Code 完成标准：
 - 改动文件符合 issue scope。
 - 文档反映新的行为或流程。
 - 测试或验证覆盖了改动行为。
+
+## 小步开发规则
+
+默认节奏：
+
+```text
+one approved issue -> one branch -> focused commits
+-> one PR -> review -> merge -> next issue
+```
+
+硬规则：
+
+- 一个 PR 只解决一个清晰目标。
+- 一个 branch 默认只绑定一个 issue。
+- 不把后续阶段连续堆到同一个长期分支。
+- 不把无关 docs、CI、infra、runtime 行为混进同一个 PR。
+- 合并当前 PR 后，再从 main 切下一个 issue 的 branch。
+- Review Agent 只在 PR 创建后运行；它不能作为开发前置批准。
+- Task Manager 只在协调复杂度需要时使用；普通小 issue 不用。
+- CodeGraph 或 context check 在动陌生代码、API、schema、runtime、privacy
+  或 security 前使用。
+- 需要 Python 环境时，在仓库本地创建，例如 `localtrace/.venv`。
+- 本地 Python 环境不提交到 git。
+- Codex 写的 commit 使用 `Codex Agent` git author，不使用人类开发者姓名。
+- GitHub PR author 由创建 PR 的 GitHub 登录态决定，不由 commit author 决定。
+- 如果 Codex 使用人类 GitHub 登录态创建 PR，该人类会成为 PR author。
+- PR author 不能 approve 自己的 PR。
+- 如果仓库有独立 reviewer，人工 approval 必须来自非 PR author 的 reviewer。
+- 如果 solo repo 没有独立 reviewer，PR author 不能点 GitHub Approve；owner
+  亲自执行 merge 视为人工 review 和 merge authorization 记录。
+
+PR 尺寸目标：
+
+- 文档 PR 目标少于 300 行 diff。
+- 普通代码 PR 目标少于 500 行 diff。
+- 超过目标时，先判断是否拆 scope，而不是继续堆代码。
+
+允许一个 phase 使用一个 issue 的前提：
+
+- checklist 仍然可 review。
+- diff 仍然集中在一个目标上。
+- 每次 PR 仍然可以独立合并。
+
+如果 phase issue 变大：
+
+- 不自动创建大量 child issues。
+- 先让人类决定是否拆成更小 issue。
+- 拆分后每个 issue 都单独走 branch、PR、review、merge。
 
 ### 4. Tests
 
@@ -373,7 +423,8 @@ Review checklist：
 - 测试覆盖改动行为。
 - CI 通过。
 - Review comments 已解决。
-- 人工 approval 已记录。
+- 非 PR author 的人工 approval 已记录；solo repo 中 owner merge 操作可以作为
+  人工 review 记录。
 
 ### 7. Merge
 
@@ -381,7 +432,8 @@ Approval 和检查通过后 merge。
 
 Merge 前确认：
 
-- PR 已获得人工 approval。
+- PR 已获得非 PR author 的人工 approval；solo repo 中 owner 准备亲自 merge
+  时可用 merge 操作本身作为 review 记录。
 - CI 通过，或 PR 写明已接受的例外。
 - PR 带 issue closure keyword。
 - 用户可见变化已经更新 release notes。

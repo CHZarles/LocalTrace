@@ -166,6 +166,58 @@ A phase may be tracked by one active issue when the work is coherent and
 reviewable. Do not create child issues unless the human explicitly asks to split
 the phase.
 
+## Small-Step Development Rule
+
+Default cadence:
+
+```text
+one approved issue -> one branch -> focused commits
+-> one PR -> review -> merge -> next issue
+```
+
+Hard rules:
+
+- One PR solves one clear target.
+- One branch is bound to one issue by default.
+- Do not keep adding later phases to a long-lived aggregate branch.
+- Do not mix unrelated docs, CI, infrastructure, and runtime behavior in one PR.
+- After a PR merges, start the next issue from `main`.
+- Review Agent runs only after a PR exists; it is not pre-implementation approval.
+- Task Manager is only used when coordination complexity justifies it.
+- CodeGraph or another context check runs before unfamiliar code, API, schema,
+  runtime, privacy, or security changes.
+- Python development environments are created inside the repository, for example
+  `localtrace/.venv`.
+- Local Python environments are never committed to git.
+- Commits written by Codex use the `Codex Agent` git author, not the human
+  developer name.
+- GitHub PR author is determined by the account that creates the PR, not by git
+  commit author.
+- If Codex creates a PR with a human GitHub login, that human is the PR author.
+- A PR author cannot approve their own PR.
+- If the repository has an independent reviewer, human approval must come from a
+  reviewer who is not the PR author.
+- In a solo repository, the PR author cannot use GitHub Approve; owner merge is
+  the human review and merge authorization record.
+
+PR size targets:
+
+- Documentation PRs should stay under 300 changed lines when practical.
+- Normal code PRs should stay under 500 changed lines when practical.
+- If a PR grows past the target, evaluate scope split before adding more code.
+
+A phase may still use one issue only when:
+
+- The checklist remains reviewable.
+- The diff remains focused on one target.
+- Each PR can still merge independently.
+
+If a phase issue becomes too large:
+
+- Do not auto-create many child issues.
+- Ask the human whether to split the scope.
+- Each split issue uses its own branch, PR, review, and merge.
+
 ## Tool Policy
 
 Development tools can reduce drift, but they do not define authority.
@@ -245,6 +297,7 @@ Not every phase has all checks at first. `INFRASTRUCTURE.md` defines when each c
 
 - [ ] Human approval is required before implementation.
 - [ ] Human approval is required after implementation.
+- [ ] PR author approval does not count; solo repo owner merge counts as review.
 - [ ] Issue is required for each change.
 - [ ] One phase at a time.
 - [ ] A coherent phase may use one active issue.

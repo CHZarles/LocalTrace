@@ -4,9 +4,12 @@ config:
   MD041: false
 
 globs:
+  - "../DEVELOPMENT_WORKFLOW.md"
   - "docs/**/*.md"
 
 ignores:
+  - ".venv/**"
+  - "localtrace/.venv/**"
   - "localtrace/node_modules/**"
   - "localtrace/site/**"
   - "node_modules/**"

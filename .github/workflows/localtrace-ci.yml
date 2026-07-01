@@ -3,11 +3,13 @@ name: LocalTrace CI
 on:
   push:
     paths:
+      - "DEVELOPMENT_WORKFLOW.md"
       - "localtrace/**"
       - ".pre-commit-config.yaml"
       - ".github/workflows/localtrace-ci.yml"
   pull_request:
     paths:
+      - "DEVELOPMENT_WORKFLOW.md"
       - "localtrace/**"
       - ".pre-commit-config.yaml"
       - ".github/workflows/localtrace-ci.yml"

@@ -3,9 +3,9 @@ repos:
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
-        files: ^(localtrace/|\.github/workflows/(localtrace-ci|pr-agent-review)\.yml|\.github/scripts/pr_agent_review\.py|\.pre-commit-config\.yaml|\.gitignore)
+        files: ^(DEVELOPMENT_WORKFLOW\.md|localtrace/|\.github/workflows/(localtrace-ci|pr-agent-review)\.yml|\.github/scripts/pr_agent_review\.py|\.pre-commit-config\.yaml|\.gitignore)
       - id: end-of-file-fixer
-        files: ^(localtrace/|\.github/workflows/(localtrace-ci|pr-agent-review)\.yml|\.github/scripts/pr_agent_review\.py|\.pre-commit-config\.yaml|\.gitignore)
+        files: ^(DEVELOPMENT_WORKFLOW\.md|localtrace/|\.github/workflows/(localtrace-ci|pr-agent-review)\.yml|\.github/scripts/pr_agent_review\.py|\.pre-commit-config\.yaml|\.gitignore)
       - id: check-yaml
         files: ^(localtrace/.*\.ya?ml|\.github/workflows/(localtrace-ci|pr-agent-review)\.yml|\.pre-commit-config\.yaml)$
       - id: check-json
@@ -19,4 +19,5 @@ repos:
         args:
           - "--config"
           - "localtrace/.markdownlint-cli2.yaml"
+          - "DEVELOPMENT_WORKFLOW.md"
           - "localtrace/**/*.md"
