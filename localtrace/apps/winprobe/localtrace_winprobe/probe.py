@@ -124,18 +124,19 @@ class ProbeState:
         if poll_failed:
             return None
 
+        if (
+            self._pending_audio_kind == "audio"
+            and self._pending_audio_app is not None
+            and self._pending_audio_seq is not None
+        ):
+            return build_app_audio_event(
+                self._pending_audio_app,
+                observed_at=observed_at,
+                settings=self._settings,
+                seq=self._pending_audio_seq,
+            )
+
         if audio is None:
-            if (
-                self._pending_audio_kind == "audio"
-                and self._pending_audio_app is not None
-                and self._pending_audio_seq is not None
-            ):
-                return build_app_audio_event(
-                    self._pending_audio_app,
-                    observed_at=observed_at,
-                    settings=self._settings,
-                    seq=self._pending_audio_seq,
-                )
             if self._last_audio is None:
                 self._clear_pending_audio()
                 return None

@@ -476,6 +476,29 @@ def test_failed_initial_audio_post_retries_even_if_app_disappears() -> None:
     assert retry_audio["seq"] == first_audio["seq"]
 
 
+def test_pending_audio_retry_wins_over_new_active_app() -> None:
+    state = ProbeState(ProbeSettings(heartbeat_seconds=60))
+    observed_at = datetime(2026, 7, 1, 10, 30, tzinfo=UTC)
+    spotify = AudioApp(pid=20, exe_path=r"C:\Spotify.exe")
+    music = AudioApp(pid=21, exe_path=r"C:\QQMusic.exe")
+
+    first_audio = state.next_audio_event(
+        spotify,
+        poll_failed=False,
+        observed_at=observed_at,
+    )
+    retry_audio = state.next_audio_event(
+        music,
+        poll_failed=False,
+        observed_at=observed_at + timedelta(seconds=1),
+    )
+
+    assert first_audio is not None
+    assert retry_audio is not None
+    assert retry_audio["entity"] == "Spotify.exe"
+    assert retry_audio["seq"] == first_audio["seq"]
+
+
 def test_pending_audio_retry_marks_original_app_after_success() -> None:
     state = ProbeState(ProbeSettings(heartbeat_seconds=60))
     observed_at = datetime(2026, 7, 1, 10, 30, tzinfo=UTC)
