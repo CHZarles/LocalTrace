@@ -105,6 +105,16 @@ def load_config(path: Path, data_dir: Path | None = None) -> LocalTraceConfig:
     return config
 
 
+def load_or_create_config(
+    path: Path, data_dir: Path | None = None
+) -> LocalTraceConfig:
+    exists = path.exists()
+    config = load_config(path, data_dir=data_dir)
+    if not exists:
+        save_config(config, path)
+    return config
+
+
 def save_config(config: LocalTraceConfig, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     data = {

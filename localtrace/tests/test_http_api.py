@@ -1,3 +1,4 @@
+import sqlite3
 from pathlib import Path
 
 from localtrace_core.app import LocalTraceService, create_http_server
@@ -9,6 +10,19 @@ def make_service(tmp_path: Path) -> LocalTraceService:
     config = default_config(data_dir=tmp_path)
     initialize_database(config.db_path)
     return LocalTraceService(config)
+
+
+def add_privacy_rule(
+    service: LocalTraceService, entity_type: str, pattern: str, action: str
+) -> None:
+    with sqlite3.connect(service.config.db_path) as conn:
+        conn.execute(
+            """
+            INSERT INTO privacy_rules (entity_type, pattern, action, created_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (entity_type, pattern, action, "2026-07-01T10:00:00.000Z"),
+        )
 
 
 def test_health_reports_local_service_status(tmp_path: Path) -> None:
@@ -120,6 +134,99 @@ def test_post_events_rejects_disallowed_event_kind(tmp_path: Path) -> None:
     assert body["ok"] is False
     assert "kind" in body["error"]
     assert service.get_events({})[1]["events"] == []
+
+
+def test_post_events_rejects_non_utc_observed_at(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+
+    status, body = service.post_events(
+        {
+            "observed_at": "2026-07-01T18:30:00.000+08:00",
+            "source": "windows_probe",
+            "kind": "app_active",
+            "entity_type": "app",
+            "entity": "Code.exe",
+            "payload": {},
+        }
+    )
+
+    assert status == 400
+    assert body["ok"] is False
+    assert "UTC" in body["error"]
+    assert service.get_events({})[1]["events"] == []
+
+
+def test_post_events_normalizes_utc_offset_observed_at(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+
+    status, _body = service.post_events(
+        {
+            "observed_at": "2026-07-01T10:30:00+00:00",
+            "source": "windows_probe",
+            "kind": "app_active",
+            "entity_type": "app",
+            "entity": "Code.exe",
+            "payload": {},
+        }
+    )
+
+    assert status == 201
+    assert service.get_events({})[1]["events"][0]["observed_at"] == (
+        "2026-07-01T10:30:00.000Z"
+    )
+
+
+def test_post_events_applies_drop_privacy_rule_to_domain_subdomains(
+    tmp_path: Path,
+) -> None:
+    service = make_service(tmp_path)
+    add_privacy_rule(service, "domain", "github.com", "drop")
+
+    status, body = service.post_events(
+        {
+            "observed_at": "2026-07-01T10:30:00.000Z",
+            "source": "browser_extension",
+            "kind": "tab_active",
+            "entity_type": "domain",
+            "entity": "private.github.com",
+            "title": "Sensitive repository",
+            "payload": {"activity": "focus"},
+        }
+    )
+
+    assert status == 202
+    assert body == {"ok": True, "stored": False}
+    assert service.get_events({})[1]["events"] == []
+
+
+def test_post_events_applies_mask_privacy_rule(tmp_path: Path) -> None:
+    config = default_config(data_dir=tmp_path)
+    config.capture.store_titles = True
+    config.capture.store_exe_path = True
+    initialize_database(config.db_path)
+    service = LocalTraceService(config)
+    add_privacy_rule(service, "app", "Code.exe", "mask")
+
+    status, _body = service.post_events(
+        {
+            "observed_at": "2026-07-01T10:30:00.000Z",
+            "source": "windows_probe",
+            "kind": "app_active",
+            "entity_type": "app",
+            "entity": "Code.exe",
+            "title": "Sensitive project title",
+            "payload": {
+                "activity": "focus",
+                "exe_path": "C:/Users/charles/AppData/Local/Programs/Code.exe",
+            },
+        }
+    )
+
+    assert status == 201
+    event = service.get_events({})[1]["events"][0]
+    assert event["entity"] == "__hidden__"
+    assert event["title"] is None
+    assert event["payload"] == {"activity": "focus"}
 
 
 def test_get_events_filters_by_time_source_kind_and_limit(tmp_path: Path) -> None:

@@ -85,6 +85,24 @@ def insert_event(db_path: Path, event: dict[str, Any]) -> int:
         return int(cursor.lastrowid)
 
 
+def list_privacy_rules(db_path: Path, entity_type: str) -> list[dict[str, str]]:
+    with sqlite3.connect(db_path) as conn:
+        rows = conn.execute(
+            """
+            SELECT entity_type, pattern, action
+            FROM privacy_rules
+            WHERE entity_type = ?
+              AND action IN ('drop', 'mask')
+            ORDER BY id ASC
+            """,
+            (entity_type,),
+        ).fetchall()
+
+    return [
+        {"entity_type": row[0], "pattern": row[1], "action": row[2]} for row in rows
+    ]
+
+
 def list_events(db_path: Path, filters: dict[str, str]) -> list[dict[str, Any]]:
     clauses: list[str] = []
     params: list[Any] = []

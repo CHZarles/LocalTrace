@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
-from .config import LOOPBACK_HOST, LocalTraceConfig, default_config, load_config
-from .storage import initialize_database, insert_event, list_events
+from .config import (
+    LOOPBACK_HOST,
+    LocalTraceConfig,
+    default_config,
+    load_or_create_config,
+)
+from .storage import initialize_database, insert_event, list_events, list_privacy_rules
 
 ALLOWED_SOURCES = {"windows_probe", "browser_extension"}
 ALLOWED_KINDS = {
@@ -20,6 +25,7 @@ ALLOWED_KINDS = {
 ALLOWED_ENTITY_TYPES = {"app", "domain", "system"}
 EXE_PATH_FIELDS = {"exe_path", "exePath"}
 ALWAYS_FILTERED_PAYLOAD_FIELDS = {"url", "full_url", "path"}
+MASKED_PAYLOAD_FIELDS = ALWAYS_FILTERED_PAYLOAD_FIELDS | EXE_PATH_FIELDS | {"title"}
 
 
 class LocalTraceService:
@@ -47,6 +53,10 @@ class LocalTraceService:
         except ValueError as exc:
             return 400, {"ok": False, "error": str(exc)}
 
+        event = self._apply_privacy_rules(event)
+        if event is None:
+            return 202, {"ok": True, "stored": False}
+
         event_id = insert_event(self.config.db_path, event)
         return 201, {"ok": True, "id": event_id}
 
@@ -57,8 +67,9 @@ class LocalTraceService:
         if not isinstance(payload, dict):
             raise ValueError("event payload must be an object")
 
-        observed_at = _required_str(payload, "observed_at")
-        _parse_rfc3339_utc(observed_at, "observed_at")
+        observed_at = _parse_rfc3339_utc(
+            _required_str(payload, "observed_at"), "observed_at"
+        )
 
         source = _required_str(payload, "source")
         if source not in ALLOWED_SOURCES:
@@ -89,6 +100,18 @@ class LocalTraceService:
             "payload": _stored_payload(raw_payload, self.config),
         }
 
+    def _apply_privacy_rules(
+        self, event: dict[str, Any]
+    ) -> dict[str, Any] | None:
+        action = _privacy_action(
+            list_privacy_rules(self.config.db_path, event["entity_type"]), event
+        )
+        if action == "drop":
+            return None
+        if action == "mask":
+            return _masked_event(event)
+        return event
+
 
 def create_http_server(
     config: LocalTraceConfig, service: LocalTraceService
@@ -98,7 +121,8 @@ def create_http_server(
 
 
 def main() -> None:
-    config = load_config(default_config().data_dir / "config.json")
+    config_path = default_config().data_dir / "config.json"
+    config = load_or_create_config(config_path)
     initialize_database(config.db_path)
     server = create_http_server(config, LocalTraceService(config))
     try:
@@ -191,11 +215,58 @@ def _stored_payload(
     return stored
 
 
-def _parse_rfc3339_utc(value: str, field: str) -> datetime:
+def _privacy_action(rules: list[dict[str, str]], event: dict[str, Any]) -> str | None:
+    matched_action = None
+    for rule in rules:
+        if not _rule_matches(rule, event):
+            continue
+        if rule["action"] == "drop":
+            return "drop"
+        if rule["action"] == "mask":
+            matched_action = "mask"
+    return matched_action
+
+
+def _rule_matches(rule: dict[str, str], event: dict[str, Any]) -> bool:
+    entity_type = str(event["entity_type"])
+    entity = str(event["entity"])
+    pattern = rule["pattern"]
+
+    if rule["entity_type"] != entity_type:
+        return False
+    if entity_type == "domain":
+        return _domain_matches(entity, pattern)
+    return entity.casefold() == pattern.casefold()
+
+
+def _domain_matches(entity: str, pattern: str) -> bool:
+    entity_value = entity.casefold().rstrip(".")
+    pattern_value = pattern.casefold().rstrip(".")
+    return entity_value == pattern_value or entity_value.endswith(f".{pattern_value}")
+
+
+def _masked_event(event: dict[str, Any]) -> dict[str, Any]:
+    masked = dict(event)
+    masked["entity"] = "__hidden__"
+    masked["title"] = None
+    masked["payload"] = {
+        key: value
+        for key, value in event["payload"].items()
+        if key not in MASKED_PAYLOAD_FIELDS
+    }
+    return masked
+
+
+def _parse_rfc3339_utc(value: str, field: str) -> str:
     try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError as exc:
-        raise ValueError(f"{field} must be RFC3339") from exc
+        raise ValueError(f"{field} must be RFC3339 UTC") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() != timedelta(0):
+        raise ValueError(f"{field} must be RFC3339 UTC")
+    return parsed.astimezone(UTC).isoformat(timespec="milliseconds").replace(
+        "+00:00", "Z"
+    )
 
 
 def _now_rfc3339_utc() -> str:
