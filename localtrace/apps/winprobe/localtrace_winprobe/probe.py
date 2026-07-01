@@ -436,6 +436,7 @@ class WindowsActivityReader:
     def __init__(self) -> None:
         if sys.platform != "win32":
             raise RuntimeError("WindowsActivityReader requires Windows")
+        self._last_audio_candidate_keys: tuple[tuple[str, int], ...] | None = None
 
     def idle_seconds(self) -> int:
         import ctypes
@@ -712,13 +713,9 @@ class WindowsActivityReader:
                     active_pids.append(int(pid.value))
 
             candidates = self._audio_candidates(sorted(set(active_pids)))
-            if not candidates:
-                return None
-            if preferred_pid is not None:
-                for candidate in candidates:
-                    if candidate.pid == preferred_pid:
-                        return candidate
-            return min(candidates, key=lambda candidate: candidate.pid)
+            selected = self._select_audio_app(candidates, preferred_pid)
+            self._last_audio_candidate_keys = self._audio_candidate_keys(candidates)
+            return selected
         finally:
             for pointer in control2s:
                 release(pointer)
@@ -759,8 +756,44 @@ class WindowsActivityReader:
         candidates: list[AudioApp] = []
         for pid in pids:
             exe_path = self._process_exe_path(pid)
+            if exe_path is None:
+                continue
             app_name = _process_name(pid, exe_path)
             if _is_excluded_audio_exe(app_name):
                 continue
             candidates.append(AudioApp(pid=pid, exe_path=exe_path))
         return candidates
+
+    def _select_audio_app(
+        self,
+        candidates: list[AudioApp],
+        preferred_pid: int | None,
+    ) -> AudioApp | None:
+        if not candidates:
+            return None
+
+        candidate_keys = self._audio_candidate_keys(candidates)
+        previous_keys = self._last_audio_candidate_keys
+        if previous_keys is not None and previous_keys != candidate_keys:
+            previous_key_set = set(previous_keys)
+            for candidate in candidates:
+                if self._audio_candidate_key(candidate) not in previous_key_set:
+                    return candidate
+
+        if preferred_pid is not None:
+            for candidate in candidates:
+                if candidate.pid == preferred_pid:
+                    return candidate
+
+        return min(candidates, key=lambda candidate: candidate.pid)
+
+    def _audio_candidate_keys(
+        self,
+        candidates: list[AudioApp],
+    ) -> tuple[tuple[str, int], ...]:
+        return tuple(
+            sorted(self._audio_candidate_key(candidate) for candidate in candidates)
+        )
+
+    def _audio_candidate_key(self, candidate: AudioApp) -> tuple[str, int]:
+        return (_audio_app_name(candidate), candidate.pid)
