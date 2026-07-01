@@ -32,7 +32,19 @@ jobs:
 
       - name: Install Node deps
         working-directory: localtrace
-        run: npm install
+        run: npm ci
+
+      - name: Python lint
+        working-directory: localtrace
+        run: ruff check .
+
+      - name: Python format check
+        working-directory: localtrace
+        run: ruff format --check .
+
+      - name: Python tests
+        working-directory: localtrace
+        run: pytest
 
       - name: Markdown lint
         working-directory: localtrace

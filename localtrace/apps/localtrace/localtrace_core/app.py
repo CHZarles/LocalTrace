@@ -111,9 +111,7 @@ class LocalTraceService:
             "payload": _stored_payload(raw_payload, self.config),
         }
 
-    def _apply_privacy_rules(
-        self, event: dict[str, Any]
-    ) -> dict[str, Any] | None:
+    def _apply_privacy_rules(self, event: dict[str, Any]) -> dict[str, Any] | None:
         action = _privacy_action(
             list_privacy_rules(self.config.db_path, event["entity_type"]), event
         )
@@ -287,8 +285,8 @@ def _parse_rfc3339_utc(value: str, field: str) -> str:
         raise ValueError(f"{field} must be RFC3339 UTC") from exc
     if parsed.tzinfo is None or parsed.utcoffset() != timedelta(0):
         raise ValueError(f"{field} must be RFC3339 UTC")
-    return parsed.astimezone(UTC).isoformat(timespec="milliseconds").replace(
-        "+00:00", "Z"
+    return (
+        parsed.astimezone(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
     )
 
 
