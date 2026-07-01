@@ -311,16 +311,21 @@ Not runtime:
 
 Use:
 
-- After P0 spec approval, parse the approved docs into candidate tasks.
-- Break each approved P phase into small task candidates.
-- Surface dependency order and likely implementation sequence.
-- Help choose the next task candidate.
-- Keep a working task board for the agent if useful.
+- When work has multiple parallel tracks.
+- When multiple agents need coordination.
+- When sequencing is unclear.
+- When a checklist has become too large for one issue.
+- To keep a working task board for the agent if useful.
 
 Task rules:
 
 - Task Master output is not the official work ledger.
-- Every accepted Task Master task must be mirrored into a GitHub issue.
+- Task Master is optional, not a required step for every issue.
+- A coherent phase may stay in one GitHub issue.
+- Do not create GitHub child issues from Task Master output unless the human
+  explicitly asks to split the work.
+- An accepted Task Master task becomes actionable only when it is represented by
+  an approved GitHub issue.
 - GitHub issue scope, non-goals, acceptance checklist, and spec links override
   Task Master text.
 - `task-master next` may suggest work, but the agent must select only a
@@ -334,13 +339,16 @@ Forbidden:
 - Expanding scope because Task Master generated extra subtasks.
 - Treating Task Master dependency order as human approval.
 - Letting Task Master bypass the one-phase-at-a-time rule.
+- Auto-generating child GitHub issues from a phase issue without explicit human
+  request.
 
 Configuration review:
 
 - Repo-local Task Master files are reviewed before adoption.
 - MCP/editor Task Master configuration is reviewed before use.
 - AI provider credentials, if any, stay outside LocalTrace runtime files.
-- Generated task lists are reviewed by the human before being copied to issues.
+- Generated task lists are reviewed by the human before they update an issue,
+  task board, or implementation plan.
 
 Not runtime:
 
@@ -416,17 +424,17 @@ Use this sequence for normal development after P0 spec approval:
 2. MkDocs serves the docs for human review.
 3. Markdown lint keeps docs reviewable.
 4. Codebase Memory records accepted decisions after the human approves them.
-5. Task Master converts approved docs into candidate task breakdowns.
-6. The human reviews generated tasks.
-7. Approved tasks are mirrored into GitHub issues.
-8. A single GitHub issue is selected for implementation.
-9. The agent queries Codebase Memory and reads the linked docs before editing.
-10. The agent implements only the approved issue scope.
-11. Ruff, pytest, markdownlint, and pre-commit run locally when applicable.
-12. GitHub Actions repeats checks on PR.
-13. The PR review agent comments with findings only.
-14. The human reviews the diff, configuration, and command results.
-15. GitHub issue status is updated after human approval.
+5. A single approved GitHub issue defines the active implementation scope.
+6. Task Master may track status when coordination overhead justifies it.
+7. A context check runs before implementation when the work touches unfamiliar
+   code, migration behavior, module boundaries, public interfaces, storage,
+   runtime behavior, privacy, or security.
+8. The agent implements only the approved issue scope.
+9. Ruff, pytest, markdownlint, and pre-commit run locally when applicable.
+10. GitHub Actions repeats checks on PR.
+11. The PR review agent comments with findings only after a PR exists.
+12. The human reviews the diff, configuration, and command results.
+13. GitHub issue status is updated after human approval.
 
 Ownership summary:
 
@@ -439,7 +447,7 @@ Ownership summary:
 - PR agent review: extra review comments, no authority.
 - GitHub issues: official work ledger.
 - Codebase Memory: searchable agent context.
-- Task Master AI: task breakdown assistant.
+- Task Master AI: optional coordination/status assistant.
 - Playwright: Web UI verification after P4.
 - Firecrawl: external research assistant.
 - Context7: current library documentation lookup.
@@ -455,6 +463,7 @@ Ownership summary:
 - [ ] Distribution is P6 implementation, not P0 implementation.
 - [ ] Development process tools are not runtime dependencies.
 - [ ] Codebase Memory is agent context only, not source of truth.
-- [ ] Task Master tasks must be mirrored to GitHub issues.
+- [ ] Task Master is optional, not mandatory for every issue.
+- [ ] Task Master cannot create child issues without explicit human request.
 - [ ] Infrastructure config files require human review before adoption.
 - [ ] Tool coordination workflow is explicit.

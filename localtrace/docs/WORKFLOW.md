@@ -160,26 +160,63 @@ Forbidden:
 
 No issue, no implementation.
 
-Every implementation PR or commit must reference a small issue. The issue must be under a phase tracking issue.
+Every implementation PR or commit must reference an approved GitHub issue.
 
-## Tool-Assisted Workflow
+A phase may be tracked by one active issue when the work is coherent and
+reviewable. Do not create child issues unless the human explicitly asks to split
+the phase.
 
-Development tools can reduce drift, but they do not change authority.
+## Tool Policy
 
-Required order:
+Development tools can reduce drift, but they do not define authority.
 
-1. Human-approved docs define the phase.
-2. Task Master may generate candidate tasks from approved docs.
-3. Human reviews task candidates.
-4. Approved task candidates are copied into GitHub issues.
-5. GitHub issues become the official work ledger.
-6. Codebase Memory is queried before implementation to recover relevant
-   decisions and constraints.
-7. Implementation follows exactly one approved GitHub issue.
-8. Pre-commit and local checks run when applicable.
-9. GitHub Actions repeats checks on PR.
-10. PR agent review comments on risks, but does not approve.
-11. Human reviews the diff, configuration, and command results.
+Source of truth:
+
+- Repository docs define accepted product and architecture decisions.
+- GitHub issues define approved implementation scope.
+- Pull requests define reviewable change sets.
+- Human review defines approval.
+
+Tool output cannot expand scope, approve work, close issues, or merge PRs.
+
+### Task Manager
+
+Task Manager is optional.
+
+Use it when work has multiple parallel tracks, multiple agents, unclear
+sequencing, or a checklist that has become too large for one issue.
+
+Do not use Task Manager as a mandatory step for every issue.
+
+Task Manager must not:
+
+- Replace GitHub issues.
+- Create GitHub child issues unless explicitly requested.
+- Expand scope beyond the approved issue.
+- Close GitHub issues.
+- Override human review.
+
+### Context Check
+
+A context check is required before implementation when work touches unfamiliar
+code, migrates behavior from old code, crosses module boundaries, or may affect
+public interfaces, storage schema, runtime behavior, privacy, or security.
+
+The context check may use CodeGraph, repository search, docs, or manual code
+reading.
+
+If the context check changes risk, scope, or implementation direction, summarize
+it in the issue or PR.
+
+### Review Agent
+
+Review Agent runs after a PR exists and has a reviewable diff.
+
+Review Agent is advisory only. It may produce findings and questions, but it
+cannot approve, merge, close issues, or override human review.
+
+If automated Review Agent is not configured, manual agent review may be used.
+Human review remains required.
 
 Forbidden shortcuts:
 
@@ -210,10 +247,12 @@ Not every phase has all checks at first. `INFRASTRUCTURE.md` defines when each c
 - [ ] Human approval is required after implementation.
 - [ ] Issue is required for each change.
 - [ ] One phase at a time.
+- [ ] A coherent phase may use one active issue.
 - [ ] Agent review cannot replace human review.
 - [ ] CI green cannot replace human review.
 - [ ] No auth rule is explicit.
 - [ ] Local HTTP JSON seam rule is explicit.
 - [ ] Task Master cannot replace GitHub issues.
+- [ ] Task Master is optional, not mandatory for every issue.
 - [ ] Codebase Memory cannot replace repository docs.
 - [ ] Infrastructure configuration requires human review.

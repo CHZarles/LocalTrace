@@ -216,24 +216,35 @@ Agent review cannot close issues. Only the human can accept completion.
 
 ## Task Master Relationship
 
-Task Master AI may generate task candidates, dependency order, and next-task
-suggestions. It is not the official project ledger.
+Task Master AI is optional. It may generate task candidates, dependency order,
+and next-task suggestions when the work has multiple parallel tracks, multiple
+agents, unclear sequencing, or a checklist that has become too large for one
+issue.
+
+It is not the official project ledger.
 
 Rules:
 
-- A Task Master task becomes actionable only after it is copied into a GitHub
-  issue.
-- The GitHub issue must use the normal small issue template.
-- The GitHub issue must link the relevant spec sections.
-- The GitHub issue must list non-goals even if Task Master did not.
+- Do not use Task Master as a mandatory step for every issue.
+- A coherent phase may stay in one GitHub issue.
+- Do not create GitHub child issues from Task Master output unless the human
+  explicitly asks to split the work.
+- A Task Master task becomes actionable only when it is represented by an
+  approved GitHub issue.
+- The GitHub issue must link the relevant spec sections when implementation
+  depends on a spec.
+- The GitHub issue must list non-goals when scope control matters.
 - The GitHub issue acceptance checklist overrides Task Master text.
 - Task Master status may mirror GitHub issue status, not the other way around.
 
 Forbidden:
 
-- Starting implementation from a Task Master task without a GitHub issue.
+- Starting implementation from a Task Master task without an approved GitHub
+  issue.
 - Closing a GitHub issue because Task Master says the task is done.
 - Adding Task Master-generated extra scope without human issue review.
+- Auto-generating child issues from a phase issue without explicit human
+  request.
 
 ## Done Definition
 
@@ -255,5 +266,7 @@ An implementation issue is done only when:
 - [ ] Issues define non-goals.
 - [ ] Human approval is required to close implementation issues.
 - [ ] Agent review cannot replace human review.
-- [ ] Task Master tasks must be mirrored into GitHub issues.
+- [ ] A coherent phase may use one GitHub issue.
+- [ ] Task Master is optional.
+- [ ] Task Master cannot create child issues without explicit human request.
 - [ ] GitHub issue status is authoritative.
