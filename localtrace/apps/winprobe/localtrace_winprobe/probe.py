@@ -491,7 +491,10 @@ def _audio_payload(audio: AudioApp, settings: ProbeSettings) -> dict[str, Any]:
 def is_browser_exe(exe_name: str) -> bool:
     return exe_name.lower() in {
         "chrome.exe",
+        "chrome_proxy.exe",
+        "chromium.exe",
         "msedge.exe",
+        "msedgewebview2.exe",
         "brave.exe",
         "vivaldi.exe",
         "opera.exe",
@@ -836,7 +839,6 @@ class WindowsActivityReader:
 
     def _audio_candidates(self, pids: list[int]) -> list[AudioApp]:
         candidates: list[AudioApp] = []
-        unresolved_path = False
         for pid in pids:
             exe_path = self._process_exe_path(pid)
             if exe_path is None:
@@ -845,14 +847,11 @@ class WindowsActivityReader:
                     "resolved",
                     pid,
                 )
-                unresolved_path = True
                 continue
             app_name = _process_name(pid, exe_path)
             if _is_excluded_audio_exe(app_name):
                 continue
             candidates.append(AudioApp(pid=pid, exe_path=exe_path))
-        if unresolved_path and not candidates:
-            raise OSError("audio executable path could not be resolved")
         return candidates
 
     def _select_audio_app(

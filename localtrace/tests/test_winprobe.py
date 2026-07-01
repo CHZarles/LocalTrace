@@ -321,12 +321,14 @@ def test_probe_state_retries_audio_until_post_is_marked_sent() -> None:
 
 def test_browser_executables_are_excluded_from_app_audio() -> None:
     assert is_browser_exe("chrome.exe") is True
+    assert is_browser_exe("chrome_proxy.exe") is True
     assert is_browser_exe("msedge.exe") is True
+    assert is_browser_exe("msedgewebview2.exe") is True
     assert is_browser_exe("firefox.exe") is True
     assert is_browser_exe("spotify.exe") is False
 
 
-def test_audio_candidates_treat_only_unknown_paths_as_poll_failure(
+def test_audio_candidates_skip_unknown_paths_without_poll_failure(
     monkeypatch,
     caplog,
 ) -> None:
@@ -337,8 +339,7 @@ def test_audio_candidates_treat_only_unknown_paths_as_poll_failure(
     monkeypatch.setattr(reader, "_process_exe_path", lambda pid: paths[pid])
     caplog.set_level(logging.DEBUG, logger="localtrace_winprobe")
 
-    with pytest.raises(OSError, match="executable path could not be resolved"):
-        reader._audio_candidates([10])
+    assert reader._audio_candidates([10]) == []
     assert "executable path could not be resolved" in caplog.text
 
 
