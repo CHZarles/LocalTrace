@@ -151,6 +151,7 @@ Issue 需要写清楚：
 - 本次 issue 的边界是什么。
 - Acceptance checklist。
 - Verification plan。
+- Implementation plan，适用于 non-trivial implementation issue。
 - 相关 docs、spec、设计或历史决策链接。
 - Context check notes，适用于需要影响分析的改动。
 - Task Manager link 或 task ID，适用于被 Task Manager 跟踪的 issue。
@@ -193,6 +194,30 @@ Expected commands:
 ...
 ```
 
+## Implementation Plan
+
+Required for non-trivial implementation issues before coding starts.
+
+```plantuml
+@startuml
+title Planned implementation
+
+actor User
+participant "Affected module" as Module
+database "Storage/API/External seam" as Seam
+
+User -> Module: planned input
+Module -> Seam: planned interaction
+Seam --> Module: planned result
+Module --> User: planned output
+@enduml
+```
+
+- Expected changed files:
+- Acceptance mapping:
+- Explicit non-goals:
+- Verification flow:
+
 ## References
 
 - Spec:
@@ -208,6 +233,7 @@ Implementation starts after human approval.
 
 - Issue 有明确 acceptance checklist。
 - Issue 有 verification plan。
+- Non-trivial implementation issue 已经在 issue 中保存 PlantUML implementation plan。
 - 人工已经批准开始实现。
 
 ### 2. Branch
@@ -251,8 +277,26 @@ feat(reports): add export settings panel
 
 1. 读 issue 和关联文档。
 2. 如果触发 context check 条件，先完成影响分析。
-3. 找到满足 acceptance checklist 的最小文件集合。
-4. 如果该 issue 在 Task Manager 里跟踪，把状态改到 `In Progress`。
+3. 对 non-trivial implementation issue，在 issue 中写入 PlantUML implementation plan。
+4. 找到满足 acceptance checklist 的最小文件集合。
+5. 如果该 issue 在 Task Manager 里跟踪，把状态改到 `In Progress`。
+
+PlantUML implementation plan 用来记录 agent 的实现意图，方便 review 时对比
+planned flow 和 actual diff。它需要覆盖：
+
+- 受影响模块或文件。
+- runtime、API、data、storage 或外部 seam 的预期流向。
+- 测试或验证流向。
+- 预期改动文件。
+- acceptance checklist 对应关系。
+- 明确排除的 non-goals。
+
+PlantUML plan 只对 non-trivial implementation issue 强制要求。Tiny fixes
+可以使用文本计划替代，例如 typo、文案、单行配置修正、PR/issue 元数据更新，
+或当前 scope 内的机械 lint 修复。
+
+Plan 可以在编码前更新。编码开始后，如果实际实现路线发生实质偏离，必须把
+deviation notes 写入 issue 或 PR，并确认偏离仍在 issue scope 内。
 
 编辑过程中需要做：
 
@@ -261,6 +305,7 @@ feat(reports): add export settings panel
 - 行为、命令或流程变化时同步文档。
 - 按风险级别补测试或验证。
 - 发现新增工作时，先更新 issue 或创建 follow-up issue，再实现新增范围。
+- 如果实际实现偏离 issue 中的 PlantUML plan，记录偏移原因和 scope 判断。
 
 Code 完成标准：
 
@@ -361,6 +406,7 @@ PR 需要包含：
 - 关联一个 issue；范围更大时需要人工提前批准。
 - 使用 `Fixes #<issue-number>` 或 `Closes #<issue-number>` 关闭对应 issue。
 - 改动摘要。
+- Planned implementation 和 actual diff 的对比。
 - 验证命令和结果。
 - UI 改动截图。
 - 生成文件变化说明。
@@ -384,6 +430,14 @@ Fixes #...
 - Changed areas:
 - CodeGraph impact notes:
 
+## Plan vs Actual
+
+- Planned changed files:
+- Actual changed files:
+- Planned flow vs actual flow:
+- Deviations:
+- Acceptance mapping:
+
 ## Verification
 
 - [ ] `command` - result
@@ -400,6 +454,8 @@ Screenshots or visual notes:
 进入 review 前确认：
 
 - PR 描述说明改了什么、怎么验证。
+- PR 对比了 issue plan 和 actual diff。
+- 如果实际流程实质偏离计划，PR 已补充 actual implementation PlantUML 或 deviation notes。
 - CI 已启动或已完成。
 - Reviewer 能从 diff 对回 issue acceptance checklist。
 
@@ -419,6 +475,7 @@ Review 顺序：
 Review checklist：
 
 - Diff 符合 issue scope。
+- Diff 与 issue implementation plan 一致，或偏移已经解释且仍在 scope 内。
 - Acceptance checklist 已完成。
 - 测试覆盖改动行为。
 - CI 通过。
@@ -462,6 +519,7 @@ short issue -> small branch -> focused diff -> relevant test
 - Scope。
 - Acceptance。
 - Verification。
+- Text-only implementation plan，除非它实际属于 non-trivial implementation。
 
 ## 文档改动
 
@@ -503,9 +561,13 @@ Read the linked docs and acceptance checklist first.
 Run context check before editing when the work touches unfamiliar code,
 migrates old behavior, crosses module boundaries, or may affect public
 interfaces, storage, runtime behavior, privacy, or security.
+For non-trivial implementation issues, post a PlantUML implementation plan in
+the issue before coding starts. Keep the plan small and map it to acceptance
+criteria and expected changed files.
 Implement only this issue scope.
 Run the relevant verification commands.
-Prepare a PR summary with changed files, tests, risks, and Fixes #<number>.
+Prepare a PR summary with changed files, plan-vs-actual notes, tests, risks,
+and Fixes #<number>.
 Update Task Manager state only if this issue is tracked there.
 ```
 
@@ -514,6 +576,8 @@ Update Task Manager state only if this issue is tracked there.
 一项改动完成时必须满足：
 
 - Linked issue scope 已实现。
+- Non-trivial implementation issue 有 pre-code PlantUML plan。
+- PR 已记录 planned implementation 与 actual diff 的对比。
 - Acceptance checklist 已完成。
 - Local verification 已运行。
 - CI 已通过，或 PR 记录了已接受的例外。

@@ -129,6 +129,29 @@ Commands expected:
 ...
 ```
 
+## Implementation Plan
+
+Required for non-trivial implementation issues before coding starts.
+Tiny fixes may use a short text plan.
+
+```plantuml
+@startuml
+title Planned implementation
+
+component "Changed module or file" as Module
+database "Storage/API seam" as Seam
+component "Tests or checks" as Tests
+
+Module -> Seam: planned runtime/data interaction
+Module -> Tests: planned verification
+@enduml
+```
+
+- Expected changed files:
+- Acceptance mapping:
+- Explicit non-goals:
+- Verification flow:
+
 ## Review Gate
 
 No implementation until human approval.
@@ -143,6 +166,7 @@ Every small issue must have:
 - Acceptance checklist.
 - Spec links.
 - Verification plan.
+- Implementation plan for non-trivial implementation work.
 - Review gate.
 
 ## PR Rules
@@ -151,6 +175,8 @@ Every PR must:
 
 - Link exactly one small issue unless explicitly approved.
 - Include changed files.
+- Compare planned implementation against actual changed files and flow.
+- Include plan deviation notes when actual flow differs materially.
 - Include verification commands and results.
 - Include screenshots only if UI changed.
 - Include agent review output if configured.
@@ -212,6 +238,21 @@ status:approved
 
 Agent-generated plans must be posted or summarized in the relevant issue before implementation.
 
+For non-trivial implementation issues, the plan must include a compact PlantUML
+diagram. The diagram should show affected modules or files, runtime/API/data
+flow, verification flow, expected changed files, acceptance checklist mapping,
+and explicit non-goals where useful.
+
+PlantUML plans are review artifacts. They do not expand scope and do not
+override the issue, spec, workflow, or human review gates. The agent may update
+the plan before coding starts or when issue scope is explicitly revised. After
+coding starts, material differences from the plan must be recorded as plan
+deviation notes in the issue or PR.
+
+Tiny fixes may use a text-only plan instead of PlantUML. Examples include typo
+fixes, wording-only documentation edits, single-line config corrections, issue
+or PR metadata updates, and mechanical lint fixes inside an approved scope.
+
 Agent review cannot close issues. Only the human can accept completion.
 
 ## Task Master Relationship
@@ -253,6 +294,9 @@ An implementation issue is done only when:
 - Scope is implemented.
 - Non-goals were not implemented.
 - Acceptance checklist is complete.
+- Non-trivial implementation work had a pre-code PlantUML plan.
+- The PR compared planned implementation against the actual diff.
+- Plan deviations, if any, were recorded and stayed inside scope.
 - Verification commands ran.
 - CI is green, once CI exists.
 - PR agent review ran, once configured.
