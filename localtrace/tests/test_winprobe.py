@@ -1,4 +1,5 @@
 import json
+import logging
 import threading
 from datetime import UTC, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -327,6 +328,7 @@ def test_browser_executables_are_excluded_from_app_audio() -> None:
 
 def test_audio_candidates_exclude_browser_audiodg_and_unknown_paths(
     monkeypatch,
+    caplog,
 ) -> None:
     reader = object.__new__(WindowsActivityReader)
     paths = {
@@ -336,20 +338,22 @@ def test_audio_candidates_exclude_browser_audiodg_and_unknown_paths(
         13: None,
     }
     monkeypatch.setattr(reader, "_process_exe_path", lambda pid: paths[pid])
+    caplog.set_level(logging.DEBUG, logger="localtrace_winprobe")
 
     assert reader._audio_candidates([10, 11, 12, 13]) == [
         AudioApp(pid=12, exe_path=r"C:\Program Files\Spotify\Spotify.exe")
     ]
+    assert "executable path could not be resolved" in caplog.text
 
 
-def test_audio_selection_prefers_new_candidate_then_stays_stable() -> None:
+def test_audio_selection_keeps_preferred_candidate_when_set_grows() -> None:
     reader = object.__new__(WindowsActivityReader)
     spotify = AudioApp(pid=20, exe_path=r"C:\Spotify.exe")
     music = AudioApp(pid=21, exe_path=r"C:\QQMusic.exe")
 
     reader._last_audio_candidate_keys = reader._audio_candidate_keys([spotify])
 
-    assert reader._select_audio_app([spotify, music], preferred_pid=20) == music
+    assert reader._select_audio_app([spotify, music], preferred_pid=20) == spotify
 
     reader._last_audio_candidate_keys = reader._audio_candidate_keys([spotify, music])
 
