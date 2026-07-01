@@ -326,22 +326,37 @@ def test_browser_executables_are_excluded_from_app_audio() -> None:
     assert is_browser_exe("spotify.exe") is False
 
 
-def test_audio_candidates_treat_unknown_paths_as_poll_failure(
+def test_audio_candidates_treat_only_unknown_paths_as_poll_failure(
     monkeypatch,
     caplog,
 ) -> None:
     reader = object.__new__(WindowsActivityReader)
     paths = {
-        10: r"C:\Program Files\Google\Chrome\Application\chrome.exe",
-        11: r"C:\Windows\System32\audiodg.exe",
-        12: r"C:\Program Files\Spotify\Spotify.exe",
-        13: None,
+        10: None,
     }
     monkeypatch.setattr(reader, "_process_exe_path", lambda pid: paths[pid])
     caplog.set_level(logging.DEBUG, logger="localtrace_winprobe")
 
     with pytest.raises(OSError, match="executable path could not be resolved"):
-        reader._audio_candidates([10, 11, 12, 13])
+        reader._audio_candidates([10])
+    assert "executable path could not be resolved" in caplog.text
+
+
+def test_audio_candidates_keep_known_apps_when_other_paths_are_unknown(
+    monkeypatch,
+    caplog,
+) -> None:
+    reader = object.__new__(WindowsActivityReader)
+    paths = {
+        10: r"C:\Program Files\Spotify\Spotify.exe",
+        11: None,
+    }
+    monkeypatch.setattr(reader, "_process_exe_path", lambda pid: paths[pid])
+    caplog.set_level(logging.DEBUG, logger="localtrace_winprobe")
+
+    assert reader._audio_candidates([10, 11]) == [
+        AudioApp(pid=10, exe_path=r"C:\Program Files\Spotify\Spotify.exe")
+    ]
     assert "executable path could not be resolved" in caplog.text
 
 
@@ -390,6 +405,7 @@ def test_audio_retry_seq_stays_stable_across_foreground_posts() -> None:
         observed_at=observed_at + timedelta(seconds=1),
     )
     assert foreground is not None
+    assert foreground["seq"] == 2
     state.mark_sent(code, observed_at=observed_at + timedelta(seconds=1))
     retry_audio = state.next_audio_event(
         spotify,

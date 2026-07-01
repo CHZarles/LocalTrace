@@ -65,8 +65,11 @@ class ProbeState:
         self._last_foreground_sent_at: datetime | None = None
         self._last_audio: AudioApp | None = None
         self._last_audio_sent_at: datetime | None = None
-        self._foreground_seq = 0
-        self._audio_seq = 0
+        self._seq = 0
+        self._pending_foreground_key: tuple[str, int, str] | None = None
+        self._pending_foreground_seq: int | None = None
+        self._pending_audio_key: tuple[str, tuple[str, int] | None] | None = None
+        self._pending_audio_seq: int | None = None
 
     @property
     def preferred_audio_pid(self) -> int | None:
@@ -81,8 +84,10 @@ class ProbeState:
     ) -> dict[str, Any] | None:
         if idle_seconds >= self._settings.idle_cutoff_seconds:
             self._last_foreground_key = None
+            self._clear_pending_foreground()
             return None
         if foreground is None or foreground.pid == 0:
+            self._clear_pending_foreground()
             return None
 
         key = self._key_for(foreground)
@@ -94,15 +99,16 @@ class ProbeState:
         if self._last_foreground_key == key and not due_heartbeat:
             return None
 
+        seq = self._seq_for_foreground(key)
         return build_app_active_event(
             foreground,
             observed_at=observed_at,
             settings=self._settings,
-            seq=self._foreground_seq + 1,
+            seq=seq,
         )
 
     def mark_sent(self, foreground: ForegroundApp, *, observed_at: datetime) -> None:
-        self._foreground_seq += 1
+        self._clear_pending_foreground()
         self._last_foreground_key = self._key_for(foreground)
         self._last_foreground_sent_at = observed_at
 
@@ -118,12 +124,18 @@ class ProbeState:
 
         if audio is None:
             if self._last_audio is None:
+                self._clear_pending_audio()
                 return None
+            pending_key: tuple[str, tuple[str, int] | None] = (
+                "stop",
+                self._audio_key_for(self._last_audio),
+            )
+            seq = self._seq_for_audio(pending_key)
             return build_app_audio_stop_event(
                 self._last_audio,
                 observed_at=observed_at,
                 settings=self._settings,
-                seq=self._audio_seq + 1,
+                seq=seq,
             )
 
         key = self._audio_key_for(audio)
@@ -138,11 +150,12 @@ class ProbeState:
         if last_key == key and not due_heartbeat:
             return None
 
+        seq = self._seq_for_audio(("audio", key))
         return build_app_audio_event(
             audio,
             observed_at=observed_at,
             settings=self._settings,
-            seq=self._audio_seq + 1,
+            seq=seq,
         )
 
     def mark_audio_sent(
@@ -151,7 +164,7 @@ class ProbeState:
         *,
         observed_at: datetime,
     ) -> None:
-        self._audio_seq += 1
+        self._clear_pending_audio()
         self._last_audio = audio
         self._last_audio_sent_at = observed_at
 
@@ -161,6 +174,37 @@ class ProbeState:
 
     def _audio_key_for(self, audio: AudioApp) -> tuple[str, int]:
         return (_audio_app_name(audio), audio.pid)
+
+    def _seq_for_foreground(self, key: tuple[str, int, str]) -> int:
+        if (
+            self._pending_foreground_key == key
+            and self._pending_foreground_seq is not None
+        ):
+            return self._pending_foreground_seq
+        seq = self._reserve_seq()
+        self._pending_foreground_key = key
+        self._pending_foreground_seq = seq
+        return seq
+
+    def _seq_for_audio(self, key: tuple[str, tuple[str, int] | None]) -> int:
+        if self._pending_audio_key == key and self._pending_audio_seq is not None:
+            return self._pending_audio_seq
+        seq = self._reserve_seq()
+        self._pending_audio_key = key
+        self._pending_audio_seq = seq
+        return seq
+
+    def _reserve_seq(self) -> int:
+        self._seq += 1
+        return self._seq
+
+    def _clear_pending_foreground(self) -> None:
+        self._pending_foreground_key = None
+        self._pending_foreground_seq = None
+
+    def _clear_pending_audio(self) -> None:
+        self._pending_audio_key = None
+        self._pending_audio_seq = None
 
 
 def build_app_active_event(
@@ -755,6 +799,7 @@ class WindowsActivityReader:
 
     def _audio_candidates(self, pids: list[int]) -> list[AudioApp]:
         candidates: list[AudioApp] = []
+        unresolved_path = False
         for pid in pids:
             exe_path = self._process_exe_path(pid)
             if exe_path is None:
@@ -763,11 +808,14 @@ class WindowsActivityReader:
                     "resolved",
                     pid,
                 )
-                raise OSError("audio executable path could not be resolved")
+                unresolved_path = True
+                continue
             app_name = _process_name(pid, exe_path)
             if _is_excluded_audio_exe(app_name):
                 continue
             candidates.append(AudioApp(pid=pid, exe_path=exe_path))
+        if unresolved_path and not candidates:
+            raise OSError("audio executable path could not be resolved")
         return candidates
 
     def _select_audio_app(
