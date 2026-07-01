@@ -862,17 +862,17 @@ class WindowsActivityReader:
         if not candidates:
             return None
 
-        if preferred_pid is not None:
-            for candidate in candidates:
-                if candidate.pid == preferred_pid:
-                    return candidate
-
         candidate_keys = self._audio_candidate_keys(candidates)
         previous_keys = self._last_audio_candidate_keys
         if previous_keys is not None and previous_keys != candidate_keys:
             previous_key_set = set(previous_keys)
             for candidate in candidates:
                 if self._audio_candidate_key(candidate) not in previous_key_set:
+                    return candidate
+
+        if preferred_pid is not None:
+            for candidate in candidates:
+                if candidate.pid == preferred_pid:
                     return candidate
 
         return min(candidates, key=lambda candidate: candidate.pid)

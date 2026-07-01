@@ -374,15 +374,20 @@ def test_audio_candidates_exclude_browser_and_audiodg(monkeypatch) -> None:
     ]
 
 
-def test_audio_selection_keeps_preferred_candidate_when_set_grows() -> None:
+def test_audio_selection_emits_new_candidate_when_set_grows() -> None:
     reader = object.__new__(WindowsActivityReader)
     spotify = AudioApp(pid=20, exe_path=r"C:\Spotify.exe")
     music = AudioApp(pid=21, exe_path=r"C:\QQMusic.exe")
 
     reader._last_audio_candidate_keys = reader._audio_candidate_keys([spotify])
 
-    assert reader._select_audio_app([spotify, music], preferred_pid=20) == spotify
+    assert reader._select_audio_app([spotify, music], preferred_pid=20) == music
 
+
+def test_audio_selection_keeps_preferred_candidate_when_set_is_stable() -> None:
+    reader = object.__new__(WindowsActivityReader)
+    spotify = AudioApp(pid=20, exe_path=r"C:\Spotify.exe")
+    music = AudioApp(pid=21, exe_path=r"C:\QQMusic.exe")
     reader._last_audio_candidate_keys = reader._audio_candidate_keys([spotify, music])
 
     assert reader._select_audio_app([spotify, music], preferred_pid=21) == music
