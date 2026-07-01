@@ -93,7 +93,7 @@ def list_events(db_path: Path, filters: dict[str, str]) -> list[dict[str, Any]]:
         clauses.append("observed_at >= ?")
         params.append(from_time)
     if to_time := filters.get("to"):
-        clauses.append("observed_at <= ?")
+        clauses.append("observed_at < ?")
         params.append(to_time)
     if source := filters.get("source"):
         clauses.append("source = ?")
@@ -146,9 +146,9 @@ def list_events(db_path: Path, filters: dict[str, str]) -> list[dict[str, Any]]:
 
 def _limit(raw: str | None) -> int:
     if raw is None:
-        return 500
+        return 200
     try:
         value = int(raw)
     except ValueError:
-        return 500
+        return 200
     return min(max(value, 1), 5000)

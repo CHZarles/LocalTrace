@@ -167,3 +167,53 @@ def test_get_events_filters_by_time_source_kind_and_limit(tmp_path: Path) -> Non
 
     assert status == 200
     assert [event["entity"] for event in body["events"]] == ["github.com"]
+
+
+def test_get_events_excludes_to_boundary(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    service.post_events(
+        {
+            "observed_at": "2026-07-01T10:00:00.000Z",
+            "source": "windows_probe",
+            "kind": "app_active",
+            "entity_type": "app",
+            "entity": "before.exe",
+            "payload": {},
+        }
+    )
+    service.post_events(
+        {
+            "observed_at": "2026-07-01T11:00:00.000Z",
+            "source": "windows_probe",
+            "kind": "app_active",
+            "entity_type": "app",
+            "entity": "boundary.exe",
+            "payload": {},
+        }
+    )
+
+    status, body = service.get_events({"to": "2026-07-01T11:00:00.000Z"})
+
+    assert status == 200
+    assert [event["entity"] for event in body["events"]] == ["before.exe"]
+
+
+def test_get_events_defaults_to_limit_200(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    for index in range(201):
+        service.post_events(
+            {
+                "observed_at": f"2026-07-01T10:{index // 60:02}:{index % 60:02}.000Z",
+                "source": "windows_probe",
+                "kind": "app_active",
+                "entity_type": "app",
+                "entity": f"app-{index}.exe",
+                "payload": {},
+            }
+        )
+
+    status, body = service.get_events({})
+
+    assert status == 200
+    assert len(body["events"]) == 200
+    assert body["events"][-1]["entity"] == "app-199.exe"
