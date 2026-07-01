@@ -38,6 +38,7 @@ def test_build_app_active_event_uses_core_schema_and_privacy_defaults() -> None:
         "kind": "app_active",
         "entity_type": "app",
         "entity": "Code.exe",
+        "title": None,
         "payload": {"activity": "focus", "pid": 1234},
     }
 

@@ -111,6 +111,7 @@ def build_app_active_event(
         "kind": "app_active",
         "entity_type": "app",
         "entity": _app_name(foreground),
+        "title": None,
         "payload": payload,
     }
     if seq is not None:
