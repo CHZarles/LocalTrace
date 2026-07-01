@@ -64,6 +64,7 @@ def test_post_events_validates_and_stores_raw_events(tmp_path: Path) -> None:
             "payload": {
                 "pid": 1234,
                 "activity": "focus",
+                "title": "Nested sensitive title",
                 "exe_path": "C:/Users/charles/AppData/Local/Programs/Code.exe",
             },
         }
@@ -106,6 +107,7 @@ def test_post_events_keeps_titles_and_exe_path_when_configured(tmp_path: Path) -
             "payload": {
                 "pid": 1234,
                 "activity": "focus",
+                "title": "Nested project title",
                 "exe_path": "C:/Program Files/Code/Code.exe",
             },
         }
@@ -113,6 +115,7 @@ def test_post_events_keeps_titles_and_exe_path_when_configured(tmp_path: Path) -
 
     event = service.get_events({})[1]["events"][0]
     assert event["title"] == "Project notes"
+    assert event["payload"]["title"] == "Nested project title"
     assert event["payload"]["exe_path"] == "C:/Program Files/Code/Code.exe"
 
 

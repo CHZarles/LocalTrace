@@ -25,7 +25,10 @@ ALLOWED_KINDS = {
 ALLOWED_ENTITY_TYPES = {"app", "domain", "system"}
 EXE_PATH_FIELDS = {"exe_path", "exePath"}
 ALWAYS_FILTERED_PAYLOAD_FIELDS = {"url", "full_url", "path"}
-MASKED_PAYLOAD_FIELDS = ALWAYS_FILTERED_PAYLOAD_FIELDS | EXE_PATH_FIELDS | {"title"}
+TITLE_PAYLOAD_FIELDS = {"title", "window_title", "tab_title"}
+MASKED_PAYLOAD_FIELDS = (
+    ALWAYS_FILTERED_PAYLOAD_FIELDS | EXE_PATH_FIELDS | TITLE_PAYLOAD_FIELDS
+)
 
 
 class LocalTraceService:
@@ -208,6 +211,12 @@ def _stored_payload(
     stored: dict[str, Any] = {}
     for key, value in payload.items():
         if key in ALWAYS_FILTERED_PAYLOAD_FIELDS:
+            continue
+        if (
+            key in TITLE_PAYLOAD_FIELDS
+            and not config.capture.store_titles
+            and not config.privacy.default_title_storage
+        ):
             continue
         if key in EXE_PATH_FIELDS and not config.capture.store_exe_path:
             continue
