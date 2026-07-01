@@ -242,6 +242,19 @@ Review checklist:
 - Does not add runtime dependencies outside scope.
 - Has tests where required.
 
+Repository setup:
+
+- Workflow file: `.github/workflows/pr-agent-review.yml`.
+- Script file: `.github/scripts/pr_agent_review.py`.
+- Required secret: `REVIEW_AGENT_API_KEY` or `OPENAI_API_KEY`.
+- Required secret: `REVIEW_AGENT_MODEL` or `OPENAI_MODEL`.
+- Optional secret: `REVIEW_AGENT_BASE_URL` or `OPENAI_BASE_URL`.
+
+The first implementation uses an OpenAI-compatible chat completions endpoint.
+If secrets are missing, the workflow posts a configuration comment instead of
+review findings. It still cannot approve, merge, close issues, push commits, or
+replace human review.
+
 ## Development Process Tools
 
 These tools help the human and coding agents manage the project. They are not

@@ -1,0 +1,41 @@
+name: PR Agent Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: write
+
+jobs:
+  review:
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Collect PR diff
+        shell: bash
+        run: |
+          git fetch --no-tags --depth=1 origin \
+            "+refs/heads/${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
+          git diff --no-ext-diff --unified=80 \
+            "origin/${{ github.base_ref }}...HEAD" > "$RUNNER_TEMP/pr.diff"
+
+      - name: Run review agent
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          REVIEW_AGENT_API_KEY: ${{ secrets.REVIEW_AGENT_API_KEY }}
+          REVIEW_AGENT_BASE_URL: ${{ secrets.REVIEW_AGENT_BASE_URL }}
+          REVIEW_AGENT_MODEL: ${{ secrets.REVIEW_AGENT_MODEL }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
+          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+        run: |
+          python .github/scripts/pr_agent_review.py \
+            --diff-file "$RUNNER_TEMP/pr.diff"
