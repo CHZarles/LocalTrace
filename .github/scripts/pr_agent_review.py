@@ -38,7 +38,9 @@ def main() -> int:
     pr_number = int(pr["number"])
 
     try:
-        body = build_review_comment(repo, token, pr, Path(args.diff_file))
+        body = build_review_comment(
+            repo, token, pr, Path(args.diff_file), Path(args.repo_root)
+        )
     except Exception as exc:  # noqa: BLE001
         body = failure_comment(exc)
 
@@ -49,11 +51,12 @@ def main() -> int:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Post review-only PR findings.")
     parser.add_argument("--diff-file", required=True)
+    parser.add_argument("--repo-root", default=".")
     return parser.parse_args()
 
 
 def build_review_comment(
-    repo: str, token: str, pr: dict[str, Any], diff_path: Path
+    repo: str, token: str, pr: dict[str, Any], diff_path: Path, repo_root: Path
 ) -> str:
     api_key = os.environ.get("REVIEW_AGENT_API_KEY") or os.environ.get("OPENAI_API_KEY")
     model = os.environ.get("REVIEW_AGENT_MODEL") or os.environ.get("OPENAI_MODEL")
@@ -61,15 +64,15 @@ def build_review_comment(
     if not api_key or not model:
         return configuration_comment()
 
-    prompt = build_prompt(repo, token, pr, diff_path)
+    prompt = build_prompt(repo, token, pr, diff_path, repo_root)
     review = request_model_review(api_key=api_key, model=model, prompt=prompt)
     return f"{COMMENT_MARKER}\n## PR Agent Review\n\n{review.strip()}\n"
 
 
 def build_prompt(
-    repo: str, token: str, pr: dict[str, Any], diff_path: Path
+    repo: str, token: str, pr: dict[str, Any], diff_path: Path, repo_root: Path
 ) -> str:
-    docs = "\n\n".join(read_doc(path) for path in DOC_PATHS)
+    docs = "\n\n".join(read_doc(repo_root, path) for path in DOC_PATHS)
     issues = "\n\n".join(fetch_issue(repo, token, number) for number in issue_numbers(pr))
     diff = truncate(diff_path.read_text(encoding="utf-8"), MAX_DIFF_CHARS)
 
@@ -172,8 +175,8 @@ def fetch_issue(repo: str, token: str, number: int) -> str:
     )
 
 
-def read_doc(path: str) -> str:
-    file_path = Path(path)
+def read_doc(repo_root: Path, path: str) -> str:
+    file_path = repo_root / path
     if not file_path.exists():
         return f"## {path}\nMissing."
     return f"## {path}\n{truncate(file_path.read_text(encoding='utf-8'), MAX_DOC_CHARS)}"

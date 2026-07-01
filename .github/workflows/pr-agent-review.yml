@@ -1,7 +1,7 @@
 name: PR Agent Review
 
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
@@ -14,18 +14,31 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout trusted base
+        uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.base.sha }}
           fetch-depth: 0
+          path: trusted
+          persist-credentials: false
+
+      - name: Checkout PR head as review data
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.sha }}
+          path: head
+          persist-credentials: false
 
       - name: Collect PR diff
         shell: bash
         run: |
-          git fetch --no-tags --depth=1 origin \
-            "+refs/heads/${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
-          git diff --no-ext-diff --unified=80 \
-            "origin/${{ github.base_ref }}...${{ github.event.pull_request.head.sha }}" \
+          git -C trusted remote add pr-head \
+            "https://github.com/${{ github.event.pull_request.head.repo.full_name }}.git"
+          git -C trusted fetch --no-tags --depth=1 pr-head \
+            "${{ github.event.pull_request.head.sha }}"
+          git -C trusted diff --no-ext-diff --unified=80 \
+            "${{ github.event.pull_request.base.sha }}" FETCH_HEAD \
             > "$RUNNER_TEMP/pr.diff"
 
       - name: Run review agent
@@ -38,5 +51,6 @@ jobs:
           OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
           OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
         run: |
-          python .github/scripts/pr_agent_review.py \
-            --diff-file "$RUNNER_TEMP/pr.diff"
+          python trusted/.github/scripts/pr_agent_review.py \
+            --diff-file "$RUNNER_TEMP/pr.diff" \
+            --repo-root head

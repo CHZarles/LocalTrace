@@ -7,12 +7,16 @@ on:
       - "localtrace/**"
       - ".pre-commit-config.yaml"
       - ".github/workflows/localtrace-ci.yml"
+      - ".github/workflows/pr-agent-review.yml"
+      - ".github/scripts/pr_agent_review.py"
   pull_request:
     paths:
       - "DEVELOPMENT_WORKFLOW.md"
       - "localtrace/**"
       - ".pre-commit-config.yaml"
       - ".github/workflows/localtrace-ci.yml"
+      - ".github/workflows/pr-agent-review.yml"
+      - ".github/scripts/pr_agent_review.py"
 
 jobs:
   docs-and-lint:
