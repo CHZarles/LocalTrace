@@ -16,6 +16,7 @@ DEFAULT_BASE_URL = "https://api.openai.com/v1"
 MAX_DOC_CHARS = 5000
 MAX_ISSUE_CHARS = 5000
 MAX_DIFF_CHARS = 65000
+REQUEST_TIMEOUT_SECONDS = 300
 
 DOC_PATHS = [
     "DEVELOPMENT_WORKFLOW.md",
@@ -253,7 +254,7 @@ def request_json(
 
     request = urllib.request.Request(url, data=body, headers=headers, method=method)
     try:
-        with urllib.request.urlopen(request, timeout=60) as response:
+        with urllib.request.urlopen(request, timeout=REQUEST_TIMEOUT_SECONDS) as response:
             raw = response.read().decode("utf-8")
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
