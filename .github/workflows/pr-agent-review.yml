@@ -17,6 +17,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Collect PR diff
         shell: bash
@@ -24,7 +25,8 @@ jobs:
           git fetch --no-tags --depth=1 origin \
             "+refs/heads/${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
           git diff --no-ext-diff --unified=80 \
-            "origin/${{ github.base_ref }}...HEAD" > "$RUNNER_TEMP/pr.diff"
+            "origin/${{ github.base_ref }}...${{ github.event.pull_request.head.sha }}" \
+            > "$RUNNER_TEMP/pr.diff"
 
       - name: Run review agent
         env:
