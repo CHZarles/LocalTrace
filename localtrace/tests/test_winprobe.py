@@ -326,7 +326,7 @@ def test_browser_executables_are_excluded_from_app_audio() -> None:
     assert is_browser_exe("spotify.exe") is False
 
 
-def test_audio_candidates_exclude_browser_audiodg_and_unknown_paths(
+def test_audio_candidates_treat_unknown_paths_as_poll_failure(
     monkeypatch,
     caplog,
 ) -> None:
@@ -340,10 +340,23 @@ def test_audio_candidates_exclude_browser_audiodg_and_unknown_paths(
     monkeypatch.setattr(reader, "_process_exe_path", lambda pid: paths[pid])
     caplog.set_level(logging.DEBUG, logger="localtrace_winprobe")
 
-    assert reader._audio_candidates([10, 11, 12, 13]) == [
+    with pytest.raises(OSError, match="executable path could not be resolved"):
+        reader._audio_candidates([10, 11, 12, 13])
+    assert "executable path could not be resolved" in caplog.text
+
+
+def test_audio_candidates_exclude_browser_and_audiodg(monkeypatch) -> None:
+    reader = object.__new__(WindowsActivityReader)
+    paths = {
+        10: r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        11: r"C:\Windows\System32\audiodg.exe",
+        12: r"C:\Program Files\Spotify\Spotify.exe",
+    }
+    monkeypatch.setattr(reader, "_process_exe_path", lambda pid: paths[pid])
+
+    assert reader._audio_candidates([10, 11, 12]) == [
         AudioApp(pid=12, exe_path=r"C:\Program Files\Spotify\Spotify.exe")
     ]
-    assert "executable path could not be resolved" in caplog.text
 
 
 def test_audio_selection_keeps_preferred_candidate_when_set_grows() -> None:
@@ -358,6 +371,35 @@ def test_audio_selection_keeps_preferred_candidate_when_set_grows() -> None:
     reader._last_audio_candidate_keys = reader._audio_candidate_keys([spotify, music])
 
     assert reader._select_audio_app([spotify, music], preferred_pid=21) == music
+
+
+def test_audio_retry_seq_stays_stable_across_foreground_posts() -> None:
+    state = ProbeState(ProbeSettings(heartbeat_seconds=60))
+    observed_at = datetime(2026, 7, 1, 10, 30, tzinfo=UTC)
+    spotify = AudioApp(pid=20, exe_path=r"C:\Spotify.exe")
+    code = ForegroundApp(pid=10, title="Code", exe_path=r"C:\Code.exe")
+
+    first_audio = state.next_audio_event(
+        spotify,
+        poll_failed=False,
+        observed_at=observed_at,
+    )
+    foreground = state.next_event(
+        code,
+        idle_seconds=0,
+        observed_at=observed_at + timedelta(seconds=1),
+    )
+    assert foreground is not None
+    state.mark_sent(code, observed_at=observed_at + timedelta(seconds=1))
+    retry_audio = state.next_audio_event(
+        spotify,
+        poll_failed=False,
+        observed_at=observed_at + timedelta(seconds=2),
+    )
+
+    assert first_audio is not None
+    assert retry_audio is not None
+    assert first_audio["seq"] == retry_audio["seq"] == 1
 
 
 def test_probe_state_retries_until_post_is_marked_sent() -> None:

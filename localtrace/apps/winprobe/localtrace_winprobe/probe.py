@@ -65,7 +65,8 @@ class ProbeState:
         self._last_foreground_sent_at: datetime | None = None
         self._last_audio: AudioApp | None = None
         self._last_audio_sent_at: datetime | None = None
-        self._seq = 0
+        self._foreground_seq = 0
+        self._audio_seq = 0
 
     @property
     def preferred_audio_pid(self) -> int | None:
@@ -97,11 +98,11 @@ class ProbeState:
             foreground,
             observed_at=observed_at,
             settings=self._settings,
-            seq=self._seq + 1,
+            seq=self._foreground_seq + 1,
         )
 
     def mark_sent(self, foreground: ForegroundApp, *, observed_at: datetime) -> None:
-        self._seq += 1
+        self._foreground_seq += 1
         self._last_foreground_key = self._key_for(foreground)
         self._last_foreground_sent_at = observed_at
 
@@ -122,7 +123,7 @@ class ProbeState:
                 self._last_audio,
                 observed_at=observed_at,
                 settings=self._settings,
-                seq=self._seq + 1,
+                seq=self._audio_seq + 1,
             )
 
         key = self._audio_key_for(audio)
@@ -141,7 +142,7 @@ class ProbeState:
             audio,
             observed_at=observed_at,
             settings=self._settings,
-            seq=self._seq + 1,
+            seq=self._audio_seq + 1,
         )
 
     def mark_audio_sent(
@@ -150,7 +151,7 @@ class ProbeState:
         *,
         observed_at: datetime,
     ) -> None:
-        self._seq += 1
+        self._audio_seq += 1
         self._last_audio = audio
         self._last_audio_sent_at = observed_at
 
@@ -762,7 +763,7 @@ class WindowsActivityReader:
                     "resolved",
                     pid,
                 )
-                continue
+                raise OSError("audio executable path could not be resolved")
             app_name = _process_name(pid, exe_path)
             if _is_excluded_audio_exe(app_name):
                 continue
