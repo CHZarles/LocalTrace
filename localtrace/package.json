@@ -1,0 +1,8 @@
+{
+  "scripts": {
+    "lint:md": "markdownlint-cli2 --config .markdownlint-cli2.yaml \"../DEVELOPMENT_WORKFLOW.md\" \"docs/**/*.md\""
+  },
+  "devDependencies": {
+    "markdownlint-cli2": "^0.17.2"
+  }
+}

@@ -1,0 +1,23 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        files: ^(DEVELOPMENT_WORKFLOW\.md|localtrace/|\.github/workflows/(localtrace-ci|pr-agent-review)\.yml|\.github/scripts/pr_agent_review\.py|\.pre-commit-config\.yaml|\.gitignore)
+      - id: end-of-file-fixer
+        files: ^(DEVELOPMENT_WORKFLOW\.md|localtrace/|\.github/workflows/(localtrace-ci|pr-agent-review)\.yml|\.github/scripts/pr_agent_review\.py|\.pre-commit-config\.yaml|\.gitignore)
+      - id: check-yaml
+        files: ^(localtrace/.*\.ya?ml|\.github/workflows/(localtrace-ci|pr-agent-review)\.yml|\.pre-commit-config\.yaml)$
+      - id: check-json
+        files: ^localtrace/.*\.json$
+
+  - repo: https://github.com/DavidAnson/markdownlint-cli2
+    rev: v0.17.2
+    hooks:
+      - id: markdownlint-cli2
+        pass_filenames: false
+        args:
+          - "--config"
+          - "localtrace/.markdownlint-cli2.yaml"
+          - "DEVELOPMENT_WORKFLOW.md"
+          - "localtrace/**/*.md"

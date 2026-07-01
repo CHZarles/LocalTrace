@@ -5,7 +5,8 @@
 本文档定义 WorkTrace 的日常开发流程：
 
 ```text
-issue -> branch -> code -> tests -> PR -> review -> merge
+issue -> branch -> context check when needed -> code + tests
+-> PR -> review -> merge
 ```
 
 目标是让每次改动都有明确范围、独立分支、本地验证、可审阅 PR 和清楚的合并记录。
@@ -22,49 +23,71 @@ issue -> branch -> code -> tests -> PR -> review -> merge
 
 Codex 工具辅助开发。GitHub issue 和 PR review 决定一项实现工作是否可以开始、是否可以完成。
 
-## 工具职责
+## 工具政策
 
-### CodeGraph
+工具辅助流程，但不定义权威。
 
-CodeGraph 用来理解代码结构和影响面。
+### 权威来源
 
-使用时机：
+开发权威顺序：
 
-1. 写 issue 前，受影响代码区域还不清楚时。
-2. 写代码前，确认相关模块、入口、依赖和影响范围。
-3. 实现过程中，改动跨模块、跨运行时、跨 UI/API 边界时。
-4. 开 PR 前，检查 diff 是否只触碰了预期组件。
-5. Review 期间，回答 reviewer 对影响面的追问。
+- GitHub issue 定义批准的 scope。
+- Pull request 定义可 review 的 change set。
+- Human review 定义 approval。
 
-产出内容：
+工具输出不能扩大 scope、批准工作、关闭 issue 或 merge PR。
+
+### Task Manager
+
+Task Manager 是可选工具，不是每个 issue 的必需步骤。
+
+只有在这些情况使用：
+
+- 多个 agent 并行。
+- 多条工作线并行。
+- 阶段顺序不清楚。
+- 单个 issue checklist 已经难以维护。
+- 需要状态板辅助跟踪。
+
+Task Manager 不能：
+
+- 替代 GitHub issue。
+- 自动创建 GitHub child issues。
+- 扩大 approved issue 的 scope。
+- 关闭 GitHub issue。
+- 替代 human review。
+
+如果使用 Task Manager，它只能镜像 GitHub issue 的状态。GitHub issue
+仍然是正式 scope 来源。
+
+### Context Check / CodeGraph
+
+以下情况实现前必须做 context check：
+
+- 接触不熟悉代码。
+- 从旧代码迁移行为。
+- 跨模块、跨运行时、跨 UI/API 边界改动。
+- 可能影响 public interface。
+- 可能影响 storage schema。
+- 可能影响 runtime behavior。
+- 可能影响 privacy 或 security。
+
+Context check 可以使用：
+
+- CodeGraph。
+- 仓库搜索。
+- 文档。
+- 手动读代码。
+
+如果 context check 改变了 scope、风险判断或实现方向，必须把结论写回
+issue 或 PR。
+
+Context check 的典型产出：
 
 - 相关文件和模块。
 - 调用路径或依赖关系。
 - 受影响的运行时入口、API、UI、配置或数据结构。
-- 可以复制到 issue 或 PR 的风险说明。
-
-### Task Manager
-
-Task Manager 用来拆解已经批准的工作，并跟踪执行状态。
-
-使用时机：
-
-1. 相关需求、spec 或设计文档已经批准后。
-2. 创建小 issue 前，生成候选任务和依赖顺序。
-3. 实现过程中，跟踪当前 issue 内部的子任务。
-4. PR review 或 merge 后，同步最终状态。
-
-Task Manager 的任务只有复制进 GitHub issue，并补齐 scope、acceptance、verification 后，才进入实现流程。
-
-推荐状态映射：
-
-| Task Manager 状态 | GitHub 状态 |
-| --- | --- |
-| Backlog | 候选任务，还未进入实现 |
-| Ready | GitHub issue 已存在并已批准 |
-| In Progress | Branch 已创建，正在实现 |
-| Review | PR 已打开 |
-| Done | PR 已合并，issue 已关闭 |
+- 风险和非迁移项。
 
 ### Codex Agent
 
@@ -88,7 +111,7 @@ Codex 完成后需要给出：
 
 ### PR Review Agent
 
-PR Review Agent 在 PR 创建后使用。
+PR Review Agent 在 PR 创建后使用，且 PR 必须已有可 review 的 diff。
 
 产出内容：
 
@@ -96,7 +119,23 @@ PR Review Agent 在 PR 创建后使用。
 - scope、测试、回归和维护性风险。
 - 需要人工 reviewer 判断的问题。
 
-PR Review Agent 提供 review 证据。人工 review 决定是否 merge。
+PR Review Agent 可以：
+
+- 提 findings。
+- 提风险。
+- 提问题。
+- 辅助 reviewer。
+
+PR Review Agent 不能：
+
+- approve PR。
+- merge PR。
+- close issue。
+- 替代 human review。
+- 修改 scope。
+
+如果自动 Review Agent 未部署，可以使用手动 agent review。Human review
+始终是最终门禁。
 
 ## 标准流程
 
@@ -113,10 +152,13 @@ Issue 需要写清楚：
 - Acceptance checklist。
 - Verification plan。
 - 相关 docs、spec、设计或历史决策链接。
-- CodeGraph notes，适用于影响范围还不清楚的改动。
-- Task Manager link 或 task ID，适用于从任务拆解生成的 issue。
+- Context check notes，适用于需要影响分析的改动。
+- Task Manager link 或 task ID，适用于被 Task Manager 跟踪的 issue。
 
-一个 issue 对应一个可 review 的改动。Checklist 混入多个无关组件、无关风险或无关测试路径时，需要拆成多个 issue。
+一个阶段可以只有一个 active issue。不要自动拆 GitHub child issues。
+
+只有当 checklist 混入多个无关组件、无关风险或无关测试路径，并且人类
+明确要求拆分时，才拆成多个 issue。
 
 Issue 模板：
 
@@ -154,7 +196,7 @@ Expected commands:
 ## References
 
 - Spec:
-- CodeGraph notes:
+- Context check notes:
 - Task Manager:
 
 ## Review Gate
@@ -192,6 +234,8 @@ Branch 需要做到：
 - 从当前 main 分支切出。
 - 一个 branch 绑定一个 issue。
 - commit message 在合适时引用 issue。
+- 不使用长期聚合分支连续承载多个阶段。
+- 当前 issue merge 后，下一项工作从 main 新切 branch。
 
 Commit 示例：
 
@@ -206,7 +250,7 @@ feat(reports): add export settings panel
 编辑前需要做：
 
 1. 读 issue 和关联文档。
-2. 影响区域不明确时先用 CodeGraph。
+2. 如果触发 context check 条件，先完成影响分析。
 3. 找到满足 acceptance checklist 的最小文件集合。
 4. 如果该 issue 在 Task Manager 里跟踪，把状态改到 `In Progress`。
 
@@ -224,6 +268,54 @@ Code 完成标准：
 - 改动文件符合 issue scope。
 - 文档反映新的行为或流程。
 - 测试或验证覆盖了改动行为。
+
+## 小步开发规则
+
+默认节奏：
+
+```text
+one approved issue -> one branch -> focused commits
+-> one PR -> review -> merge -> next issue
+```
+
+硬规则：
+
+- 一个 PR 只解决一个清晰目标。
+- 一个 branch 默认只绑定一个 issue。
+- 不把后续阶段连续堆到同一个长期分支。
+- 不把无关 docs、CI、infra、runtime 行为混进同一个 PR。
+- 合并当前 PR 后，再从 main 切下一个 issue 的 branch。
+- Review Agent 只在 PR 创建后运行；它不能作为开发前置批准。
+- Task Manager 只在协调复杂度需要时使用；普通小 issue 不用。
+- CodeGraph 或 context check 在动陌生代码、API、schema、runtime、privacy
+  或 security 前使用。
+- 需要 Python 环境时，在仓库本地创建，例如 `localtrace/.venv`。
+- 本地 Python 环境不提交到 git。
+- Codex 写的 commit 使用 `Codex Agent` git author，不使用人类开发者姓名。
+- GitHub PR author 由创建 PR 的 GitHub 登录态决定，不由 commit author 决定。
+- 如果 Codex 使用人类 GitHub 登录态创建 PR，该人类会成为 PR author。
+- PR author 不能 approve 自己的 PR。
+- 如果仓库有独立 reviewer，人工 approval 必须来自非 PR author 的 reviewer。
+- 如果 solo repo 没有独立 reviewer，PR author 不能点 GitHub Approve；owner
+  亲自执行 merge 视为人工 review 和 merge authorization 记录。
+
+PR 尺寸目标：
+
+- 文档 PR 目标少于 300 行 diff。
+- 普通代码 PR 目标少于 500 行 diff。
+- 超过目标时，先判断是否拆 scope，而不是继续堆代码。
+
+允许一个 phase 使用一个 issue 的前提：
+
+- checklist 仍然可 review。
+- diff 仍然集中在一个目标上。
+- 每次 PR 仍然可以独立合并。
+
+如果 phase issue 变大：
+
+- 不自动创建大量 child issues。
+- 先让人类决定是否拆成更小 issue。
+- 拆分后每个 issue 都单独走 branch、PR、review、merge。
 
 ### 4. Tests
 
@@ -272,7 +364,7 @@ PR 需要包含：
 - 验证命令和结果。
 - UI 改动截图。
 - 生成文件变化说明。
-- 跨模块改动的 CodeGraph 影响说明。
+- 跨模块改动的 context check 影响说明。
 - Task Manager 状态同步到 `Review`，适用于被跟踪的 issue。
 
 PR 模板：
@@ -331,7 +423,8 @@ Review checklist：
 - 测试覆盖改动行为。
 - CI 通过。
 - Review comments 已解决。
-- 人工 approval 已记录。
+- 非 PR author 的人工 approval 已记录；solo repo 中 owner merge 操作可以作为
+  人工 review 记录。
 
 ### 7. Merge
 
@@ -339,7 +432,8 @@ Approval 和检查通过后 merge。
 
 Merge 前确认：
 
-- PR 已获得人工 approval。
+- PR 已获得非 PR author 的人工 approval；solo repo 中 owner 准备亲自 merge
+  时可用 merge 操作本身作为 review 记录。
 - CI 通过，或 PR 写明已接受的例外。
 - PR 带 issue closure keyword。
 - 用户可见变化已经更新 release notes。
@@ -351,7 +445,7 @@ Merge 后需要做：
 - 确认 issue 已关闭，或已写明剩余 follow-up。
 - 对 review 中发现的延期工作创建 follow-up issue。
 - 持久架构或流程决策写回仓库文档。
-- follow-up 影响面不清楚时继续用 CodeGraph。
+- follow-up 影响面不清楚时继续做 context check。
 
 ## 小改动快路径
 
@@ -389,14 +483,14 @@ short issue -> small branch -> focused diff -> relevant test
 
 | 阶段 | CodeGraph | Task Manager | Codex Agent | GitHub |
 | --- | --- | --- | --- | --- |
-| Intake | 影响区域不清楚时看代码图 | 记录候选任务 | 总结需求 | 起草 issue |
-| Issue | 补影响说明 | 关联已接受任务 | 起草 scope 和 acceptance | 批准 issue |
-| Branch | 确认目标模块 | 标记 ready/in progress | 创建 branch | 从 main 切分支 |
-| Code | 查依赖和调用路径 | 跟踪子任务 | 编辑文件 | commit 到 branch |
-| Tests | 确认受影响 surface | 跟踪验证任务 | 运行命令并修复失败 | 准备 PR 证据 |
-| PR | 总结影响面 | 标记 review | 写 PR 描述 | 打开 PR |
-| Review | 回答影响面问题 | 跟踪 review fixes | 处理 review 修改 | 人工 review 和 CI |
-| Merge | 支持 follow-up 分析 | 标记 done | 总结最终状态 | merge 并关闭 issue |
+| Intake | 条件触发时看代码图 | 可选记录候选任务 | 总结需求 | 起草 issue |
+| Issue | 补影响说明 | 可选关联任务 | 起草 scope 和 acceptance | 批准 issue |
+| Branch | 条件触发时确认模块 | 可选标记状态 | 创建 branch | 从 base 切分支 |
+| Code | 查依赖和调用路径 | 可选跟踪子任务 | 编辑文件 | commit 到 branch |
+| Tests | 确认受影响 surface | 可选跟踪验证 | 运行命令并修复失败 | 准备 PR 证据 |
+| PR | 总结影响面 | 可选标记 review | 写 PR 描述 | 打开 PR |
+| Review | 回答影响面问题 | 可选跟踪 fixes | 处理 review 修改 | 人工 review 和 CI |
+| Merge | 支持 follow-up 分析 | 可选标记 done | 总结最终状态 | merge 并关闭 issue |
 
 ## Codex Prompt 模板
 
@@ -406,11 +500,13 @@ short issue -> small branch -> focused diff -> relevant test
 Work on GitHub issue #<number>.
 Create or use branch <type>/<issue-number>-<short-title>.
 Read the linked docs and acceptance checklist first.
-Use CodeGraph before editing if the affected modules are unclear.
+Run context check before editing when the work touches unfamiliar code,
+migrates old behavior, crosses module boundaries, or may affect public
+interfaces, storage, runtime behavior, privacy, or security.
 Implement only this issue scope.
 Run the relevant verification commands.
 Prepare a PR summary with changed files, tests, risks, and Fixes #<number>.
-Update Task Manager state if this issue is tracked there.
+Update Task Manager state only if this issue is tracked there.
 ```
 
 ## Definition Of Done

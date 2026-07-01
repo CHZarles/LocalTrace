@@ -11,15 +11,25 @@ windows/**/obj/
 
 # Node
 node_modules/
+localtrace/node_modules/
 
 # Local data
 data/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+localtrace/.venv/
+.pytest_cache/
+.ruff_cache/
 
 # Rust
 target/
 
 # Dist / packaging
 dist/
+localtrace/site/
 
 # Flutter (when generated)
 ui_flutter/**/.dart_tool/

@@ -1,0 +1,60 @@
+name: LocalTrace CI
+
+on:
+  push:
+    paths:
+      - "DEVELOPMENT_WORKFLOW.md"
+      - "localtrace/**"
+      - ".pre-commit-config.yaml"
+      - ".github/workflows/localtrace-ci.yml"
+      - ".github/workflows/pr-agent-review.yml"
+      - ".github/scripts/pr_agent_review.py"
+  pull_request:
+    paths:
+      - "DEVELOPMENT_WORKFLOW.md"
+      - "localtrace/**"
+      - ".pre-commit-config.yaml"
+      - ".github/workflows/localtrace-ci.yml"
+      - ".github/workflows/pr-agent-review.yml"
+      - ".github/scripts/pr_agent_review.py"
+
+jobs:
+  docs-and-lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Python deps
+        run: pip install -r localtrace/requirements-dev.txt
+
+      - name: Install Node deps
+        working-directory: localtrace
+        run: npm ci
+
+      - name: Python lint
+        working-directory: localtrace
+        run: ruff check .
+
+      - name: Python format check
+        working-directory: localtrace
+        run: ruff format --check .
+
+      - name: Python tests
+        working-directory: localtrace
+        run: pytest
+
+      - name: Markdown lint
+        working-directory: localtrace
+        run: npm run lint:md
+
+      - name: Build docs
+        run: mkdocs build --strict -f localtrace/mkdocs.yml
