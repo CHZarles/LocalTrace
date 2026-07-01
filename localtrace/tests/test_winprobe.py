@@ -3,10 +3,14 @@ import threading
 from datetime import UTC, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+import pytest
+
 from localtrace_winprobe.probe import (
     ForegroundApp,
     ProbeSettings,
     ProbeState,
+    _parse_args,
+    _settings_from_args,
     build_app_active_event,
     post_event,
 )
@@ -105,6 +109,25 @@ def test_probe_state_gates_idle_and_emits_on_change_or_heartbeat() -> None:
         )
         is not None
     )
+
+
+def test_probe_settings_ignore_endpoint_environment_override(monkeypatch) -> None:
+    monkeypatch.setenv("LOCALTRACE_ENDPOINT", "http://10.0.0.5:8765/events")
+
+    settings = _settings_from_args(_parse_args([]))
+
+    assert settings.endpoint == "http://127.0.0.1:8765/events"
+
+
+def test_probe_settings_allow_port_without_changing_loopback_host() -> None:
+    settings = _settings_from_args(_parse_args(["--port", "9876"]))
+
+    assert settings.endpoint == "http://127.0.0.1:9876/events"
+
+
+def test_probe_cli_rejects_arbitrary_endpoint_argument() -> None:
+    with pytest.raises(SystemExit):
+        _parse_args(["--endpoint", "http://10.0.0.5:8765/events"])
 
 
 def test_post_event_sends_json_to_configured_events_endpoint() -> None:

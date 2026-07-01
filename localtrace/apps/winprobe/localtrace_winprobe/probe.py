@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import os
 import re
 import sys
 import time
@@ -14,7 +13,8 @@ from datetime import UTC, datetime
 from typing import Any, Protocol
 
 LOGGER = logging.getLogger("localtrace_winprobe")
-DEFAULT_ENDPOINT = "http://127.0.0.1:8765/events"
+LOOPBACK_HOST = "127.0.0.1"
+DEFAULT_PORT = 8765
 
 
 @dataclass(frozen=True)
@@ -26,12 +26,16 @@ class ForegroundApp:
 
 @dataclass(frozen=True)
 class ProbeSettings:
-    endpoint: str = DEFAULT_ENDPOINT
+    api_port: int = DEFAULT_PORT
     poll_ms: int = 1000
     heartbeat_seconds: int = 60
     idle_cutoff_seconds: int = 300
     store_titles: bool = False
     store_exe_path: bool = False
+
+    @property
+    def endpoint(self) -> str:
+        return f"http://{LOOPBACK_HOST}:{self.api_port}/events"
 
 
 @dataclass(frozen=True)
@@ -208,9 +212,10 @@ def _post_with_logging(settings: ProbeSettings, event: dict[str, Any]) -> None:
 def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="localtrace-winprobe")
     parser.add_argument(
-        "--endpoint",
-        default=os.environ.get("LOCALTRACE_ENDPOINT", DEFAULT_ENDPOINT),
-        help="LocalTrace POST /events endpoint.",
+        "--port",
+        type=int,
+        default=DEFAULT_PORT,
+        help="LocalTrace local API port.",
     )
     parser.add_argument("--poll-ms", type=int, default=1000)
     parser.add_argument("--heartbeat-seconds", type=int, default=60)
@@ -222,7 +227,7 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
 
 def _settings_from_args(args: argparse.Namespace) -> ProbeSettings:
     return ProbeSettings(
-        endpoint=args.endpoint,
+        api_port=max(args.port, 1),
         poll_ms=max(args.poll_ms, 100),
         heartbeat_seconds=max(args.heartbeat_seconds, 1),
         idle_cutoff_seconds=max(args.idle_cutoff_seconds, 1),
