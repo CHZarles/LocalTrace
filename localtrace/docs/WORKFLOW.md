@@ -29,8 +29,12 @@ Every implementation task must have:
 - Scope.
 - Non-goals.
 - Acceptance checklist.
+- Implementation plan.
 - Linked spec section.
 - Human approval to implement.
+
+Non-trivial implementation issues must include a PlantUML implementation plan
+before coding starts. Tiny fixes may use a short text plan instead.
 
 Forbidden before approval:
 
@@ -49,6 +53,7 @@ Allowed before approval:
 - Write or update spec documents.
 - Write issue descriptions.
 - Write acceptance checklists.
+- Write PlantUML implementation plans in GitHub issues.
 - Propose architecture.
 
 ### After Implementation
@@ -56,6 +61,8 @@ Allowed before approval:
 Every implementation task completion must include:
 
 - Changed files.
+- Planned implementation versus actual diff.
+- Deviation notes when actual flow differs materially from the issue plan.
 - Commands run.
 - Command results.
 - Any skipped verification and why.
@@ -111,6 +118,7 @@ Before implementation:
 
 - Does this issue match the current phase?
 - Is the acceptance checklist specific enough to test?
+- Does a non-trivial implementation issue have a PlantUML plan in the issue?
 - Does this change introduce any forbidden feature?
 - Does this change require new runtime dependencies?
 - Does the human explicitly approve implementation?
@@ -118,6 +126,7 @@ Before implementation:
 After implementation:
 
 - Did the changed files match the issue scope?
+- Did the actual diff match the implementation plan, or are deviations recorded?
 - Did tests/lints/docs build run?
 - Did any generated or unrelated file change?
 - Did the work introduce auth, cloud, LAN, or derived tables?
@@ -182,6 +191,9 @@ Hard rules:
 - Do not keep adding later phases to a long-lived aggregate branch.
 - Do not mix unrelated docs, CI, infrastructure, and runtime behavior in one PR.
 - After a PR merges, start the next issue from `main`.
+- Non-trivial implementation issues need a PlantUML implementation plan before
+  coding starts.
+- PRs must compare planned implementation against the actual diff.
 - Review Agent runs only after a PR exists; it is not pre-implementation approval.
 - Task Manager is only used when coordination complexity justifies it.
 - CodeGraph or another context check runs before unfamiliar code, API, schema,
@@ -259,6 +271,25 @@ reading.
 
 If the context check changes risk, scope, or implementation direction, summarize
 it in the issue or PR.
+
+### Implementation Plan
+
+The implementation plan is a review artifact, not a source of extra scope.
+
+For every non-trivial implementation issue, the agent must post a compact
+PlantUML plan in the GitHub issue before writing implementation code. The plan
+must show the intended modules or files, the API/runtime/data flow, the
+verification flow, expected changed files, acceptance checklist mapping, and
+explicit non-goals where useful.
+
+The plan may be updated before coding starts or when the issue scope is
+explicitly revised. After coding starts, material differences from the plan must
+be recorded as plan deviation notes in the issue or PR, and the agent must
+confirm that the deviation remains inside the approved issue scope.
+
+Tiny fixes may use a short text plan instead of PlantUML. Examples include
+typos, wording-only docs updates, single-line config corrections, issue or PR
+metadata updates, and mechanical lint fixes inside an already approved scope.
 
 ### Review Agent
 
