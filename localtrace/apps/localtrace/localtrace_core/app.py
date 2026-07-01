@@ -23,6 +23,13 @@ ALLOWED_KINDS = {
     "tab_audio_stop",
 }
 ALLOWED_ENTITY_TYPES = {"app", "domain", "system"}
+EVENT_CONTRACTS = {
+    "app_active": ("windows_probe", "app"),
+    "app_audio": ("windows_probe", "app"),
+    "app_audio_stop": ("windows_probe", "app"),
+    "tab_active": ("browser_extension", "domain"),
+    "tab_audio_stop": ("browser_extension", "domain"),
+}
 EXE_PATH_FIELDS = {"exe_path", "exePath"}
 ALWAYS_FILTERED_PAYLOAD_FIELDS = {"url", "full_url", "path"}
 TITLE_PAYLOAD_FIELDS = {"title", "window_title", "tab_title"}
@@ -85,6 +92,7 @@ class LocalTraceService:
         entity_type = _required_str(payload, "entity_type")
         if entity_type not in ALLOWED_ENTITY_TYPES:
             raise ValueError("entity_type is not allowed")
+        _validate_event_contract(source, kind, entity_type)
 
         entity = _required_str(payload, "entity")
         raw_payload = payload.get("payload", {})
@@ -197,6 +205,12 @@ def _optional_int(value: Any) -> int | None:
     if isinstance(value, int) and not isinstance(value, bool):
         return value
     raise ValueError("seq must be an integer")
+
+
+def _validate_event_contract(source: str, kind: str, entity_type: str) -> None:
+    expected_source, expected_entity_type = EVENT_CONTRACTS[kind]
+    if source != expected_source or entity_type != expected_entity_type:
+        raise ValueError("source, kind, and entity_type combination is not allowed")
 
 
 def _stored_title(value: Any, config: LocalTraceConfig) -> str | None:

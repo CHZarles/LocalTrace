@@ -139,6 +139,48 @@ def test_post_events_rejects_disallowed_event_kind(tmp_path: Path) -> None:
     assert service.get_events({})[1]["events"] == []
 
 
+def test_post_events_rejects_invalid_source_kind_entity_type_combinations(
+    tmp_path: Path,
+) -> None:
+    service = make_service(tmp_path)
+
+    invalid_events = [
+        {
+            "source": "browser_extension",
+            "kind": "app_audio",
+            "entity_type": "domain",
+            "entity": "github.com",
+        },
+        {
+            "source": "windows_probe",
+            "kind": "tab_active",
+            "entity_type": "app",
+            "entity": "Code.exe",
+        },
+        {
+            "source": "windows_probe",
+            "kind": "app_active",
+            "entity_type": "domain",
+            "entity": "code.example",
+        },
+    ]
+
+    for index, event in enumerate(invalid_events):
+        status, body = service.post_events(
+            {
+                "observed_at": f"2026-07-01T10:30:0{index}.000Z",
+                "payload": {},
+                **event,
+            }
+        )
+
+        assert status == 400
+        assert body["ok"] is False
+        assert "combination" in body["error"]
+
+    assert service.get_events({})[1]["events"] == []
+
+
 def test_post_events_rejects_non_utc_observed_at(tmp_path: Path) -> None:
     service = make_service(tmp_path)
 
