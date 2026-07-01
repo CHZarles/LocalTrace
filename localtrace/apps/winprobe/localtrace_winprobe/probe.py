@@ -25,6 +25,12 @@ class ForegroundApp:
 
 
 @dataclass(frozen=True)
+class AudioApp:
+    pid: int
+    exe_path: str | None
+
+
+@dataclass(frozen=True)
 class ProbeSettings:
     api_port: int = DEFAULT_PORT
     poll_ms: int = 1000
@@ -49,13 +55,27 @@ class ActivityReader(Protocol):
 
     def foreground_app(self) -> ForegroundApp: ...
 
+    def active_audio_app(self, preferred_pid: int | None) -> AudioApp | None: ...
+
 
 class ProbeState:
     def __init__(self, settings: ProbeSettings) -> None:
         self._settings = settings
-        self._last_key: tuple[str, int, str] | None = None
-        self._last_sent_at: datetime | None = None
+        self._last_foreground_key: tuple[str, int, str] | None = None
+        self._last_foreground_sent_at: datetime | None = None
+        self._last_audio: AudioApp | None = None
+        self._last_audio_sent_at: datetime | None = None
         self._seq = 0
+        self._pending_foreground_key: tuple[str, int, str] | None = None
+        self._pending_foreground_seq: int | None = None
+        self._pending_audio_key: tuple[str, tuple[str, int] | None] | None = None
+        self._pending_audio_seq: int | None = None
+        self._pending_audio_kind: str | None = None
+        self._pending_audio_app: AudioApp | None = None
+
+    @property
+    def preferred_audio_pid(self) -> int | None:
+        return self._last_audio.pid if self._last_audio is not None else None
 
     def next_event(
         self,
@@ -65,35 +85,163 @@ class ProbeState:
         observed_at: datetime,
     ) -> dict[str, Any] | None:
         if idle_seconds >= self._settings.idle_cutoff_seconds:
-            self._last_key = None
+            self._last_foreground_key = None
+            self._clear_pending_foreground()
             return None
         if foreground is None or foreground.pid == 0:
+            self._clear_pending_foreground()
             return None
 
         key = self._key_for(foreground)
         due_heartbeat = (
-            self._last_sent_at is None
-            or (observed_at - self._last_sent_at).total_seconds()
+            self._last_foreground_sent_at is None
+            or (observed_at - self._last_foreground_sent_at).total_seconds()
             >= self._settings.heartbeat_seconds
         )
-        if self._last_key == key and not due_heartbeat:
+        if self._last_foreground_key == key and not due_heartbeat:
             return None
 
+        seq = self._seq_for_foreground(key)
         return build_app_active_event(
             foreground,
             observed_at=observed_at,
             settings=self._settings,
-            seq=self._seq + 1,
+            seq=seq,
         )
 
     def mark_sent(self, foreground: ForegroundApp, *, observed_at: datetime) -> None:
-        self._seq += 1
-        self._last_key = self._key_for(foreground)
-        self._last_sent_at = observed_at
+        self._clear_pending_foreground()
+        self._last_foreground_key = self._key_for(foreground)
+        self._last_foreground_sent_at = observed_at
+
+    def next_audio_event(
+        self,
+        audio: AudioApp | None,
+        *,
+        poll_failed: bool,
+        observed_at: datetime,
+    ) -> dict[str, Any] | None:
+        if poll_failed:
+            return None
+
+        if (
+            self._pending_audio_kind == "audio"
+            and self._pending_audio_app is not None
+            and self._pending_audio_seq is not None
+        ):
+            return build_app_audio_event(
+                self._pending_audio_app,
+                observed_at=observed_at,
+                settings=self._settings,
+                seq=self._pending_audio_seq,
+            )
+
+        if audio is None:
+            if self._last_audio is None:
+                self._clear_pending_audio()
+                return None
+            pending_key: tuple[str, tuple[str, int] | None] = (
+                "stop",
+                self._audio_key_for(self._last_audio),
+            )
+            seq = self._seq_for_audio(pending_key, kind="stop", audio=None)
+            return build_app_audio_stop_event(
+                self._last_audio,
+                observed_at=observed_at,
+                settings=self._settings,
+                seq=seq,
+            )
+
+        force_audio_event = False
+        if self._pending_audio_kind == "stop":
+            self._clear_pending_audio()
+            force_audio_event = True
+
+        key = self._audio_key_for(audio)
+        last_key = (
+            None if self._last_audio is None else self._audio_key_for(self._last_audio)
+        )
+        due_heartbeat = (
+            self._last_audio_sent_at is None
+            or (observed_at - self._last_audio_sent_at).total_seconds()
+            >= self._settings.heartbeat_seconds
+        )
+        if last_key == key and not due_heartbeat and not force_audio_event:
+            return None
+
+        seq = self._seq_for_audio(("audio", key), kind="audio", audio=audio)
+        return build_app_audio_event(
+            audio,
+            observed_at=observed_at,
+            settings=self._settings,
+            seq=seq,
+        )
+
+    def mark_audio_sent(
+        self,
+        audio: AudioApp | None,
+        *,
+        observed_at: datetime,
+    ) -> None:
+        self._clear_pending_audio()
+        self._last_audio = audio
+        self._last_audio_sent_at = observed_at
+
+    def mark_audio_event_sent(self, *, observed_at: datetime) -> None:
+        if self._pending_audio_kind is None:
+            return
+        audio = self._pending_audio_app if self._pending_audio_kind == "audio" else None
+        self._clear_pending_audio()
+        self._last_audio = audio
+        self._last_audio_sent_at = observed_at
 
     def _key_for(self, foreground: ForegroundApp) -> tuple[str, int, str]:
         title_key = foreground.title if self._settings.store_titles else ""
         return (_app_name(foreground), foreground.pid, title_key)
+
+    def _audio_key_for(self, audio: AudioApp) -> tuple[str, int]:
+        return (_audio_app_name(audio), audio.pid)
+
+    def _seq_for_foreground(self, key: tuple[str, int, str]) -> int:
+        if (
+            self._pending_foreground_key == key
+            and self._pending_foreground_seq is not None
+        ):
+            return self._pending_foreground_seq
+        seq = self._reserve_seq()
+        self._pending_foreground_key = key
+        self._pending_foreground_seq = seq
+        return seq
+
+    def _seq_for_audio(
+        self,
+        key: tuple[str, tuple[str, int] | None],
+        *,
+        kind: str,
+        audio: AudioApp | None,
+    ) -> int:
+        if self._pending_audio_key == key and self._pending_audio_seq is not None:
+            return self._pending_audio_seq
+        seq = self._reserve_seq()
+        self._pending_audio_key = key
+        self._pending_audio_seq = seq
+        self._pending_audio_kind = kind
+        self._pending_audio_app = audio
+        return seq
+
+    def _reserve_seq(self) -> int:
+        self._seq += 1
+        return self._seq
+
+    def _clear_pending_foreground(self) -> None:
+        self._pending_foreground_key = None
+        self._pending_foreground_seq = None
+
+    def _clear_pending_audio(self) -> None:
+        self._pending_audio_key = None
+        self._pending_audio_seq = None
+        self._pending_audio_kind = None
+        self._pending_audio_app = None
 
 
 def build_app_active_event(
@@ -123,6 +271,51 @@ def build_app_active_event(
         payload["title"] = foreground.title
     if settings.store_exe_path and foreground.exe_path:
         payload["exe_path"] = foreground.exe_path
+    return event
+
+
+def build_app_audio_event(
+    audio: AudioApp,
+    *,
+    observed_at: datetime,
+    settings: ProbeSettings,
+    seq: int | None = None,
+) -> dict[str, Any]:
+    payload = _audio_payload(audio, settings)
+    event: dict[str, Any] = {
+        "observed_at": _format_utc(observed_at),
+        "source": "windows_probe",
+        "kind": "app_audio",
+        "entity_type": "app",
+        "entity": _audio_app_name(audio),
+        "title": None,
+        "payload": payload,
+    }
+    if seq is not None:
+        event["seq"] = seq
+    return event
+
+
+def build_app_audio_stop_event(
+    audio: AudioApp,
+    *,
+    observed_at: datetime,
+    settings: ProbeSettings,
+    seq: int | None = None,
+) -> dict[str, Any]:
+    payload = _audio_payload(audio, settings)
+    payload["reason"] = "no_active_audio_sessions"
+    event: dict[str, Any] = {
+        "observed_at": _format_utc(observed_at),
+        "source": "windows_probe",
+        "kind": "app_audio_stop",
+        "entity_type": "app",
+        "entity": _audio_app_name(audio),
+        "title": None,
+        "payload": payload,
+    }
+    if seq is not None:
+        event["seq"] = seq
     return event
 
 
@@ -174,6 +367,22 @@ def run_probe(settings: ProbeSettings, reader: ActivityReader) -> None:
             and _post_with_logging(settings, event)
         ):
             state.mark_sent(foreground, observed_at=observed_at)
+
+        audio_poll_failed = False
+        audio: AudioApp | None = None
+        try:
+            audio = reader.active_audio_app(state.preferred_audio_pid)
+        except OSError as exc:
+            LOGGER.warning("audio poll failed error=%s", exc)
+            audio_poll_failed = True
+
+        audio_event = state.next_audio_event(
+            audio,
+            poll_failed=audio_poll_failed,
+            observed_at=observed_at,
+        )
+        if audio_event is not None and _post_with_logging(settings, audio_event):
+            state.mark_audio_event_sent(observed_at=observed_at)
         time.sleep(settings.poll_ms / 1000)
 
 
@@ -254,11 +463,48 @@ def _format_utc(value: datetime) -> str:
 
 
 def _app_name(foreground: ForegroundApp) -> str:
-    if foreground.exe_path:
-        parts = [part for part in re.split(r"[\\/]+", foreground.exe_path) if part]
+    return _process_name(foreground.pid, foreground.exe_path)
+
+
+def _audio_app_name(audio: AudioApp) -> str:
+    return _process_name(audio.pid, audio.exe_path)
+
+
+def _process_name(pid: int, exe_path: str | None) -> str:
+    if exe_path:
+        parts = [part for part in re.split(r"[\\/]+", exe_path) if part]
         if parts:
             return parts[-1]
-    return f"pid:{foreground.pid}"
+    return f"pid:{pid}"
+
+
+def _audio_payload(audio: AudioApp, settings: ProbeSettings) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "activity": "audio",
+        "pid": audio.pid,
+    }
+    if settings.store_exe_path and audio.exe_path:
+        payload["exe_path"] = audio.exe_path
+    return payload
+
+
+def is_browser_exe(exe_name: str) -> bool:
+    return exe_name.lower() in {
+        "chrome.exe",
+        "chrome_proxy.exe",
+        "chromium.exe",
+        "msedge.exe",
+        "msedgewebview2.exe",
+        "brave.exe",
+        "vivaldi.exe",
+        "opera.exe",
+        "firefox.exe",
+    }
+
+
+def _is_excluded_audio_exe(exe_name: str) -> bool:
+    lowered = exe_name.lower()
+    return lowered == "audiodg.exe" or is_browser_exe(lowered)
 
 
 def _decode_json_response(raw: bytes) -> dict[str, Any]:
@@ -275,6 +521,7 @@ class WindowsActivityReader:
     def __init__(self) -> None:
         if sys.platform != "win32":
             raise RuntimeError("WindowsActivityReader requires Windows")
+        self._last_audio_candidate_keys: tuple[tuple[str, int], ...] | None = None
 
     def idle_seconds(self) -> int:
         import ctypes
@@ -320,6 +567,252 @@ class WindowsActivityReader:
             exe_path=self._process_exe_path(int(pid.value)),
         )
 
+    def active_audio_app(self, preferred_pid: int | None) -> AudioApp | None:
+        import ctypes
+        from ctypes import wintypes
+
+        hresult = ctypes.c_long
+        clsctx_all = 0x17
+        coinit_multithreaded = 0x0
+        s_ok = 0
+        s_false = 1
+        rpc_e_changed_mode = -2147417850
+        e_render = 0
+        e_multimedia = 1
+        audio_session_state_active = 1
+
+        class GUID(ctypes.Structure):
+            _fields_ = [
+                ("data1", wintypes.DWORD),
+                ("data2", wintypes.WORD),
+                ("data3", wintypes.WORD),
+                ("data4", ctypes.c_ubyte * 8),
+            ]
+
+        def guid(
+            data1: int,
+            data2: int,
+            data3: int,
+            data4: tuple[int, int, int, int, int, int, int, int],
+        ) -> GUID:
+            return GUID(data1, data2, data3, (ctypes.c_ubyte * 8)(*data4))
+
+        clsid_mm_device_enumerator = guid(
+            0xBCDE0395,
+            0xE52F,
+            0x467C,
+            (0x8E, 0x3D, 0xC4, 0x57, 0x92, 0x91, 0x69, 0x2E),
+        )
+        iid_mm_device_enumerator = guid(
+            0xA95664D2,
+            0x9614,
+            0x4F35,
+            (0xA7, 0x46, 0xDE, 0x8D, 0xB6, 0x36, 0x17, 0xE6),
+        )
+        iid_audio_session_manager2 = guid(
+            0x77AA99A0,
+            0x1BD6,
+            0x484F,
+            (0x8B, 0xC7, 0x2C, 0x65, 0x4C, 0x9A, 0x9B, 0x6F),
+        )
+        iid_audio_session_control2 = guid(
+            0xBFB7FF88,
+            0x7239,
+            0x4FC9,
+            (0x8F, 0xA2, 0x07, 0xC9, 0x50, 0xBE, 0x9C, 0x6D),
+        )
+
+        def failed(value: int) -> bool:
+            return ctypes.c_long(value).value < 0
+
+        def check(value: int, action: str) -> None:
+            if failed(value):
+                raise OSError(
+                    f"{action} failed with HRESULT 0x{value & 0xFFFFFFFF:08X}"
+                )
+
+        def com_method(
+            pointer: ctypes.c_void_p,
+            index: int,
+            restype: type[ctypes._SimpleCData],
+            *argtypes: object,
+        ) -> object:
+            vtable = ctypes.cast(
+                pointer,
+                ctypes.POINTER(ctypes.POINTER(ctypes.c_void_p)),
+            ).contents
+            prototype = ctypes.WINFUNCTYPE(restype, ctypes.c_void_p, *argtypes)
+            return prototype(vtable[index])
+
+        def release(pointer: ctypes.c_void_p | None) -> None:
+            if pointer:
+                method = com_method(pointer, 2, wintypes.ULONG)
+                method(pointer)
+
+        ole32 = ctypes.windll.ole32
+        initialized = False
+        enumerator = ctypes.c_void_p()
+        device = ctypes.c_void_p()
+        manager = ctypes.c_void_p()
+        sessions = ctypes.c_void_p()
+        controls: list[ctypes.c_void_p] = []
+        control2s: list[ctypes.c_void_p] = []
+        try:
+            hr = int(ole32.CoInitializeEx(None, coinit_multithreaded))
+            if hr in {s_ok, s_false}:
+                initialized = True
+            elif hr != rpc_e_changed_mode:
+                check(hr, "CoInitializeEx")
+
+            hr = int(
+                ole32.CoCreateInstance(
+                    ctypes.byref(clsid_mm_device_enumerator),
+                    None,
+                    clsctx_all,
+                    ctypes.byref(iid_mm_device_enumerator),
+                    ctypes.byref(enumerator),
+                )
+            )
+            check(hr, "CoCreateInstance")
+
+            get_default_audio_endpoint = com_method(
+                enumerator,
+                4,
+                hresult,
+                ctypes.c_int,
+                ctypes.c_int,
+                ctypes.POINTER(ctypes.c_void_p),
+            )
+            check(
+                int(
+                    get_default_audio_endpoint(
+                        enumerator,
+                        e_render,
+                        e_multimedia,
+                        ctypes.byref(device),
+                    )
+                ),
+                "GetDefaultAudioEndpoint",
+            )
+
+            activate = com_method(
+                device,
+                3,
+                hresult,
+                ctypes.POINTER(GUID),
+                wintypes.DWORD,
+                ctypes.c_void_p,
+                ctypes.POINTER(ctypes.c_void_p),
+            )
+            check(
+                int(
+                    activate(
+                        device,
+                        ctypes.byref(iid_audio_session_manager2),
+                        clsctx_all,
+                        None,
+                        ctypes.byref(manager),
+                    )
+                ),
+                "IMMDevice.Activate",
+            )
+
+            get_session_enumerator = com_method(
+                manager,
+                5,
+                hresult,
+                ctypes.POINTER(ctypes.c_void_p),
+            )
+            check(
+                int(get_session_enumerator(manager, ctypes.byref(sessions))),
+                "GetSessionEnumerator",
+            )
+
+            get_count = com_method(
+                sessions,
+                3,
+                hresult,
+                ctypes.POINTER(ctypes.c_int),
+            )
+            count = ctypes.c_int()
+            check(int(get_count(sessions, ctypes.byref(count))), "GetCount")
+
+            active_pids: list[int] = []
+            get_session = com_method(
+                sessions,
+                4,
+                hresult,
+                ctypes.c_int,
+                ctypes.POINTER(ctypes.c_void_p),
+            )
+            for index in range(count.value):
+                control = ctypes.c_void_p()
+                check(
+                    int(get_session(sessions, index, ctypes.byref(control))),
+                    "GetSession",
+                )
+                controls.append(control)
+
+                get_state = com_method(
+                    control,
+                    3,
+                    hresult,
+                    ctypes.POINTER(ctypes.c_int),
+                )
+                state = ctypes.c_int()
+                check(int(get_state(control, ctypes.byref(state))), "GetState")
+                if state.value != audio_session_state_active:
+                    continue
+
+                query_interface = com_method(
+                    control,
+                    0,
+                    hresult,
+                    ctypes.POINTER(GUID),
+                    ctypes.POINTER(ctypes.c_void_p),
+                )
+                control2 = ctypes.c_void_p()
+                hr = int(
+                    query_interface(
+                        control,
+                        ctypes.byref(iid_audio_session_control2),
+                        ctypes.byref(control2),
+                    )
+                )
+                if failed(hr):
+                    continue
+                control2s.append(control2)
+
+                get_process_id = com_method(
+                    control2,
+                    14,
+                    hresult,
+                    ctypes.POINTER(wintypes.DWORD),
+                )
+                pid = wintypes.DWORD()
+                check(
+                    int(get_process_id(control2, ctypes.byref(pid))),
+                    "GetProcessId",
+                )
+                if pid.value:
+                    active_pids.append(int(pid.value))
+
+            candidates = self._audio_candidates(sorted(set(active_pids)))
+            selected = self._select_audio_app(candidates, preferred_pid)
+            self._last_audio_candidate_keys = self._audio_candidate_keys(candidates)
+            return selected
+        finally:
+            for pointer in control2s:
+                release(pointer)
+            for pointer in controls:
+                release(pointer)
+            release(sessions)
+            release(manager)
+            release(device)
+            release(enumerator)
+            if initialized:
+                ole32.CoUninitialize()
+
     def _process_exe_path(self, pid: int) -> str | None:
         import ctypes
         from ctypes import wintypes
@@ -343,3 +836,58 @@ class WindowsActivityReader:
             return buffer.value
         finally:
             kernel32.CloseHandle(handle)
+
+    def _audio_candidates(self, pids: list[int]) -> list[AudioApp]:
+        candidates: list[AudioApp] = []
+        unresolved_pids: list[int] = []
+        for pid in pids:
+            exe_path = self._process_exe_path(pid)
+            if exe_path is None:
+                LOGGER.debug(
+                    "skipping audio pid=%s because executable path could not be "
+                    "resolved",
+                    pid,
+                )
+                unresolved_pids.append(pid)
+                continue
+            app_name = _process_name(pid, exe_path)
+            if _is_excluded_audio_exe(app_name):
+                continue
+            candidates.append(AudioApp(pid=pid, exe_path=exe_path))
+        if not candidates:
+            return [AudioApp(pid=pid, exe_path=None) for pid in unresolved_pids]
+        return candidates
+
+    def _select_audio_app(
+        self,
+        candidates: list[AudioApp],
+        preferred_pid: int | None,
+    ) -> AudioApp | None:
+        if not candidates:
+            return None
+
+        candidate_keys = self._audio_candidate_keys(candidates)
+        previous_keys = self._last_audio_candidate_keys
+        if previous_keys is not None and previous_keys != candidate_keys:
+            previous_key_set = set(previous_keys)
+            for candidate in candidates:
+                if self._audio_candidate_key(candidate) not in previous_key_set:
+                    return candidate
+
+        if preferred_pid is not None:
+            for candidate in candidates:
+                if candidate.pid == preferred_pid:
+                    return candidate
+
+        return min(candidates, key=lambda candidate: candidate.pid)
+
+    def _audio_candidate_keys(
+        self,
+        candidates: list[AudioApp],
+    ) -> tuple[tuple[str, int], ...]:
+        return tuple(
+            sorted(self._audio_candidate_key(candidate) for candidate in candidates)
+        )
+
+    def _audio_candidate_key(self, candidate: AudioApp) -> tuple[str, int]:
+        return (_audio_app_name(candidate), candidate.pid)
