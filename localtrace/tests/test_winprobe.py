@@ -418,6 +418,89 @@ def test_audio_retry_seq_stays_stable_across_foreground_posts() -> None:
     assert first_audio["seq"] == retry_audio["seq"] == 1
 
 
+def test_failed_audio_stop_is_abandoned_when_same_app_resumes() -> None:
+    state = ProbeState(ProbeSettings(heartbeat_seconds=60))
+    observed_at = datetime(2026, 7, 1, 10, 30, tzinfo=UTC)
+    spotify = AudioApp(pid=20, exe_path=r"C:\Spotify.exe")
+
+    first_audio = state.next_audio_event(
+        spotify,
+        poll_failed=False,
+        observed_at=observed_at,
+    )
+    assert first_audio is not None
+    state.mark_audio_sent(spotify, observed_at=observed_at)
+    failed_stop = state.next_audio_event(
+        None,
+        poll_failed=False,
+        observed_at=observed_at + timedelta(seconds=1),
+    )
+    resumed_audio = state.next_audio_event(
+        spotify,
+        poll_failed=False,
+        observed_at=observed_at + timedelta(seconds=2),
+    )
+
+    assert failed_stop is not None
+    assert failed_stop["kind"] == "app_audio_stop"
+    assert resumed_audio is not None
+    assert resumed_audio["kind"] == "app_audio"
+    assert resumed_audio["seq"] > failed_stop["seq"]
+
+
+def test_failed_initial_audio_post_retries_even_if_app_disappears() -> None:
+    state = ProbeState(ProbeSettings(heartbeat_seconds=60))
+    observed_at = datetime(2026, 7, 1, 10, 30, tzinfo=UTC)
+    spotify = AudioApp(pid=20, exe_path=r"C:\Spotify.exe")
+
+    first_audio = state.next_audio_event(
+        spotify,
+        poll_failed=False,
+        observed_at=observed_at,
+    )
+    retry_audio = state.next_audio_event(
+        None,
+        poll_failed=False,
+        observed_at=observed_at + timedelta(seconds=1),
+    )
+
+    assert first_audio is not None
+    assert retry_audio is not None
+    assert retry_audio["kind"] == "app_audio"
+    assert retry_audio["entity"] == "Spotify.exe"
+    assert retry_audio["seq"] == first_audio["seq"]
+
+
+def test_pending_audio_retry_marks_original_app_after_success() -> None:
+    state = ProbeState(ProbeSettings(heartbeat_seconds=60))
+    observed_at = datetime(2026, 7, 1, 10, 30, tzinfo=UTC)
+    spotify = AudioApp(pid=20, exe_path=r"C:\Spotify.exe")
+
+    first_audio = state.next_audio_event(
+        spotify,
+        poll_failed=False,
+        observed_at=observed_at,
+    )
+    retry_audio = state.next_audio_event(
+        None,
+        poll_failed=False,
+        observed_at=observed_at + timedelta(seconds=1),
+    )
+    assert first_audio is not None
+    assert retry_audio is not None
+
+    state.mark_audio_event_sent(observed_at=observed_at + timedelta(seconds=1))
+    stop_audio = state.next_audio_event(
+        None,
+        poll_failed=False,
+        observed_at=observed_at + timedelta(seconds=2),
+    )
+
+    assert stop_audio is not None
+    assert stop_audio["kind"] == "app_audio_stop"
+    assert stop_audio["entity"] == "Spotify.exe"
+
+
 def test_probe_state_retries_until_post_is_marked_sent() -> None:
     state = ProbeState(ProbeSettings(heartbeat_seconds=60, idle_cutoff_seconds=300))
     observed_at = datetime(2026, 7, 1, 10, 30, tzinfo=UTC)

@@ -70,6 +70,8 @@ class ProbeState:
         self._pending_foreground_seq: int | None = None
         self._pending_audio_key: tuple[str, tuple[str, int] | None] | None = None
         self._pending_audio_seq: int | None = None
+        self._pending_audio_kind: str | None = None
+        self._pending_audio_app: AudioApp | None = None
 
     @property
     def preferred_audio_pid(self) -> int | None:
@@ -123,6 +125,17 @@ class ProbeState:
             return None
 
         if audio is None:
+            if (
+                self._pending_audio_kind == "audio"
+                and self._pending_audio_app is not None
+                and self._pending_audio_seq is not None
+            ):
+                return build_app_audio_event(
+                    self._pending_audio_app,
+                    observed_at=observed_at,
+                    settings=self._settings,
+                    seq=self._pending_audio_seq,
+                )
             if self._last_audio is None:
                 self._clear_pending_audio()
                 return None
@@ -130,13 +143,18 @@ class ProbeState:
                 "stop",
                 self._audio_key_for(self._last_audio),
             )
-            seq = self._seq_for_audio(pending_key)
+            seq = self._seq_for_audio(pending_key, kind="stop", audio=None)
             return build_app_audio_stop_event(
                 self._last_audio,
                 observed_at=observed_at,
                 settings=self._settings,
                 seq=seq,
             )
+
+        force_audio_event = False
+        if self._pending_audio_kind == "stop":
+            self._clear_pending_audio()
+            force_audio_event = True
 
         key = self._audio_key_for(audio)
         last_key = (
@@ -147,10 +165,10 @@ class ProbeState:
             or (observed_at - self._last_audio_sent_at).total_seconds()
             >= self._settings.heartbeat_seconds
         )
-        if last_key == key and not due_heartbeat:
+        if last_key == key and not due_heartbeat and not force_audio_event:
             return None
 
-        seq = self._seq_for_audio(("audio", key))
+        seq = self._seq_for_audio(("audio", key), kind="audio", audio=audio)
         return build_app_audio_event(
             audio,
             observed_at=observed_at,
@@ -164,6 +182,14 @@ class ProbeState:
         *,
         observed_at: datetime,
     ) -> None:
+        self._clear_pending_audio()
+        self._last_audio = audio
+        self._last_audio_sent_at = observed_at
+
+    def mark_audio_event_sent(self, *, observed_at: datetime) -> None:
+        if self._pending_audio_kind is None:
+            return
+        audio = self._pending_audio_app if self._pending_audio_kind == "audio" else None
         self._clear_pending_audio()
         self._last_audio = audio
         self._last_audio_sent_at = observed_at
@@ -186,12 +212,20 @@ class ProbeState:
         self._pending_foreground_seq = seq
         return seq
 
-    def _seq_for_audio(self, key: tuple[str, tuple[str, int] | None]) -> int:
+    def _seq_for_audio(
+        self,
+        key: tuple[str, tuple[str, int] | None],
+        *,
+        kind: str,
+        audio: AudioApp | None,
+    ) -> int:
         if self._pending_audio_key == key and self._pending_audio_seq is not None:
             return self._pending_audio_seq
         seq = self._reserve_seq()
         self._pending_audio_key = key
         self._pending_audio_seq = seq
+        self._pending_audio_kind = kind
+        self._pending_audio_app = audio
         return seq
 
     def _reserve_seq(self) -> int:
@@ -205,6 +239,8 @@ class ProbeState:
     def _clear_pending_audio(self) -> None:
         self._pending_audio_key = None
         self._pending_audio_seq = None
+        self._pending_audio_kind = None
+        self._pending_audio_app = None
 
 
 def build_app_active_event(
@@ -345,7 +381,7 @@ def run_probe(settings: ProbeSettings, reader: ActivityReader) -> None:
             observed_at=observed_at,
         )
         if audio_event is not None and _post_with_logging(settings, audio_event):
-            state.mark_audio_sent(audio, observed_at=observed_at)
+            state.mark_audio_event_sent(observed_at=observed_at)
         time.sleep(settings.poll_ms / 1000)
 
 
