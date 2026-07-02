@@ -80,13 +80,15 @@ def _read_error_detail(exc: HTTPError) -> str:
     return str(body)
 
 
-def parse_positive_int(value: str | int, label: str) -> int:
+def parse_positive_int(value: str | int, label: str, maximum: int | None = None) -> int:
     try:
         parsed = int(value)
     except ValueError as exc:
         raise LocalTraceValidationError(f"{label} must be an integer") from exc
     if parsed < 1:
         raise LocalTraceValidationError(f"{label} must be at least 1")
+    if maximum is not None and parsed > maximum:
+        raise LocalTraceValidationError(f"{label} must be at most {maximum}")
     return parsed
 
 
@@ -156,7 +158,6 @@ def events_between(
     source: str | None = None,
     kind: str | None = None,
     limit: int = 1000,
-    order: str = "asc",
 ) -> dict[str, Any]:
     return request_json(
         base_url,
@@ -167,7 +168,6 @@ def events_between(
             "source": source,
             "kind": kind,
             "limit": limit,
-            "order": order,
         },
     )
 

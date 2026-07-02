@@ -147,7 +147,6 @@ def events_route(events: list[dict[str, Any]]):
         selected = sorted(
             selected,
             key=lambda event: (event["observed_at"], event["id"]),
-            reverse=query.get("order", ["asc"])[0] == "desc",
         )
         if "limit" in query:
             selected = selected[: int(query["limit"][0])]
@@ -167,28 +166,58 @@ def test_health_script_returns_core_health_json() -> None:
     assert server.requests == ["/health"]
 
 
-def test_recent_events_script_requests_descending_events_with_limit() -> None:
+def test_recent_events_script_returns_newest_events_from_complete_scan() -> None:
     with FakeLocalTraceServer(
-        {
-            "/events": {
-                "body": {"ok": True, "events": list(reversed(sample_events()))[:2]}
-            }
-        }
+        {"/events": {"body": {"ok": True, "events": sample_events()}}}
     ) as server:
         result = run_script(
             "localtrace_recent_events.py",
-            ["--limit", "2"],
+            ["--limit", "2", "--scan-limit", "5"],
             server.base_url,
         )
 
     assert result.returncode == 0
     body = output_json(result)
-    assert body["events"] == list(reversed(sample_events()))[:2]
+    assert body["events"] == sample_events()[-2:]
     assert body["recent_limit"] == 2
+    assert body["scan_limit"] == 5
+    assert body["truncated"] is False
     path, query = parse_request(server.requests[0])
     assert path == "/events"
-    assert query["limit"] == ["2"]
-    assert query["order"] == ["desc"]
+    assert query["limit"] == ["6"]
+
+
+def test_recent_events_refuses_partial_output_when_scan_limit_is_exceeded() -> None:
+    with FakeLocalTraceServer(
+        {"/events": {"body": {"ok": True, "events": sample_events()}}}
+    ) as server:
+        result = run_script(
+            "localtrace_recent_events.py",
+            ["--limit", "2", "--scan-limit", "2"],
+            server.base_url,
+        )
+
+    assert result.returncode == 1
+    assert output_json(result) == {
+        "ok": False,
+        "partial": True,
+        "error": "recent events exceed scan limit; increase --scan-limit",
+        "truncated": True,
+        "scan_limit": 2,
+    }
+    path, query = parse_request(server.requests[0])
+    assert path == "/events"
+    assert query["limit"] == ["3"]
+
+
+def test_recent_events_rejects_scan_limit_above_detection_cap() -> None:
+    result = run_script("localtrace_recent_events.py", ["--scan-limit", "5000"])
+
+    assert result.returncode == 2
+    assert output_json(result) == {
+        "ok": False,
+        "error": "--scan-limit must be at most 4999",
+    }
 
 
 def test_events_between_script_validates_range_and_filters() -> None:
@@ -310,8 +339,7 @@ def test_explain_gap_script_reports_before_inside_and_after_context() -> None:
     before_path, before_query = parse_request(server.requests[1])
     assert before_path == "/events"
     assert before_query["to"] == ["2026-07-01T09:10:00.000Z"]
-    assert before_query["order"] == ["desc"]
-    assert before_query["limit"] == ["1"]
+    assert before_query["limit"] == ["1001"]
     after_path, after_query = parse_request(server.requests[2])
     assert after_path == "/events"
     assert after_query["from"] == ["2026-07-01T09:20:00.000Z"]
@@ -396,6 +424,18 @@ def test_day_summary_refuses_partial_output_when_event_limit_is_exceeded() -> No
     path, query = parse_request(server.requests[0])
     assert path == "/events"
     assert query["limit"] == ["3"]
+
+
+def test_day_summary_rejects_limit_above_detection_cap() -> None:
+    result = run_script(
+        "localtrace_day_summary.py", ["--date", "2026-07-01", "--limit", "5000"]
+    )
+
+    assert result.returncode == 2
+    assert output_json(result) == {
+        "ok": False,
+        "error": "--limit must be at most 4999",
+    }
 
 
 def test_explain_gap_refuses_partial_output_when_event_limit_is_exceeded() -> None:

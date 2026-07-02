@@ -28,7 +28,7 @@ def main() -> int:
 
     try:
         day = parse_date(args.date)
-        limit = parse_positive_int(args.limit, "--limit")
+        limit = parse_positive_int(args.limit, "--limit", maximum=4999)
         start, end = day_bounds(day)
         body = events_between(args.base_url, start, end, limit=limit + 1)
         events, truncated = apply_event_limit(body.get("events", []), limit)

@@ -36,7 +36,7 @@ def main() -> int:
         start = rfc3339_utc(args.start, "--from")
         end = rfc3339_utc(args.end, "--to")
         ensure_ordered_range(start, end)
-        limit = parse_positive_int(args.limit, "--limit")
+        limit = parse_positive_int(args.limit, "--limit", maximum=4999)
         inside_body = events_between(args.base_url, start, end, limit=limit + 1)
         inside, inside_truncated = apply_event_limit(
             inside_body.get("events", []), limit
@@ -53,9 +53,24 @@ def main() -> int:
             )
             return 1
         day_start, _day_end = day_bounds(parse_date(start[:10]))
-        before_body = events_between(
-            args.base_url, day_start, start, limit=1, order="desc"
+        before_body = events_between(args.base_url, day_start, start, limit=limit + 1)
+        before, before_truncated = apply_event_limit(
+            before_body.get("events", []), limit
         )
+        if before_truncated:
+            print_json(
+                {
+                    "ok": False,
+                    "partial": True,
+                    "error": (
+                        "gap context before window exceeds event limit; "
+                        "increase --limit"
+                    ),
+                    "truncated": True,
+                    "source_event_limit": limit,
+                }
+            )
+            return 1
         _after_start, day_end = day_bounds(parse_date(end[:10]))
         after_body = events_between(args.base_url, end, day_end, limit=1)
         if inside:
@@ -68,7 +83,7 @@ def main() -> int:
             "to": end,
             "gap_detected": not inside,
             "inside_event_count": len(inside),
-            "before": _first_or_none(before_body.get("events", [])),
+            "before": before[-1] if before else None,
             "inside": inside,
             "after": _first_or_none(after_body.get("events", [])),
             "explanation": explanation,
