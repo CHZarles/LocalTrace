@@ -250,15 +250,16 @@ Skill:
 localtrace-skill
 ```
 
-## Old WorkTrace Code Reuse
+## Legacy WorkTrace Code Reuse
 
-Old code is a reference, not the new architecture.
+Legacy WorkTrace code is reference material, not the new architecture.
 
 May reuse ideas or small code sections from:
 
 - `collectors/windows_collector/src/main.rs`
-- `extension/`
-- current UI information architecture
+- old browser extension history, as already migrated into `localtrace/extension/`
+- old UI information architecture, only where it supports LocalTrace's local
+  capture scope
 
 Must not preserve:
 

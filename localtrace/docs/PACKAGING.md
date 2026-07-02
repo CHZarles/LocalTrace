@@ -62,8 +62,7 @@ LocalTrace uses a dedicated Windows release workflow:
 .github/workflows/localtrace-release-windows.yml
 ```
 
-The workflow is intentionally separate from the older WorkTrace installer
-workflow. LocalTrace release tags use this prefix:
+LocalTrace release tags use this prefix:
 
 ```text
 localtrace-v*

@@ -4,6 +4,10 @@ config:
   MD041: false
 
 globs:
+  - "../README.md"
+  - "../DEVELOPING.md"
+  - "../WINDOWS_DEV.md"
+  - "../RELEASING.md"
   - "../DEVELOPMENT_WORKFLOW.md"
   - "docs/**/*.md"
 

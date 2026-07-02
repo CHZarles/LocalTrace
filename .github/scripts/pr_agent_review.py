@@ -19,6 +19,10 @@ MAX_DIFF_CHARS = 65000
 REQUEST_TIMEOUT_SECONDS = 300
 
 DOC_PATHS = [
+    "README.md",
+    "DEVELOPING.md",
+    "WINDOWS_DEV.md",
+    "RELEASING.md",
     "DEVELOPMENT_WORKFLOW.md",
     "localtrace/docs/WORKFLOW.md",
     "localtrace/docs/LOCALTRACE_SPEC.md",
