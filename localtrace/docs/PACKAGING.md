@@ -99,8 +99,10 @@ After install:
 3. Confirm the Web Settings health view loads.
 4. Start `%LOCALAPPDATA%\LocalTrace\App\localtrace-winprobe.exe` on Windows.
 5. Confirm `GET /health` reports LocalTrace and recent source diagnostics.
-6. Load `extension/localtrace-extension.zip` through Chrome or Edge extension
-   developer tooling and confirm the extension health check reports OK.
+6. Extract `extension/localtrace-extension.zip` to a temporary directory.
+7. In Chrome or Edge extension developer tooling, use Load unpacked and select
+   the extracted extension directory.
+8. Confirm the extension health check reports OK.
 
 ## Non-Goals
 

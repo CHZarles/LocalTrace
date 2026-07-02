@@ -163,9 +163,19 @@ def test_install_script_fails_fast_for_missing_required_artifacts() -> None:
         LOCALTRACE_ROOT / "packaging" / "scripts" / "install-localtrace.ps1"
     ).read_text(encoding="utf-8")
 
+    assert '[string]$InstallDir = ""' in script
     assert 'throw "Release root missing required artifact:' in script
     assert "continue" not in script
     assert "Set-ItemProperty" in script
+
+
+def test_install_script_rejects_running_from_installed_copy() -> None:
+    script = (
+        LOCALTRACE_ROOT / "packaging" / "scripts" / "install-localtrace.ps1"
+    ).read_text(encoding="utf-8")
+
+    assert "[System.IO.Path]::GetFullPath" in script
+    assert "ReleaseRoot and InstallDir must be different" in script
 
 
 def test_packaging_docs_are_in_mkdocs_nav() -> None:
@@ -177,3 +187,5 @@ def test_packaging_docs_are_in_mkdocs_nav() -> None:
     assert "localtrace.exe" in docs
     assert "localtrace-winprobe.exe" in docs
     assert "LocalTrace-windows.zip" in docs
+    assert "Extract `extension/localtrace-extension.zip`" in docs
+    assert "Load unpacked" in docs

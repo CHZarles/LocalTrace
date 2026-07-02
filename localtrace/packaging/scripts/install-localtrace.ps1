@@ -1,6 +1,6 @@
 param(
   [string]$ReleaseRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path,
-  [string]$InstallDir = (Join-Path $env:LOCALAPPDATA "LocalTrace\App")
+  [string]$InstallDir = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -12,6 +12,21 @@ $coreExe = Join-Path $InstallDir "localtrace.exe"
 if ([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
   throw "LOCALAPPDATA is not set."
 }
+if ([string]::IsNullOrWhiteSpace($InstallDir)) {
+  $InstallDir = Join-Path $env:LOCALAPPDATA "LocalTrace\App"
+}
+
+function Get-NormalizedPath {
+  param([Parameter(Mandatory = $true)][string]$Path)
+  return [System.IO.Path]::GetFullPath($Path).TrimEnd("\", "/")
+}
+
+$normalizedReleaseRoot = Get-NormalizedPath -Path $ReleaseRoot
+$normalizedInstallDir = Get-NormalizedPath -Path $InstallDir
+if ($normalizedReleaseRoot -ieq $normalizedInstallDir) {
+  throw "ReleaseRoot and InstallDir must be different. Run this script from an extracted release directory, not from the installed app directory."
+}
+
 $requiredItems = @(
   "localtrace.exe",
   "localtrace-winprobe.exe",
