@@ -42,14 +42,25 @@ class FakeLocalTraceServer:
                 if route is None:
                     self._write_json(404, {"ok": False, "error": "not found"})
                     return
-                self._write_json(route.get("status", 200), route["body"])
+                self._write_json(
+                    route.get("status", 200),
+                    route["body"],
+                    route.get("headers", {}),
+                )
 
             def log_message(self, format: str, *args: object) -> None:
                 return
 
-            def _write_json(self, status: int, body: dict[str, Any]) -> None:
+            def _write_json(
+                self,
+                status: int,
+                body: dict[str, Any],
+                headers: dict[str, str] | None = None,
+            ) -> None:
                 encoded = json.dumps(body).encode("utf-8")
                 self.send_response(status)
+                for key, value in (headers or {}).items():
+                    self.send_header(key, value)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(encoded)))
                 self.end_headers()
@@ -131,19 +142,49 @@ def test_health_script_returns_core_health_json() -> None:
     assert server.requests == ["/health"]
 
 
-def test_recent_events_script_queries_events_with_limit() -> None:
+def test_recent_events_script_returns_newest_events_from_scanned_events() -> None:
     with FakeLocalTraceServer(
-        {"/events": {"body": {"ok": True, "events": sample_events()[:2]}}}
+        {"/events": {"body": {"ok": True, "events": sample_events()}}}
     ) as server:
         result = run_script(
-            "localtrace_recent_events.py", ["--limit", "2"], server.base_url
+            "localtrace_recent_events.py",
+            ["--limit", "2", "--scan-limit", "5"],
+            server.base_url,
         )
 
     assert result.returncode == 0
-    assert output_json(result)["events"] == sample_events()[:2]
+    body = output_json(result)
+    assert body["events"] == sample_events()[-2:]
+    assert body["recent_limit"] == 2
+    assert body["scan_limit"] == 5
+    assert body["truncated"] is False
     path, query = parse_request(server.requests[0])
     assert path == "/events"
-    assert query["limit"] == ["2"]
+    assert query["limit"] == ["6"]
+
+
+def test_recent_events_refuses_partial_output_when_scan_limit_is_exceeded() -> None:
+    with FakeLocalTraceServer(
+        {"/events": {"body": {"ok": True, "events": sample_events()}}}
+    ) as server:
+        result = run_script(
+            "localtrace_recent_events.py",
+            ["--limit", "2", "--scan-limit", "2"],
+            server.base_url,
+        )
+
+    assert result.returncode == 1
+    body = output_json(result)
+    assert body == {
+        "ok": False,
+        "partial": True,
+        "error": "recent events exceed scan limit; increase --scan-limit",
+        "truncated": True,
+        "scan_limit": 2,
+    }
+    path, query = parse_request(server.requests[0])
+    assert path == "/events"
+    assert query["limit"] == ["3"]
 
 
 def test_events_between_script_validates_range_and_filters() -> None:
@@ -274,6 +315,35 @@ def test_scripts_return_machine_readable_error_when_core_is_unavailable() -> Non
     body = output_json(result)
     assert body["ok"] is False
     assert "LocalTrace request failed" in body["error"]
+
+
+def test_health_script_uses_env_base_url_override() -> None:
+    with FakeLocalTraceServer(
+        {"/health": {"body": {"ok": True, "service": "localtrace"}}}
+    ) as server:
+        result = run_script("localtrace_health.py", [], server.base_url)
+
+    assert result.returncode == 0
+    assert output_json(result)["service"] == "localtrace"
+    assert server.requests == ["/health"]
+
+
+def test_http_helper_does_not_follow_redirects() -> None:
+    with FakeLocalTraceServer(
+        {
+            "/health": {
+                "status": 302,
+                "headers": {"Location": "http://example.com/health"},
+                "body": {"ok": False, "error": "redirect"},
+            }
+        }
+    ) as server:
+        result = run_script("localtrace_health.py", [], server.base_url)
+
+    assert result.returncode == 1
+    body = output_json(result)
+    assert body["ok"] is False
+    assert "HTTP 302" in body["error"]
 
 
 def test_scripts_reject_non_loopback_base_url_before_http_request() -> None:

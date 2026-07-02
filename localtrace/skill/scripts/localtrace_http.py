@@ -9,7 +9,7 @@ from datetime import UTC, date, datetime, timedelta
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlparse
-from urllib.request import urlopen
+from urllib.request import HTTPRedirectHandler, build_opener
 
 DEFAULT_BASE_URL = "http://127.0.0.1:8765"
 
@@ -20,6 +20,14 @@ class LocalTraceError(Exception):
 
 class LocalTraceValidationError(LocalTraceError):
     pass
+
+
+class NoRedirectHandler(HTTPRedirectHandler):
+    def redirect_request(self, *args: Any, **kwargs: Any) -> None:
+        return None
+
+
+HTTP_OPENER = build_opener(NoRedirectHandler)
 
 
 def add_base_url_argument(parser: argparse.ArgumentParser) -> None:
@@ -47,7 +55,7 @@ def request_json(base_url: str, path: str, params: dict[str, Any] | None = None)
         url = f"{url}?{urlencode(query)}"
 
     try:
-        with urlopen(url, timeout=5) as response:
+        with HTTP_OPENER.open(url, timeout=5) as response:
             return json.loads(response.read())
     except HTTPError as exc:
         detail = _read_error_detail(exc)
