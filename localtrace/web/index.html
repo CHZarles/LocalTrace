@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LocalTrace Settings</title>
+    <link rel="stylesheet" href="/web/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <h1>LocalTrace</h1>
+        <p id="statusLine">Loading</p>
+      </div>
+      <div class="top-actions">
+        <button id="refreshButton" type="button">Refresh</button>
+        <button id="pauseButton" type="button">Pause</button>
+        <button id="resumeButton" type="button">Resume</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="band">
+        <div class="section-heading">
+          <h2>Health</h2>
+        </div>
+        <dl class="metrics" id="healthMetrics"></dl>
+      </section>
+
+      <section class="band">
+        <div class="section-heading">
+          <h2>Settings</h2>
+          <button id="saveSettings" type="button">Save</button>
+        </div>
+        <form id="settingsForm" class="settings-grid">
+          <label>
+            <span>Port</span>
+            <input id="apiPort" name="apiPort" type="number" min="1" max="65535" />
+          </label>
+          <label>
+            <span>Poll ms</span>
+            <input id="pollMs" name="pollMs" type="number" min="100" step="100" />
+          </label>
+          <label>
+            <span>Heartbeat sec</span>
+            <input id="heartbeatSeconds" name="heartbeatSeconds" type="number" min="1" />
+          </label>
+          <label>
+            <span>Idle cutoff sec</span>
+            <input id="idleCutoffSeconds" name="idleCutoffSeconds" type="number" min="1" />
+          </label>
+          <label class="toggle">
+            <span>Store titles</span>
+            <input id="storeTitles" name="storeTitles" type="checkbox" />
+          </label>
+          <label class="toggle">
+            <span>Store exe path</span>
+            <input id="storeExePath" name="storeExePath" type="checkbox" />
+          </label>
+          <label class="toggle">
+            <span>Track browser</span>
+            <input id="trackBrowser" name="trackBrowser" type="checkbox" />
+          </label>
+          <label class="toggle">
+            <span>Track audio</span>
+            <input id="trackAudio" name="trackAudio" type="checkbox" />
+          </label>
+          <label class="toggle">
+            <span>Default title storage</span>
+            <input id="defaultTitleStorage" name="defaultTitleStorage" type="checkbox" />
+          </label>
+        </form>
+      </section>
+
+      <section class="band">
+        <div class="section-heading">
+          <h2>Privacy</h2>
+          <button id="addRule" type="button">Add Rule</button>
+        </div>
+        <form id="ruleForm" class="rule-form">
+          <label>
+            <span>Entity</span>
+            <select id="ruleEntityType" name="ruleEntityType">
+              <option value="domain">domain</option>
+              <option value="app">app</option>
+            </select>
+          </label>
+          <label>
+            <span>Pattern</span>
+            <input id="rulePattern" name="rulePattern" type="text" autocomplete="off" />
+          </label>
+          <label>
+            <span>Action</span>
+            <select id="ruleAction" name="ruleAction">
+              <option value="mask">mask</option>
+              <option value="drop">drop</option>
+            </select>
+          </label>
+        </form>
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Entity</th>
+              <th>Pattern</th>
+              <th>Action</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="rulesTable"></tbody>
+        </table>
+      </section>
+    </main>
+
+    <script type="module" src="/web/app.js"></script>
+  </body>
+</html>

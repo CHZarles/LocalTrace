@@ -103,6 +103,79 @@ def list_privacy_rules(db_path: Path, entity_type: str) -> list[dict[str, str]]:
     ]
 
 
+def list_all_privacy_rules(db_path: Path) -> list[dict[str, Any]]:
+    with sqlite3.connect(db_path) as conn:
+        rows = conn.execute(
+            """
+            SELECT id, entity_type, pattern, action, created_at
+            FROM privacy_rules
+            ORDER BY id ASC
+            """
+        ).fetchall()
+
+    return [
+        {
+            "id": row[0],
+            "entity_type": row[1],
+            "pattern": row[2],
+            "action": row[3],
+            "created_at": row[4],
+        }
+        for row in rows
+    ]
+
+
+def insert_privacy_rule(
+    db_path: Path, entity_type: str, pattern: str, action: str, created_at: str
+) -> dict[str, Any]:
+    with sqlite3.connect(db_path) as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO privacy_rules (entity_type, pattern, action, created_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (entity_type, pattern, action, created_at),
+        )
+        rule_id = int(cursor.lastrowid)
+
+    return {
+        "id": rule_id,
+        "entity_type": entity_type,
+        "pattern": pattern,
+        "action": action,
+        "created_at": created_at,
+    }
+
+
+def delete_privacy_rule(db_path: Path, rule_id: int) -> bool:
+    with sqlite3.connect(db_path) as conn:
+        cursor = conn.execute("DELETE FROM privacy_rules WHERE id = ?", (rule_id,))
+        return cursor.rowcount > 0
+
+
+def count_recent_events(db_path: Path, received_since: str) -> int:
+    with sqlite3.connect(db_path) as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) FROM events WHERE received_at >= ?", (received_since,)
+        ).fetchone()
+    return int(row[0])
+
+
+def latest_events_by_source(db_path: Path) -> dict[str, dict[str, str]]:
+    with sqlite3.connect(db_path) as conn:
+        rows = conn.execute(
+            """
+            SELECT source, MAX(observed_at), MAX(received_at)
+            FROM events
+            GROUP BY source
+            """
+        ).fetchall()
+
+    return {
+        row[0]: {"last_observed_at": row[1], "last_received_at": row[2]} for row in rows
+    }
+
+
 def list_events(db_path: Path, filters: dict[str, str]) -> list[dict[str, Any]]:
     clauses: list[str] = []
     params: list[Any] = []
