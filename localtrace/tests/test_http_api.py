@@ -320,8 +320,10 @@ def test_http_routes_expose_web_settings_and_local_json_apis(tmp_path: Path) -> 
         assert "Now" in html
         assert "Today Top" in html
         assert "Timeline" in html
-        assert "Recent events" in html
-        assert "eventsTable" in html
+        assert "Recent flow" not in html
+        assert "flowList" not in html
+        assert "Recent events" not in html
+        assert "eventsTable" not in html
         assert "settingsPanel" in html
         assert "/web/app.js" in html
         assert "Dashboard" not in html

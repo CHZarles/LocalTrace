@@ -73,8 +73,6 @@ function renderToday() {
   renderSummary(model);
   renderTop(model);
   renderTimeline(model);
-  renderFlow(model);
-  renderEvents(model.todayEvents);
 }
 
 function buildTodayModel(events, settings) {
@@ -333,41 +331,6 @@ function renderTimeline(model) {
   $("timelineLanes").replaceChildren(...lanes.map(renderTimelineLane));
 }
 
-function renderFlow(model) {
-  const items = model.focusSegments
-    .slice()
-    .sort((a, b) => b.start - a.start)
-    .slice(0, 12);
-  $("flowList").replaceChildren(...items.map(renderFlowItem));
-  if (!items.length) {
-    const empty = document.createElement("p");
-    empty.className = "empty-state compact";
-    empty.textContent = "No focus flow yet.";
-    $("flowList").append(empty);
-  }
-}
-
-function renderFlowItem(segment) {
-  const item = document.createElement("div");
-  item.className = "flow-item";
-  const time = document.createElement("span");
-  time.className = "flow-time";
-  time.textContent = formatTime(segment.start);
-  const body = document.createElement("div");
-  body.className = "flow-body";
-  const title = document.createElement("strong");
-  const meta = document.createElement("span");
-  title.textContent = segment.label;
-  meta.textContent = `${segment.kind} - ${formatDuration(segment.seconds)}`;
-  body.append(title, meta);
-  item.append(
-    time,
-    entityAvatar(segment.kind, segment.entity, segment.label, segment.activity),
-    body
-  );
-  return item;
-}
-
 function renderAxisTicks() {
   return [0, 360, 720, 1080, 1440].map((minute) => {
     const tick = document.createElement("span");
@@ -405,27 +368,6 @@ function renderTimelineLane(lane) {
   return row;
 }
 
-function renderEvents(events) {
-  const latest = events.slice(0, 40);
-  $("eventsCount").textContent = latest.length
-    ? `${latest.length} latest events`
-    : "No events";
-  $("eventsEmpty").hidden = latest.length !== 0;
-  $("eventsTable").replaceChildren(
-    ...latest.map((event) => {
-      const tr = document.createElement("tr");
-      tr.append(
-        cell(formatTime(event.observed_at)),
-        entityCell(event),
-        cell(event.kind || ""),
-        cell(event.payload?.activity || ""),
-        cell(sourceLabel(event.source))
-      );
-      return tr;
-    })
-  );
-}
-
 function renderHealth(health) {
   if (!health) return;
   const source = health.sources || {};
@@ -434,7 +376,7 @@ function renderHealth(health) {
     ["Bind", `${health.bind?.host || "127.0.0.1"}:${health.bind?.port || ""}`],
     ["Database", health.database?.exists ? "exists" : "missing"],
     ["DB path", health.database?.path || ""],
-    ["Recent events", String(health.events?.recent_count ?? 0)],
+    ["Stored events", String(health.events?.recent_count ?? 0)],
     ["Tracking", health.tracking?.paused ? "paused" : "active"],
     ["Windows probe", source.windows_probe?.last_observed_at || "unknown"],
     ["Browser extension", source.browser_extension?.last_observed_at || "unknown"]
@@ -489,29 +431,6 @@ function renderTracking(tracking) {
 function cell(text) {
   const td = document.createElement("td");
   td.textContent = text;
-  return td;
-}
-
-function entityCell(event) {
-  const td = document.createElement("td");
-  const wrap = document.createElement("div");
-  wrap.className = "entity-cell";
-  wrap.append(
-    entityAvatar(
-      event.entity_type,
-      event.entity,
-      displayEntity(event),
-      event.payload?.activity || "focus"
-    )
-  );
-  const text = document.createElement("div");
-  const title = document.createElement("strong");
-  const sub = document.createElement("span");
-  title.textContent = displayEntity(event);
-  sub.textContent = event.title || event.entity_type || "";
-  text.append(title, sub);
-  wrap.append(text);
-  td.append(wrap);
   return td;
 }
 
@@ -788,12 +707,6 @@ function formatTime(value) {
     minute: "2-digit",
     second: "2-digit"
   }).format(date);
-}
-
-function sourceLabel(source) {
-  if (source === "windows_probe") return "Windows";
-  if (source === "browser_extension") return "Browser";
-  return source || "";
 }
 
 function setView(viewId) {

@@ -348,7 +348,6 @@ main {
 }
 
 .row-value,
-.entity-cell,
 .timeline-lane-label,
 .top-item {
   display: flex;
@@ -372,8 +371,6 @@ main {
 
 .row-value strong,
 .row-value span,
-.entity-cell strong,
-.entity-cell span,
 .timeline-lane-label strong,
 .timeline-lane-label span,
 .top-body strong,
@@ -385,7 +382,6 @@ main {
 }
 
 .row-value span,
-.entity-cell span,
 .timeline-lane-label span,
 .top-body span {
   color: var(--text2);
@@ -664,16 +660,6 @@ th {
 
 td {
   overflow-wrap: anywhere;
-}
-
-.events-table th:nth-child(1) {
-  width: 110px;
-}
-
-.events-table th:nth-child(3),
-.events-table th:nth-child(4),
-.events-table th:nth-child(5) {
-  width: 140px;
 }
 
 .rules-table td:last-child,
