@@ -93,13 +93,13 @@ class LocalTraceService:
         }
 
     def post_events(self, payload: dict[str, Any]) -> tuple[int, dict[str, Any]]:
-        if self.tracking_paused:
-            return 202, {"ok": True, "stored": False, "paused": True}
-
         try:
             event = self._normalize_event(payload)
         except ValueError as exc:
             return 400, {"ok": False, "error": str(exc)}
+
+        if self.tracking_paused:
+            return 202, {"ok": True, "stored": False, "paused": True}
 
         event = self._apply_privacy_rules(event)
         if event is None:
@@ -484,7 +484,7 @@ def _validate_event_contract(source: str, kind: str, entity_type: str) -> None:
 
 
 def _stored_title(value: Any, config: LocalTraceConfig) -> str | None:
-    if not config.capture.store_titles and not config.privacy.default_title_storage:
+    if not config.capture.store_titles:
         return None
     return value if isinstance(value, str) and value else None
 
@@ -496,11 +496,7 @@ def _stored_payload(
     for key, value in payload.items():
         if key in ALWAYS_FILTERED_PAYLOAD_FIELDS:
             continue
-        if (
-            key in TITLE_PAYLOAD_FIELDS
-            and not config.capture.store_titles
-            and not config.privacy.default_title_storage
-        ):
+        if key in TITLE_PAYLOAD_FIELDS and not config.capture.store_titles:
             continue
         if key in EXE_PATH_FIELDS and not config.capture.store_exe_path:
             continue

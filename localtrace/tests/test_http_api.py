@@ -228,6 +228,13 @@ def test_privacy_rule_api_validates_lists_creates_and_deletes_rules(
     assert status == 400
     assert body["ok"] is False
 
+    status, body = service.post_privacy_rule(
+        {"entity_type": "domain", "pattern": "   ", "action": "mask"}
+    )
+
+    assert status == 400
+    assert body["ok"] is False
+
     status, body = service.delete_privacy_rule(rule["id"])
 
     assert status == 200
@@ -256,6 +263,11 @@ def test_tracking_pause_prevents_event_storage_until_resumed(tmp_path: Path) -> 
     assert body == {"ok": True, "paused": False}
 
     service.pause_tracking()
+    status, body = service.post_events({"source": "windows_probe"})
+
+    assert status == 400
+    assert body["ok"] is False
+
     status, body = service.post_events(event)
 
     assert status == 202
@@ -380,6 +392,35 @@ def test_post_events_keeps_titles_and_exe_path_when_configured(tmp_path: Path) -
     assert event["title"] == "Project notes"
     assert event["payload"]["title"] == "Nested project title"
     assert event["payload"]["exe_path"] == "C:/Program Files/Code/Code.exe"
+
+
+def test_default_title_storage_does_not_override_disabled_title_storage(
+    tmp_path: Path,
+) -> None:
+    config = default_config(data_dir=tmp_path)
+    config.privacy.default_title_storage = True
+    initialize_database(config.db_path)
+    service = LocalTraceService(config)
+
+    service.post_events(
+        {
+            "observed_at": "2026-07-01T10:30:00.000Z",
+            "source": "browser_extension",
+            "kind": "tab_active",
+            "entity_type": "domain",
+            "entity": "github.com",
+            "title": "Sensitive tab title",
+            "payload": {
+                "activity": "focus",
+                "title": "Nested sensitive title",
+                "tab_title": "Nested tab title",
+            },
+        }
+    )
+
+    event = service.get_events({})[1]["events"][0]
+    assert event["title"] is None
+    assert event["payload"] == {"activity": "focus"}
 
 
 def test_post_events_rejects_disallowed_event_kind(tmp_path: Path) -> None:
