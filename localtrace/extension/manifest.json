@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "LocalTrace Extension",
+  "version": "0.1.0",
+  "description": "Domain-level browser activity capture for LocalTrace.",
+  "permissions": ["tabs", "storage", "alarms", "offscreen"],
+  "host_permissions": ["http://127.0.0.1:*/*"],
+  "background": {
+    "service_worker": "service_worker.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "LocalTrace",
+    "default_popup": "popup.html"
+  }
+}
