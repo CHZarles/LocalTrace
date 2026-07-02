@@ -307,6 +307,7 @@ to          RFC3339 exclusive
 source      optional
 kind        optional
 limit       optional, default 200
+order       optional, asc or desc, default asc
 ```
 
 Default sort:
@@ -316,7 +317,12 @@ observed_at ascending
 id ascending
 ```
 
-Recent events may support descending order later, but v1 spec starts with predictable ascending ranges.
+When `order=desc`, sort is:
+
+```text
+observed_at descending
+id descending
+```
 
 ## Event Schema Acceptance Checklist
 

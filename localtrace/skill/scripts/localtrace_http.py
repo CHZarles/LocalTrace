@@ -156,6 +156,7 @@ def events_between(
     source: str | None = None,
     kind: str | None = None,
     limit: int = 1000,
+    order: str = "asc",
 ) -> dict[str, Any]:
     return request_json(
         base_url,
@@ -166,6 +167,7 @@ def events_between(
             "source": source,
             "kind": kind,
             "limit": limit,
+            "order": order,
         },
     )
 

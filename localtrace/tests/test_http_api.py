@@ -687,3 +687,36 @@ def test_get_events_defaults_to_limit_200(tmp_path: Path) -> None:
     assert status == 200
     assert len(body["events"]) == 200
     assert body["events"][-1]["entity"] == "app-199.exe"
+
+
+def test_get_events_supports_descending_order(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    for observed_at, entity in [
+        ("2026-07-01T09:00:00.000Z", "old.exe"),
+        ("2026-07-01T10:00:00.000Z", "middle.exe"),
+        ("2026-07-01T11:00:00.000Z", "new.exe"),
+    ]:
+        service.post_events(
+            {
+                "observed_at": observed_at,
+                "source": "windows_probe",
+                "kind": "app_active",
+                "entity_type": "app",
+                "entity": entity,
+                "payload": {},
+            }
+        )
+
+    status, body = service.get_events({"order": "desc", "limit": "2"})
+
+    assert status == 200
+    assert [event["entity"] for event in body["events"]] == ["new.exe", "middle.exe"]
+
+
+def test_get_events_rejects_unknown_order(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+
+    status, body = service.get_events({"order": "random"})
+
+    assert status == 400
+    assert body == {"ok": False, "error": "order must be asc or desc"}

@@ -119,6 +119,8 @@ class LocalTraceService:
         return 201, {"ok": True, "id": event_id}
 
     def get_events(self, filters: dict[str, str]) -> tuple[int, dict[str, Any]]:
+        if filters.get("order", "asc") not in {"asc", "desc"}:
+            return 400, {"ok": False, "error": "order must be asc or desc"}
         return 200, {"ok": True, "events": list_events(self.config.db_path, filters)}
 
     def get_settings(self) -> tuple[int, dict[str, Any]]:
