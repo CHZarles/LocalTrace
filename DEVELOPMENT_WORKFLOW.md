@@ -368,21 +368,22 @@ PR 尺寸目标：
 
 按改动区域选择命令：
 
-- Rust core 或 collector:
-  `cargo fmt --check`, `cargo test`
-- Rust lint 敏感改动:
-  `cargo clippy --all-targets --all-features -- -D warnings`
-- Flutter UI:
-  `flutter analyze`, `flutter test`
-- Browser extension:
+- LocalTrace Python/runtime:
+  `localtrace/.venv/bin/python -m pytest localtrace/tests -q`
+  `localtrace/.venv/bin/python -m ruff check localtrace`
+  `localtrace/.venv/bin/python -m ruff format --check localtrace`
+- LocalTrace Web UI:
+  `node --check localtrace/web/app.js`
+- LocalTrace browser extension:
+  `node --test localtrace/extension/*.test.mjs`
   Chrome/Edge 手动加载、extension console 检查、`/health` 或 event smoke test
 - LocalTrace docs:
   `npm --prefix localtrace run lint:md`
   `mkdocs build --strict -f localtrace/mkdocs.yml`
 - Repo hooks:
   `pre-commit run --all-files`
-- Windows packaging:
-  `powershell -ExecutionPolicy Bypass -File dev/package-windows.ps1 -Installer`
+- LocalTrace Windows packaging:
+  `powershell -NoProfile -ExecutionPolicy Bypass -File .\localtrace\packaging\build-windows.ps1`
 
 Verification notes 需要记录：
 

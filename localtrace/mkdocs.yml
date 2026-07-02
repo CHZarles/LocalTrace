@@ -6,7 +6,6 @@ theme:
   name: material
 
 nav:
-  - WorkTrace Current System: WORKTRACE_CURRENT_SYSTEM.md
   - LocalTrace Spec: LOCALTRACE_SPEC.md
   - Architecture: ARCHITECTURE.md
   - Event Schema: EVENT_SCHEMA.md

@@ -4,17 +4,27 @@ on:
   push:
     paths:
       - "DEVELOPMENT_WORKFLOW.md"
+      - "README.md"
+      - "DEVELOPING.md"
+      - "WINDOWS_DEV.md"
+      - "RELEASING.md"
       - "localtrace/**"
       - ".pre-commit-config.yaml"
       - ".github/workflows/localtrace-ci.yml"
+      - ".github/workflows/localtrace-release-windows.yml"
       - ".github/workflows/pr-agent-review.yml"
       - ".github/scripts/pr_agent_review.py"
   pull_request:
     paths:
       - "DEVELOPMENT_WORKFLOW.md"
+      - "README.md"
+      - "DEVELOPING.md"
+      - "WINDOWS_DEV.md"
+      - "RELEASING.md"
       - "localtrace/**"
       - ".pre-commit-config.yaml"
       - ".github/workflows/localtrace-ci.yml"
+      - ".github/workflows/localtrace-release-windows.yml"
       - ".github/workflows/pr-agent-review.yml"
       - ".github/scripts/pr_agent_review.py"
 
