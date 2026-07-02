@@ -2,7 +2,7 @@
 
 Status: draft for human review.
 
-LocalTrace is a local-only activity capture system for one Windows user session. It replaces the old visible desktop-client product shape with a small background process, an independent Windows probe, a browser extension, an optional local Web settings page, and a skill-facing HTTP surface.
+LocalTrace is a local-only activity capture system for one Windows user session. It uses a small background process, an independent Windows probe, a browser extension, a local Web UI, and a skill-facing HTTP surface.
 
 No implementation code may be written from this spec until the human review gate in `WORKFLOW.md` is passed.
 
@@ -10,7 +10,7 @@ No implementation code may be written from this spec until the human review gate
 
 - Run as a user-session background application on Windows.
 - Keep all captured data local.
-- Preserve the current capture signals from WorkTrace.
+- Preserve the capture signals already adopted by LocalTrace.
 - Store raw events only.
 - Expose raw data through a local HTTP JSON interface.
 - Let agent skills compute timeline/top/day summaries on demand.
@@ -22,10 +22,10 @@ No implementation code may be written from this spec until the human review gate
 
 LocalTrace v1 does not include:
 
-- Visible Flutter desktop client.
-- Planner.
+- Separate foreground desktop client.
+- Task planning UI.
 - TODO.
-- Reports.
+- Report UI.
 - Daily/weekly report generation.
 - LLM prompt configuration.
 - Review notes.
@@ -76,14 +76,17 @@ LocalTrace v1 consists of four deliverables:
    - Does not read SQLite directly.
    - Computes summaries from raw events in scripts.
 
-Optional display:
+Web display:
 
-- A local Web UI may reuse the old WorkTrace client's information architecture later.
-- v1 Web UI is restricted to settings, privacy rules, and health checks.
+- A local Web UI renders Today, Timeline, Top apps/domains, Now, settings,
+  privacy rules, and health checks from raw events.
+- Derived views are computed in the Web UI and are not stored as derived core
+  tables.
 
 ## Capture Scope
 
-LocalTrace preserves the current WorkTrace capture signals.
+LocalTrace preserves capture signals for Windows focus, non-browser audio, and
+browser focus/audio.
 
 Windows probe events:
 
@@ -285,12 +288,9 @@ Health:
 
 V1 Web UI does not include:
 
-- Today.
-- Timeline.
-- Top apps/domains.
-- Reports.
-- Review.
-- Planner.
+- Report generation UI.
+- Block review workflow.
+- Task planning UI.
 - Charts.
 
 ## Skill V1 Scope

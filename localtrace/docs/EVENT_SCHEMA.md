@@ -48,7 +48,7 @@ manual
 
 ## Event Kinds
 
-Preserved from current WorkTrace capture:
+Preserved LocalTrace capture signals:
 
 ```text
 app_active
@@ -321,7 +321,7 @@ Recent events may support descending order later, but v1 spec starts with predic
 ## Event Schema Acceptance Checklist
 
 - [ ] `observed_at` and `received_at` are distinct.
-- [ ] Existing WorkTrace capture signals are preserved.
+- [ ] Existing LocalTrace capture signals are preserved.
 - [ ] Idle is not stored as raw events.
 - [ ] No derived duration field is required.
 - [ ] Titles and exe paths are disabled by default.

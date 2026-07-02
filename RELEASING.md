@@ -11,7 +11,7 @@ git tag localtrace-v0.1.0
 git push origin localtrace-v0.1.0
 ```
 
-Do not use old `v*` WorkTrace tags for LocalTrace releases.
+Use only `localtrace-v*` tags for LocalTrace releases.
 
 ## GitHub Actions
 
@@ -74,9 +74,3 @@ Smoke mode creates placeholder `.exe` files and must not be shipped.
 7. Extract `extension\localtrace-extension.zip`.
 8. Load the extracted extension directory in Chrome or Edge.
 9. Confirm the extension health check reports OK.
-
-## Old WorkTrace Releases
-
-The old Flutter/Rust WorkTrace installer workflow and `WorkTrace-*-setup.exe`
-release notes have been removed from the active main branch. LocalTrace ships as
-`LocalTrace-windows.zip`.
