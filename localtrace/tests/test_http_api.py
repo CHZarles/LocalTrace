@@ -326,6 +326,8 @@ def test_http_routes_expose_web_settings_and_local_json_apis(tmp_path: Path) -> 
         assert "eventsTable" not in html
         assert "settingsPanel" in html
         assert "/web/app.js" in html
+        assert 'src="/web/app.js?v=' in html
+        assert 'href="/web/styles.css?v=' in html
         assert "Dashboard" not in html
         assert "Reports" not in html
         assert "Planner" not in html
