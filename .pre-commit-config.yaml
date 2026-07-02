@@ -3,13 +3,13 @@ repos:
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
-        files: ^(README\.md|DEVELOPING\.md|WINDOWS_DEV\.md|RELEASING\.md|DEVELOPMENT_WORKFLOW\.md|localtrace/|\.github/workflows/(localtrace-ci|localtrace-release-windows|pr-agent-review)\.yml|\.github/scripts/pr_agent_review\.py|\.pre-commit-config\.yaml|\.gitignore)
+        files: ^(README\.md|DEVELOPING\.md|WINDOWS_DEV\.md|RELEASING\.md|DEVELOPMENT_WORKFLOW\.md|apps/|docs/|extension/|localtrace_packaging/|packaging/|skill/|tests/|web/|pyproject\.toml|requirements-dev\.txt|package(-lock)?\.json|mkdocs\.yml|\.markdownlint-cli2\.yaml|\.github/workflows/(localtrace-ci|localtrace-release-windows|pr-agent-review)\.yml|\.github/scripts/pr_agent_review\.py|\.pre-commit-config\.yaml|\.gitignore)
       - id: end-of-file-fixer
-        files: ^(README\.md|DEVELOPING\.md|WINDOWS_DEV\.md|RELEASING\.md|DEVELOPMENT_WORKFLOW\.md|localtrace/|\.github/workflows/(localtrace-ci|localtrace-release-windows|pr-agent-review)\.yml|\.github/scripts/pr_agent_review\.py|\.pre-commit-config\.yaml|\.gitignore)
+        files: ^(README\.md|DEVELOPING\.md|WINDOWS_DEV\.md|RELEASING\.md|DEVELOPMENT_WORKFLOW\.md|apps/|docs/|extension/|localtrace_packaging/|packaging/|skill/|tests/|web/|pyproject\.toml|requirements-dev\.txt|package(-lock)?\.json|mkdocs\.yml|\.markdownlint-cli2\.yaml|\.github/workflows/(localtrace-ci|localtrace-release-windows|pr-agent-review)\.yml|\.github/scripts/pr_agent_review\.py|\.pre-commit-config\.yaml|\.gitignore)
       - id: check-yaml
-        files: ^(localtrace/.*\.ya?ml|\.github/workflows/(localtrace-ci|localtrace-release-windows|pr-agent-review)\.yml|\.pre-commit-config\.yaml)$
+        files: ^(.*\.ya?ml|\.github/workflows/(localtrace-ci|localtrace-release-windows|pr-agent-review)\.yml|\.pre-commit-config\.yaml)$
       - id: check-json
-        files: ^localtrace/.*\.json$
+        files: ^(package(-lock)?\.json|extension/.*\.json)$
 
   - repo: https://github.com/DavidAnson/markdownlint-cli2
     rev: v0.17.2
@@ -18,10 +18,13 @@ repos:
         pass_filenames: false
         args:
           - "--config"
-          - "localtrace/.markdownlint-cli2.yaml"
+          - ".markdownlint-cli2.yaml"
           - "README.md"
           - "DEVELOPING.md"
           - "WINDOWS_DEV.md"
           - "RELEASING.md"
           - "DEVELOPMENT_WORKFLOW.md"
-          - "localtrace/**/*.md"
+          - "docs/**/*.md"
+          - "extension/**/*.md"
+          - "skill/**/*.md"
+          - "web/**/*.md"

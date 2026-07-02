@@ -1,9 +1,0 @@
-{
-  "scripts": {
-    "lint:md": "markdownlint-cli2 --config .markdownlint-cli2.yaml \"../README.md\" \"../DEVELOPING.md\" \"../WINDOWS_DEV.md\" \"../RELEASING.md\" \"../DEVELOPMENT_WORKFLOW.md\" \"docs/**/*.md\""
-  },
-  "devDependencies": {
-    "@playwright/test": "^1.61.1",
-    "markdownlint-cli2": "^0.17.2"
-  }
-}

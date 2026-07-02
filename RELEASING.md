@@ -1,6 +1,6 @@
 # Releasing LocalTrace
 
-LocalTrace releases are Windows zip releases built from `localtrace/`.
+LocalTrace releases are Windows zip releases built from the repository root.
 
 ## Release Tags
 
@@ -29,7 +29,7 @@ It runs on:
 The workflow builds:
 
 ```text
-localtrace/dist/windows/LocalTrace-windows.zip
+dist/windows/LocalTrace-windows.zip
 ```
 
 and verifies the zip contains:
@@ -50,13 +50,12 @@ and verifies the zip contains:
 From Windows PowerShell:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\localtrace\packaging\build-windows.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\packaging\build-windows.ps1
 ```
 
 For a zip assembly smoke test without building real executables:
 
 ```bash
-cd localtrace
 python -m localtrace_packaging.package_release --skip-exe-check
 ```
 

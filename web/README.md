@@ -16,6 +16,6 @@ Manual smoke steps:
 
 Asset layout:
 
-- Source-tree runs serve assets from `localtrace/web`.
+- Source-tree runs serve assets from `web/`.
 - Packaged runs should place the `web/` directory next to the LocalTrace runtime
   executable.

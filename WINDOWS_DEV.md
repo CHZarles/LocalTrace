@@ -34,13 +34,13 @@ http://127.0.0.1:8765/
 From Windows PowerShell at the repository root:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\localtrace\packaging\build-windows.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\packaging\build-windows.ps1
 ```
 
 The release zip is written to:
 
 ```text
-localtrace\dist\windows\LocalTrace-windows.zip
+dist\windows\LocalTrace-windows.zip
 ```
 
 ## Install Locally
@@ -70,10 +70,10 @@ If you are only changing static web files and already have LocalTrace installed,
 copy the web files into the installed app directory:
 
 ```bash
-cp -f localtrace/web/index.html \
-  localtrace/web/app.js \
-  localtrace/web/styles.css \
-  localtrace/web/README.md \
+cp -f web/index.html \
+  web/app.js \
+  web/styles.css \
+  web/README.md \
   /mnt/c/Users/$USER/AppData/Local/LocalTrace/App/web/
 ```
 
@@ -90,7 +90,7 @@ Then hard-refresh `http://127.0.0.1:8765/`.
 Development extension source:
 
 ```text
-localtrace/extension/
+extension/
 ```
 
 Release extension zip inside the Windows package:
@@ -99,8 +99,8 @@ Release extension zip inside the Windows package:
 LocalTrace/extension/localtrace-extension.zip
 ```
 
-For development, load `localtrace/extension/` as an unpacked extension in Chrome
-or Edge. After editing extension files, reload the extension from the browser's
+For development, load `extension/` as an unpacked extension in Chrome or Edge.
+After editing extension files, reload the extension from the browser's
 extension management page. Service-worker changes may require a reload or
 browser restart before old workers are replaced.
 

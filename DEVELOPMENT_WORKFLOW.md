@@ -334,7 +334,7 @@ one approved issue -> one branch -> focused commits
 - Task Manager 只在协调复杂度需要时使用；普通小 issue 不用。
 - CodeGraph 或 context check 在动陌生代码、API、schema、runtime、privacy
   或 security 前使用。
-- 需要 Python 环境时，在仓库本地创建，例如 `localtrace/.venv`。
+- 需要 Python 环境时，在仓库本地创建，例如 `.venv`。
 - 本地 Python 环境不提交到 git。
 - Codex 写的 commit 使用 `Codex Agent` git author，不使用人类开发者姓名。
 - GitHub PR author 由创建 PR 的 GitHub 登录态决定，不由 commit author 决定。
@@ -369,21 +369,21 @@ PR 尺寸目标：
 按改动区域选择命令：
 
 - LocalTrace Python/runtime:
-  `localtrace/.venv/bin/python -m pytest localtrace/tests -q`
-  `localtrace/.venv/bin/python -m ruff check localtrace`
-  `localtrace/.venv/bin/python -m ruff format --check localtrace`
+  `.venv/bin/python -m pytest tests -q`
+  `.venv/bin/python -m ruff check .`
+  `.venv/bin/python -m ruff format --check .`
 - LocalTrace Web UI:
-  `node --check localtrace/web/app.js`
+  `node --check web/app.js`
 - LocalTrace browser extension:
-  `node --test localtrace/extension/*.test.mjs`
+  `node --test extension/*.test.mjs`
   Chrome/Edge 手动加载、extension console 检查、`/health` 或 event smoke test
 - LocalTrace docs:
-  `npm --prefix localtrace run lint:md`
-  `mkdocs build --strict -f localtrace/mkdocs.yml`
+  `npm run lint:md`
+  `mkdocs build --strict -f mkdocs.yml`
 - Repo hooks:
   `pre-commit run --all-files`
 - LocalTrace Windows packaging:
-  `powershell -NoProfile -ExecutionPolicy Bypass -File .\localtrace\packaging\build-windows.ps1`
+  `powershell -NoProfile -ExecutionPolicy Bypass -File .\packaging\build-windows.ps1`
 
 Verification notes 需要记录：
 

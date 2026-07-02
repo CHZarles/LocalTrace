@@ -8,7 +8,20 @@ on:
       - "DEVELOPING.md"
       - "WINDOWS_DEV.md"
       - "RELEASING.md"
-      - "localtrace/**"
+      - "apps/**"
+      - "docs/**"
+      - "extension/**"
+      - "localtrace_packaging/**"
+      - "packaging/**"
+      - "skill/**"
+      - "tests/**"
+      - "web/**"
+      - "mkdocs.yml"
+      - "package.json"
+      - "package-lock.json"
+      - "pyproject.toml"
+      - "requirements-dev.txt"
+      - ".markdownlint-cli2.yaml"
       - ".pre-commit-config.yaml"
       - ".github/workflows/localtrace-ci.yml"
       - ".github/workflows/localtrace-release-windows.yml"
@@ -21,7 +34,20 @@ on:
       - "DEVELOPING.md"
       - "WINDOWS_DEV.md"
       - "RELEASING.md"
-      - "localtrace/**"
+      - "apps/**"
+      - "docs/**"
+      - "extension/**"
+      - "localtrace_packaging/**"
+      - "packaging/**"
+      - "skill/**"
+      - "tests/**"
+      - "web/**"
+      - "mkdocs.yml"
+      - "package.json"
+      - "package-lock.json"
+      - "pyproject.toml"
+      - "requirements-dev.txt"
+      - ".markdownlint-cli2.yaml"
       - ".pre-commit-config.yaml"
       - ".github/workflows/localtrace-ci.yml"
       - ".github/workflows/localtrace-release-windows.yml"
@@ -44,27 +70,22 @@ jobs:
           node-version: "22"
 
       - name: Install Python deps
-        run: pip install -r localtrace/requirements-dev.txt
+        run: pip install -r requirements-dev.txt
 
       - name: Install Node deps
-        working-directory: localtrace
         run: npm ci
 
       - name: Python lint
-        working-directory: localtrace
         run: ruff check .
 
       - name: Python format check
-        working-directory: localtrace
         run: ruff format --check .
 
       - name: Python tests
-        working-directory: localtrace
         run: pytest
 
       - name: Markdown lint
-        working-directory: localtrace
         run: npm run lint:md
 
       - name: Build docs
-        run: mkdocs build --strict -f localtrace/mkdocs.yml
+        run: mkdocs build --strict -f mkdocs.yml

@@ -34,7 +34,7 @@ SQLite databases, and secrets.
 Executable packaging uses PyInstaller from the packaging environment. PyInstaller
 is not a LocalTrace runtime dependency and is not added to project dependencies.
 
-From the `localtrace/` directory:
+From the repository root:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\packaging\build-windows.ps1
@@ -88,7 +88,7 @@ The workflow can also be started manually from GitHub Actions. Manual runs uploa
 The release workflow runs:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\localtrace\packaging\build-windows.ps1 -Python python
+powershell -NoProfile -ExecutionPolicy Bypass -File .\packaging\build-windows.ps1 -Python python
 ```
 
 The workflow verifies the generated zip contains the documented release layout

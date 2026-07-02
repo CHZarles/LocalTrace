@@ -199,7 +199,7 @@ Hard rules:
 - CodeGraph or another context check runs before unfamiliar code, API, schema,
   runtime, privacy, or security changes.
 - Python development environments are created inside the repository, for example
-  `localtrace/.venv`.
+  `.venv`.
 - Local Python environments are never committed to git.
 - Commits written by Codex use the `Codex Agent` git author, not the human
   developer name.

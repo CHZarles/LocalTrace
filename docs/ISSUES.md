@@ -53,7 +53,7 @@ Goal:
 
 Scope:
 
-- Add MkDocs config for `localtrace/docs`.
+- Add MkDocs config for `docs/`.
 - Add Markdown lint config.
 - Add local dev dependency files.
 - Add pre-commit config.
@@ -69,14 +69,14 @@ Non-goals:
 
 Spec links:
 
-- `localtrace/docs/INFRASTRUCTURE.md`
-- `localtrace/docs/WORKFLOW.md`
-- `localtrace/docs/ISSUES.md`
+- `docs/INFRASTRUCTURE.md`
+- `docs/WORKFLOW.md`
+- `docs/ISSUES.md`
 
 Acceptance:
 
-- `mkdocs build --strict -f localtrace/mkdocs.yml` passes.
-- `npx markdownlint-cli2 --config localtrace/.markdownlint-cli2.yaml "localtrace/**/*.md"` passes.
+- `mkdocs build --strict -f mkdocs.yml` passes.
+- `npx markdownlint-cli2 --config .markdownlint-cli2.yaml "docs/**/*.md"` passes.
 - `pre-commit run --all-files` passes.
 - GitHub Actions workflow runs on push and pull request.
 

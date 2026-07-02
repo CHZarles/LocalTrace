@@ -8,8 +8,7 @@ from pathlib import Path
 
 import pytest
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-LOCALTRACE_ROOT = REPO_ROOT / "localtrace"
+LOCALTRACE_ROOT = Path(__file__).resolve().parents[1]
 
 
 def run_packager(*args: str) -> subprocess.CompletedProcess[str]:

@@ -20,7 +20,7 @@ Manifest V3 extension for LocalTrace browser activity capture.
    - Chrome: `chrome://extensions/`
    - Edge: `edge://extensions/`
 3. Enable developer mode.
-4. Load this directory as an unpacked extension: `localtrace/extension/`.
+4. Load this directory as an unpacked extension: `extension/`.
 5. Open the LocalTrace extension popup and confirm tracking is enabled.
 6. Click `Test Health`; it should show `OK` when LocalTrace core is running.
 

@@ -1,14 +1,13 @@
 # Developing LocalTrace
 
-This repository's active product is LocalTrace. Work primarily under
-`localtrace/`.
+This repository's active product is LocalTrace. The repository root is the
+project root.
 
 ## Setup
 
 From the repository root:
 
 ```bash
-cd localtrace
 python -m venv .venv
 .venv/bin/python -m pip install -r requirements-dev.txt
 npm ci
@@ -17,7 +16,6 @@ npm ci
 On Windows PowerShell, use the equivalent venv path:
 
 ```powershell
-cd localtrace
 py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
 npm ci
@@ -25,34 +23,33 @@ npm ci
 
 ## Main Directories
 
-- `localtrace/apps/localtrace/`: local HTTP app, SQLite owner, config owner.
-- `localtrace/apps/winprobe/`: Windows foreground app and audio probe.
-- `localtrace/web/`: static web UI served by `localtrace.exe`.
-- `localtrace/extension/`: Chrome/Edge Manifest V3 extension.
-- `localtrace/packaging/`: Windows zip assembly and install scripts.
-- `localtrace/tests/`: Python tests for app, storage, config, packaging, and
+- `apps/localtrace/`: local HTTP app, SQLite owner, config owner.
+- `apps/winprobe/`: Windows foreground app and audio probe.
+- `web/`: static web UI served by `localtrace.exe`.
+- `extension/`: Chrome/Edge Manifest V3 extension.
+- `packaging/`: Windows zip assembly and install scripts.
+- `tests/`: Python tests for app, storage, config, packaging, and
   scripts.
-- `localtrace/docs/`: LocalTrace spec, architecture, workflow, and packaging
-  docs.
+- `docs/`: LocalTrace spec, architecture, workflow, and packaging docs.
 
 ## Local Checks
 
 Run the checks relevant to your change:
 
 ```bash
-node --check localtrace/web/app.js
-node --test localtrace/extension/*.test.mjs
-localtrace/.venv/bin/python -m pytest localtrace/tests -q
-localtrace/.venv/bin/python -m ruff check localtrace
-localtrace/.venv/bin/python -m ruff format --check localtrace
-npm --prefix localtrace run lint:md
-localtrace/.venv/bin/mkdocs build --strict -f localtrace/mkdocs.yml
+node --check web/app.js
+node --test extension/*.test.mjs
+.venv/bin/python -m pytest tests -q
+.venv/bin/python -m ruff check .
+.venv/bin/python -m ruff format --check .
+npm run lint:md
+.venv/bin/mkdocs build --strict -f mkdocs.yml
 ```
 
 Before committing, run the repo hooks when available:
 
 ```bash
-PATH="$PWD/localtrace/.venv/bin:$PATH" pre-commit run --all-files
+PATH="$PWD/.venv/bin:$PATH" pre-commit run --all-files
 ```
 
 ## Run Locally
@@ -60,7 +57,6 @@ PATH="$PWD/localtrace/.venv/bin:$PATH" pre-commit run --all-files
 During development, run the core app from Python:
 
 ```bash
-cd localtrace
 .venv/bin/python -m localtrace_core --bind 127.0.0.1:8765
 ```
 
@@ -74,14 +70,13 @@ On Windows, run the probe from a shell that can access the Windows desktop
 session:
 
 ```powershell
-cd localtrace
 .\.venv\Scripts\python.exe -m localtrace_winprobe
 ```
 
 Load the browser extension from:
 
 ```text
-localtrace/extension/
+extension/
 ```
 
 After editing extension service-worker code, reload the unpacked extension in
@@ -90,18 +85,18 @@ Chrome or Edge.
 ## Packaging
 
 Windows packaging is documented in
-[localtrace/docs/PACKAGING.md](localtrace/docs/PACKAGING.md).
+[docs/PACKAGING.md](docs/PACKAGING.md).
 
 From Windows PowerShell:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\localtrace\packaging\build-windows.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\packaging\build-windows.ps1
 ```
 
 The output zip is:
 
 ```text
-localtrace\dist\windows\LocalTrace-windows.zip
+dist\windows\LocalTrace-windows.zip
 ```
 
 ## Removed Prototype Code
