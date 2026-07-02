@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import argparse
-from datetime import timedelta
+from datetime import datetime, timedelta
+from typing import Any
 
 from localtrace_http import (
     LocalTraceError,
@@ -58,29 +59,12 @@ def main() -> int:
                 }
             )
             return 1
-        before_start = format_rfc3339_utc(
-            rfc3339_utc_datetime(start, "--from") - timedelta(days=context_days)
+        before = _nearest_before(
+            args.base_url,
+            rfc3339_utc_datetime(start, "--from"),
+            context_days=context_days,
+            limit=limit,
         )
-        before_body = events_between(
-            args.base_url, before_start, start, limit=limit + 1
-        )
-        before, before_truncated = apply_event_limit(
-            before_body.get("events", []), limit
-        )
-        if before_truncated:
-            print_json(
-                {
-                    "ok": False,
-                    "partial": True,
-                    "error": (
-                        "gap context before window exceeds event limit; "
-                        "increase --limit"
-                    ),
-                    "truncated": True,
-                    "source_event_limit": limit,
-                }
-            )
-            return 1
         after_end = format_rfc3339_utc(
             rfc3339_utc_datetime(end, "--to") + timedelta(days=context_days)
         )
@@ -88,7 +72,7 @@ def main() -> int:
         result = gap_context_result(
             start,
             end,
-            before[-1] if before else None,
+            before,
             inside,
             _first_or_none(after_body.get("events", [])),
         )
@@ -101,6 +85,46 @@ def main() -> int:
     except LocalTraceError as exc:
         return fail(str(exc))
     return 0
+
+
+def _nearest_before(
+    base_url: str,
+    start: datetime,
+    *,
+    context_days: int,
+    limit: int,
+) -> dict[str, Any] | None:
+    earliest = start - timedelta(days=context_days)
+    return _nearest_before_between(base_url, earliest, start, limit=limit)
+
+
+def _nearest_before_between(
+    base_url: str,
+    window_start: datetime,
+    window_end: datetime,
+    *,
+    limit: int,
+) -> dict[str, Any] | None:
+    body = events_between(
+        base_url,
+        format_rfc3339_utc(window_start),
+        format_rfc3339_utc(window_end),
+        limit=limit + 1,
+    )
+    events, truncated = apply_event_limit(body.get("events", []), limit)
+    if not truncated:
+        return events[-1] if events else None
+
+    if window_end - window_start <= timedelta(milliseconds=1):
+        raise LocalTraceError(
+            "gap context before window exceeds event limit at timestamp resolution"
+        )
+
+    midpoint = window_start + (window_end - window_start) / 2
+    nearest = _nearest_before_between(base_url, midpoint, window_end, limit=limit)
+    if nearest is not None:
+        return nearest
+    return _nearest_before_between(base_url, window_start, midpoint, limit=limit)
 
 
 if __name__ == "__main__":

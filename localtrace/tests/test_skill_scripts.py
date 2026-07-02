@@ -1,3 +1,4 @@
+import ast
 import json
 import os
 import subprocess
@@ -500,6 +501,36 @@ def test_explain_gap_searches_context_across_day_boundary() -> None:
     assert after_query["to"] == ["2026-07-03T00:01:00.000Z"]
 
 
+def test_explain_gap_finds_nearest_before_in_dense_context_window() -> None:
+    events = [
+        event_at(1, "2026-07-01T09:00:00.000Z", "before-1.exe"),
+        event_at(2, "2026-07-01T09:01:00.000Z", "before-2.exe"),
+        event_at(3, "2026-07-01T09:02:00.000Z", "before-3.exe"),
+        event_at(4, "2026-07-01T09:30:00.000Z", "after.exe"),
+    ]
+    with FakeLocalTraceServer({"/events": {"body": events_route(events)}}) as server:
+        result = run_script(
+            "localtrace_explain_gap.py",
+            [
+                "--from",
+                "2026-07-01T09:10:00.000Z",
+                "--to",
+                "2026-07-01T09:20:00.000Z",
+                "--limit",
+                "2",
+            ],
+            server.base_url,
+        )
+
+    assert result.returncode == 0
+    body = output_json(result)
+    assert body["before"]["id"] == 3
+    assert body["after"]["id"] == 4
+    assert body["previous_event_delta_seconds"] == 480
+    assert body["next_event_delta_seconds"] == 600
+    assert len(server.requests) > 3
+
+
 def test_scripts_return_machine_readable_error_when_core_is_unavailable() -> None:
     result = run_script("localtrace_health.py", ["--base-url", "http://127.0.0.1:1"])
 
@@ -656,7 +687,13 @@ def test_skill_scripts_do_not_import_core_or_sqlite() -> None:
     script_paths = sorted(SCRIPTS_DIR.glob("*.py"))
 
     assert script_paths
+    forbidden_modules = {"localtrace_core", "sqlite3"}
     for script_path in script_paths:
         text = script_path.read_text(encoding="utf-8")
-        assert "localtrace_core" not in text
-        assert "sqlite3" not in text
+        tree = ast.parse(text, filename=str(script_path))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                imported = {alias.name.split(".")[0] for alias in node.names}
+                assert imported.isdisjoint(forbidden_modules)
+            if isinstance(node, ast.ImportFrom) and node.module is not None:
+                assert node.module.split(".")[0] not in forbidden_modules
