@@ -165,9 +165,16 @@ def latest_events_by_source(db_path: Path) -> dict[str, dict[str, str]]:
     with sqlite3.connect(db_path) as conn:
         rows = conn.execute(
             """
-            SELECT source, MAX(observed_at), MAX(received_at)
-            FROM events
-            GROUP BY source
+            SELECT source, observed_at, received_at
+            FROM events AS event
+            WHERE id = (
+              SELECT id
+              FROM events AS latest
+              WHERE latest.source = event.source
+              ORDER BY latest.received_at DESC, latest.id DESC
+              LIMIT 1
+            )
+            ORDER BY source ASC
             """
         ).fetchall()
 

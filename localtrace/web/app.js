@@ -145,7 +145,11 @@ async function saveSettings() {
     });
     state.settings = body.settings;
     renderSettings(body.settings);
-    setStatus("Saved");
+    if (body.restart_required?.includes("api.port")) {
+      setStatus("Saved; restart required for port");
+    } else {
+      setStatus("Saved");
+    }
   } catch (error) {
     setStatus(error.message);
   } finally {

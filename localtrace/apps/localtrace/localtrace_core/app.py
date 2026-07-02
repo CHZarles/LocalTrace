@@ -123,8 +123,10 @@ class LocalTraceService:
         api = updates.get("api", {})
         capture = updates.get("capture", {})
         privacy = updates.get("privacy", {})
+        restart_required = []
 
-        if "port" in api:
+        if "port" in api and api["port"] != self.config.api.port:
+            restart_required.append("api.port")
             self.config.api.port = api["port"]
         for key, value in capture.items():
             setattr(self.config.capture, key, value)
@@ -134,7 +136,11 @@ class LocalTraceService:
         if self.config_path is not None:
             save_config(self.config, self.config_path)
 
-        return 200, {"ok": True, "settings": _settings_payload(self.config)}
+        return 200, {
+            "ok": True,
+            "settings": _settings_payload(self.config),
+            "restart_required": restart_required,
+        }
 
     def get_privacy_rules(self) -> tuple[int, dict[str, Any]]:
         return 200, {

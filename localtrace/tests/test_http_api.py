@@ -189,6 +189,7 @@ def test_health_keeps_actual_bind_port_after_settings_port_update(
 
         assert status == 200
         assert body["settings"]["api"]["port"] == 9876
+        assert body["restart_required"] == ["api.port"]
         assert service.get_health()[1]["bind"]["port"] == actual_port
     finally:
         server.server_close()
@@ -296,6 +297,7 @@ def test_http_routes_expose_web_settings_and_local_json_apis(tmp_path: Path) -> 
         assert "/settings" in script
         assert "/privacy/rules" in script
         assert "/tracking/status" in script
+        assert "restart required" in script
 
         status, body = request_json(base_url, "/settings")
         assert status == 200
