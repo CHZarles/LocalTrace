@@ -31,7 +31,7 @@ class CaptureConfig:
 
 @dataclass
 class PrivacyConfig:
-    default_title_storage: bool = False
+    pass
 
 
 @dataclass
@@ -77,9 +77,7 @@ def load_config(path: Path, data_dir: Path | None = None) -> LocalTraceConfig:
 
     api = _section(raw, "api")
     capture = _section(raw, "capture")
-    privacy = _section(raw, "privacy")
-
-    config.api.port = _int(api, "port", config.api.port)
+    config.api.port = _bounded_int(api, "port", config.api.port, 1, 65535)
     config.capture.poll_ms = _int(capture, "poll_ms", config.capture.poll_ms)
     config.capture.heartbeat_seconds = _int(
         capture, "heartbeat_seconds", config.capture.heartbeat_seconds
@@ -98,9 +96,6 @@ def load_config(path: Path, data_dir: Path | None = None) -> LocalTraceConfig:
     )
     config.capture.track_audio = _bool(
         capture, "track_audio", config.capture.track_audio
-    )
-    config.privacy.default_title_storage = _bool(
-        privacy, "default_title_storage", config.privacy.default_title_storage
     )
     return config
 
@@ -131,6 +126,13 @@ def _section(raw: dict[str, Any], key: str) -> dict[str, Any]:
 def _int(raw: dict[str, Any], key: str, default: int) -> int:
     value = raw.get(key, default)
     return value if isinstance(value, int) and not isinstance(value, bool) else default
+
+
+def _bounded_int(
+    raw: dict[str, Any], key: str, default: int, minimum: int, maximum: int
+) -> int:
+    value = _int(raw, key, default)
+    return value if minimum <= value <= maximum else default
 
 
 def _bool(raw: dict[str, Any], key: str, default: bool) -> bool:

@@ -1,5 +1,13 @@
+import importlib
+import json
 import sqlite3
+import sys
+import threading
 from pathlib import Path
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
+
+import pytest
 
 from localtrace_core.app import LocalTraceService, create_http_server
 from localtrace_core.config import default_config
@@ -25,6 +33,51 @@ def add_privacy_rule(
         )
 
 
+def request_json(
+    base_url: str,
+    path: str,
+    *,
+    method: str = "GET",
+    payload: dict | None = None,
+) -> tuple[int, dict]:
+    data = None
+    headers = {}
+    if payload is not None:
+        data = json.dumps(payload).encode("utf-8")
+        headers["Content-Type"] = "application/json"
+
+    request = Request(base_url + path, data=data, headers=headers, method=method)
+    try:
+        with urlopen(request, timeout=5) as response:
+            return response.status, json.loads(response.read())
+    except HTTPError as exc:
+        return exc.code, json.loads(exc.read())
+
+
+def request_text(base_url: str, path: str) -> tuple[int, str, str]:
+    with urlopen(base_url + path, timeout=5) as response:
+        content_type = response.headers.get("Content-Type", "")
+        return response.status, content_type, response.read().decode("utf-8")
+
+
+def test_web_dir_prefers_assets_next_to_runtime_executable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from localtrace_core import app as app_module
+
+    runtime_web_dir = tmp_path / "web"
+    runtime_web_dir.mkdir()
+
+    try:
+        with monkeypatch.context() as patch:
+            patch.setattr(sys, "executable", str(tmp_path / "localtrace.exe"))
+            reloaded = importlib.reload(app_module)
+
+            assert runtime_web_dir == reloaded.WEB_DIR
+    finally:
+        importlib.reload(app_module)
+
+
 def test_health_reports_local_service_status(tmp_path: Path) -> None:
     service = make_service(tmp_path)
 
@@ -37,6 +90,42 @@ def test_health_reports_local_service_status(tmp_path: Path) -> None:
     assert body["database"]["path"] == str(tmp_path / "localtrace.db")
 
 
+def test_health_reports_event_count_and_source_recency(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+
+    service.post_events(
+        {
+            "observed_at": "2026-07-01T10:30:00.000Z",
+            "source": "windows_probe",
+            "kind": "app_active",
+            "entity_type": "app",
+            "entity": "Code.exe",
+            "payload": {"activity": "focus"},
+        }
+    )
+    service.post_events(
+        {
+            "observed_at": "2026-07-01T10:31:00.000Z",
+            "source": "browser_extension",
+            "kind": "tab_active",
+            "entity_type": "domain",
+            "entity": "github.com",
+            "payload": {"activity": "focus"},
+        }
+    )
+
+    status, body = service.get_health()
+
+    assert status == 200
+    assert body["events"]["recent_count"] == 2
+    assert body["sources"]["windows_probe"]["last_observed_at"] == (
+        "2026-07-01T10:30:00.000Z"
+    )
+    assert body["sources"]["browser_extension"]["last_observed_at"] == (
+        "2026-07-01T10:31:00.000Z"
+    )
+
+
 def test_http_server_binds_to_loopback_only(tmp_path: Path) -> None:
     config = default_config(data_dir=tmp_path)
     config.api.port = 0
@@ -47,6 +136,235 @@ def test_http_server_binds_to_loopback_only(tmp_path: Path) -> None:
         assert server.server_address[0] == "127.0.0.1"
     finally:
         server.server_close()
+
+
+def test_settings_api_returns_loopback_and_persists_approved_updates(
+    tmp_path: Path,
+) -> None:
+    config = default_config(data_dir=tmp_path)
+    initialize_database(config.db_path)
+    config_path = tmp_path / "config.json"
+    service = LocalTraceService(config, config_path=config_path)
+
+    status, body = service.get_settings()
+
+    assert status == 200
+    assert body["settings"]["api"] == {"host": "127.0.0.1", "port": 8765}
+
+    status, body = service.post_settings(
+        {
+            "api": {"port": 9876},
+            "capture": {
+                "poll_ms": 1500,
+                "heartbeat_seconds": 90,
+                "idle_cutoff_seconds": 420,
+                "store_titles": True,
+                "store_exe_path": True,
+                "track_browser": False,
+                "track_audio": False,
+            },
+        }
+    )
+
+    assert status == 200
+    assert body["settings"]["api"] == {"host": "127.0.0.1", "port": 9876}
+    assert body["settings"]["capture"]["poll_ms"] == 1500
+    assert body["settings"]["capture"]["store_titles"] is True
+    persisted = json.loads(config_path.read_text(encoding="utf-8"))
+    assert persisted["api"]["port"] == 9876
+    assert persisted["capture"]["heartbeat_seconds"] == 90
+
+
+def test_settings_api_rejects_unknown_or_unsafe_values(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+
+    invalid_payloads = [
+        {"api": {"host": "0.0.0.0"}},
+        {"api": {"port": 0}},
+        {"capture": {"poll_ms": "fast"}},
+        {"capture": {"unknown": True}},
+        {"privacy": {"unknown": True}},
+        {"unknown": {}},
+    ]
+
+    for payload in invalid_payloads:
+        status, body = service.post_settings(payload)
+
+        assert status == 400
+        assert body["ok"] is False
+
+
+def test_health_keeps_actual_bind_port_after_settings_port_update(
+    tmp_path: Path,
+) -> None:
+    config = default_config(data_dir=tmp_path)
+    config.api.port = 0
+    initialize_database(config.db_path)
+    service = LocalTraceService(config, config_path=tmp_path / "config.json")
+    server = create_http_server(config, service)
+    actual_port = server.server_address[1]
+    try:
+        status, body = service.post_settings({"api": {"port": 9876}})
+
+        assert status == 200
+        assert body["settings"]["api"]["port"] == 9876
+        assert body["restart_required"] == ["api.port"]
+        assert service.get_health()[1]["bind"]["port"] == actual_port
+    finally:
+        server.server_close()
+
+
+def test_privacy_rule_api_validates_lists_creates_and_deletes_rules(
+    tmp_path: Path,
+) -> None:
+    service = make_service(tmp_path)
+
+    status, body = service.get_privacy_rules()
+
+    assert status == 200
+    assert body == {"ok": True, "rules": []}
+
+    status, body = service.post_privacy_rule(
+        {"entity_type": "domain", "pattern": "github.com", "action": "mask"}
+    )
+
+    assert status == 201
+    rule = body["rule"]
+    assert rule["id"] == 1
+    assert rule["entity_type"] == "domain"
+    assert rule["pattern"] == "github.com"
+    assert rule["action"] == "mask"
+
+    status, body = service.get_privacy_rules()
+
+    assert status == 200
+    assert body["rules"] == [rule]
+
+    status, body = service.post_privacy_rule(
+        {"entity_type": "system", "pattern": "idle", "action": "drop"}
+    )
+
+    assert status == 400
+    assert body["ok"] is False
+
+    status, body = service.post_privacy_rule(
+        {"entity_type": "domain", "pattern": "   ", "action": "mask"}
+    )
+
+    assert status == 400
+    assert body["ok"] is False
+
+    status, body = service.delete_privacy_rule(rule["id"])
+
+    assert status == 200
+    assert body == {"ok": True, "deleted": True}
+
+    status, body = service.delete_privacy_rule(rule["id"])
+
+    assert status == 404
+    assert body == {"ok": False, "error": "privacy rule not found"}
+
+
+def test_tracking_pause_prevents_event_storage_until_resumed(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    event = {
+        "observed_at": "2026-07-01T10:30:00.000Z",
+        "source": "windows_probe",
+        "kind": "app_active",
+        "entity_type": "app",
+        "entity": "Code.exe",
+        "payload": {"activity": "focus"},
+    }
+
+    status, body = service.get_tracking_status()
+
+    assert status == 200
+    assert body == {"ok": True, "paused": False}
+
+    service.pause_tracking()
+    status, body = service.post_events({"source": "windows_probe"})
+
+    assert status == 400
+    assert body["ok"] is False
+
+    status, body = service.post_events(event)
+
+    assert status == 202
+    assert body == {"ok": True, "stored": False, "paused": True}
+    assert service.get_events({})[1]["events"] == []
+
+    service.resume_tracking()
+    status, body = service.post_events(event)
+
+    assert status == 201
+    assert body["ok"] is True
+    assert len(service.get_events({})[1]["events"]) == 1
+
+
+def test_http_routes_expose_web_settings_and_local_json_apis(tmp_path: Path) -> None:
+    config = default_config(data_dir=tmp_path)
+    config.api.port = 0
+    initialize_database(config.db_path)
+    service = LocalTraceService(config, config_path=tmp_path / "config.json")
+    server = create_http_server(config, service)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base_url = f"http://{server.server_address[0]}:{server.server_address[1]}"
+
+    try:
+        status, content_type, html = request_text(base_url, "/")
+        assert status == 200
+        assert "text/html" in content_type
+        assert "LocalTrace" in html
+        assert "/web/app.js" in html
+        assert "Dashboard" not in html
+        assert "Timeline" not in html
+        assert "Reports" not in html
+
+        status, content_type, script = request_text(base_url, "/web/app.js")
+        assert status == 200
+        assert "javascript" in content_type
+        assert "fetch" in script
+        assert "/settings" in script
+        assert "/privacy/rules" in script
+        assert "/tracking/status" in script
+        assert "restart required" in script
+
+        status, content_type, styles = request_text(base_url, "/web/styles.css")
+        assert status == 200
+        assert "text/css" in content_type
+        assert ":root" in styles
+
+        status, body = request_json(base_url, "/settings")
+        assert status == 200
+        assert body["settings"]["api"]["host"] == "127.0.0.1"
+
+        status, body = request_json(
+            base_url,
+            "/privacy/rules",
+            method="POST",
+            payload={
+                "entity_type": "domain",
+                "pattern": "github.com",
+                "action": "mask",
+            },
+        )
+        assert status == 201
+        rule_id = body["rule"]["id"]
+
+        status, body = request_json(
+            base_url, f"/privacy/rules/{rule_id}", method="DELETE"
+        )
+        assert status == 200
+        assert body == {"ok": True, "deleted": True}
+
+        status, body = request_json(base_url, "/tracking/pause", method="POST")
+        assert status == 200
+        assert body == {"ok": True, "paused": True}
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
 
 
 def test_post_events_validates_and_stores_raw_events(tmp_path: Path) -> None:

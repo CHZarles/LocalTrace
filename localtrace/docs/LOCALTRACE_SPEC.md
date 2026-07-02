@@ -223,13 +223,12 @@ Draft `config.json`:
     "track_browser": true,
     "track_audio": true
   },
-  "privacy": {
-    "default_title_storage": false
-  }
+  "privacy": {}
 }
 ```
 
-The host is not configurable.
+The host is not configurable. Title storage is controlled only by
+`capture.store_titles`.
 
 ## Component Independence
 
