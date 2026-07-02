@@ -4,6 +4,7 @@ import argparse
 
 from localtrace_http import (
     LocalTraceError,
+    LocalTraceValidationError,
     add_base_url_argument,
     ensure_ordered_range,
     events_between,
@@ -39,8 +40,10 @@ def main() -> int:
                 limit=limit,
             )
         )
-    except LocalTraceError as exc:
+    except LocalTraceValidationError as exc:
         return fail(str(exc), code=2)
+    except LocalTraceError as exc:
+        return fail(str(exc))
     return 0
 
 

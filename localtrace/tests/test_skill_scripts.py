@@ -276,6 +276,62 @@ def test_scripts_return_machine_readable_error_when_core_is_unavailable() -> Non
     assert "LocalTrace request failed" in body["error"]
 
 
+def test_scripts_reject_non_loopback_base_url_before_http_request() -> None:
+    result = run_script("localtrace_health.py", ["--base-url", "https://example.com"])
+
+    assert result.returncode == 2
+    assert output_json(result) == {
+        "ok": False,
+        "error": "base URL must use a loopback host",
+    }
+
+
+def test_day_summary_marks_output_truncated_when_event_limit_is_exceeded() -> None:
+    with FakeLocalTraceServer(
+        {"/events": {"body": {"ok": True, "events": sample_events()}}}
+    ) as server:
+        result = run_script(
+            "localtrace_day_summary.py",
+            ["--date", "2026-07-01", "--limit", "2"],
+            server.base_url,
+        )
+
+    assert result.returncode == 0
+    body = output_json(result)
+    assert body["event_count"] == 2
+    assert body["truncated"] is True
+    assert body["source_event_limit"] == 2
+    path, query = parse_request(server.requests[0])
+    assert path == "/events"
+    assert query["limit"] == ["3"]
+
+
+def test_explain_gap_marks_output_truncated_when_event_limit_is_exceeded() -> None:
+    with FakeLocalTraceServer(
+        {"/events": {"body": {"ok": True, "events": sample_events()}}}
+    ) as server:
+        result = run_script(
+            "localtrace_explain_gap.py",
+            [
+                "--from",
+                "2026-07-01T09:10:00.000Z",
+                "--to",
+                "2026-07-01T09:20:00.000Z",
+                "--limit",
+                "2",
+            ],
+            server.base_url,
+        )
+
+    assert result.returncode == 0
+    body = output_json(result)
+    assert body["truncated"] is True
+    assert body["source_event_limit"] == 2
+    path, query = parse_request(server.requests[0])
+    assert path == "/events"
+    assert query["limit"] == ["3"]
+
+
 def test_skill_scripts_do_not_import_core_or_sqlite() -> None:
     script_paths = sorted(SCRIPTS_DIR.glob("*.py"))
 

@@ -4,7 +4,9 @@ import argparse
 
 from localtrace_http import (
     LocalTraceError,
+    LocalTraceValidationError,
     add_base_url_argument,
+    apply_event_limit,
     day_bounds,
     events_between,
     fail,
@@ -28,10 +30,16 @@ def main() -> int:
         day = parse_date(args.date)
         limit = parse_positive_int(args.limit, "--limit")
         start, end = day_bounds(day)
-        body = events_between(args.base_url, start, end, limit=limit)
-        print_json(summarize_day(body.get("events", []), day))
-    except LocalTraceError as exc:
+        body = events_between(args.base_url, start, end, limit=limit + 1)
+        events, truncated = apply_event_limit(body.get("events", []), limit)
+        summary = summarize_day(events, day)
+        summary["truncated"] = truncated
+        summary["source_event_limit"] = limit
+        print_json(summary)
+    except LocalTraceValidationError as exc:
         return fail(str(exc), code=2)
+    except LocalTraceError as exc:
+        return fail(str(exc))
     return 0
 
 

@@ -4,6 +4,7 @@ import argparse
 
 from localtrace_http import (
     LocalTraceError,
+    LocalTraceValidationError,
     add_base_url_argument,
     fail,
     print_json,
@@ -18,6 +19,8 @@ def main() -> int:
 
     try:
         print_json(request_json(args.base_url, "/health"))
+    except LocalTraceValidationError as exc:
+        return fail(str(exc), code=2)
     except LocalTraceError as exc:
         return fail(str(exc))
     return 0

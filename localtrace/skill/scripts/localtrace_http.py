@@ -1,19 +1,24 @@
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
 import os
 from collections import Counter
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 from urllib.request import urlopen
 
 DEFAULT_BASE_URL = "http://127.0.0.1:8765"
 
 
 class LocalTraceError(Exception):
+    pass
+
+
+class LocalTraceValidationError(LocalTraceError):
     pass
 
 
@@ -35,7 +40,8 @@ def fail(message: str, code: int = 1) -> int:
 
 
 def request_json(base_url: str, path: str, params: dict[str, Any] | None = None) -> Any:
-    url = f"{base_url.rstrip('/')}{path}"
+    base_url = normalize_base_url(base_url)
+    url = f"{base_url}{path}"
     if params:
         query = {key: value for key, value in params.items() if value is not None}
         url = f"{url}?{urlencode(query)}"
@@ -70,19 +76,37 @@ def parse_positive_int(value: str | int, label: str) -> int:
     try:
         parsed = int(value)
     except ValueError as exc:
-        raise LocalTraceError(f"{label} must be an integer") from exc
+        raise LocalTraceValidationError(f"{label} must be an integer") from exc
     if parsed < 1:
-        raise LocalTraceError(f"{label} must be at least 1")
+        raise LocalTraceValidationError(f"{label} must be at least 1")
     return parsed
+
+
+def normalize_base_url(base_url: str) -> str:
+    parsed = urlparse(base_url)
+    if parsed.scheme not in {"http", "https"}:
+        raise LocalTraceValidationError("base URL must use http or https")
+    if not parsed.hostname or not _is_loopback_host(parsed.hostname):
+        raise LocalTraceValidationError("base URL must use a loopback host")
+    return base_url.rstrip("/")
+
+
+def _is_loopback_host(host: str) -> bool:
+    if host.casefold() == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
 
 
 def rfc3339_utc(value: str, label: str) -> str:
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError as exc:
-        raise LocalTraceError(f"{label} must be RFC3339 UTC") from exc
+        raise LocalTraceValidationError(f"{label} must be RFC3339 UTC") from exc
     if parsed.tzinfo is None or parsed.utcoffset() != timedelta(0):
-        raise LocalTraceError(f"{label} must be RFC3339 UTC")
+        raise LocalTraceValidationError(f"{label} must be RFC3339 UTC")
     return _format_rfc3339_utc(parsed)
 
 
@@ -90,14 +114,14 @@ def parse_date(value: str) -> date:
     try:
         return date.fromisoformat(value)
     except ValueError as exc:
-        raise LocalTraceError("--date must be YYYY-MM-DD") from exc
+        raise LocalTraceValidationError("--date must be YYYY-MM-DD") from exc
 
 
 def ensure_ordered_range(start: str, end: str) -> None:
     start_dt = datetime.fromisoformat(start.replace("Z", "+00:00"))
     end_dt = datetime.fromisoformat(end.replace("Z", "+00:00"))
     if start_dt >= end_dt:
-        raise LocalTraceError("--from must be before --to")
+        raise LocalTraceValidationError("--from must be before --to")
 
 
 def day_bounds(day: date) -> tuple[str, str]:
@@ -173,6 +197,12 @@ def summarize_day(events: list[dict[str, Any]], day: date) -> dict[str, Any]:
             key=lambda item: (-int(item["count"]), item["entity_type"], item["entity"]),
         ),
     }
+
+
+def apply_event_limit(
+    events: list[dict[str, Any]], limit: int
+) -> tuple[list[dict[str, Any]], bool]:
+    return events[:limit], len(events) > limit
 
 
 def explain_gap(events: list[dict[str, Any]], start: str, end: str) -> dict[str, Any]:

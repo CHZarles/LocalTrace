@@ -4,6 +4,7 @@ import argparse
 
 from localtrace_http import (
     LocalTraceError,
+    LocalTraceValidationError,
     add_base_url_argument,
     fail,
     parse_positive_int,
@@ -20,11 +21,13 @@ def main() -> int:
 
     try:
         limit = parse_positive_int(args.limit, "--limit")
-    except LocalTraceError as exc:
+    except LocalTraceValidationError as exc:
         return fail(str(exc), code=2)
 
     try:
         print_json(request_json(args.base_url, "/events", {"limit": limit}))
+    except LocalTraceValidationError as exc:
+        return fail(str(exc), code=2)
     except LocalTraceError as exc:
         return fail(str(exc))
     return 0
