@@ -107,8 +107,7 @@ localtrace\dist\windows\LocalTrace-windows.zip
 ## Legacy Code
 
 The old WorkTrace Flutter client, WinUI prototype, root browser extension,
-client design docs, and old Windows installer workflow have been removed from
-the active development path.
+client design docs, old Windows installer workflow, and old Rust runtime have
+been removed from the active development path.
 
-The old Rust runtime under `core/` and `collectors/` remains temporarily as
-legacy reference. Do not add new LocalTrace features there.
+Use Git history if old implementation details are needed for reference.
