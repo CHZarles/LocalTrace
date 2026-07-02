@@ -528,7 +528,38 @@ def test_explain_gap_finds_nearest_before_in_dense_context_window() -> None:
     assert body["after"]["id"] == 4
     assert body["previous_event_delta_seconds"] == 480
     assert body["next_event_delta_seconds"] == 600
+    assert body["before_context_truncated"] is False
+    assert body["before_context_exact"] is True
     assert len(server.requests) > 3
+
+
+def test_explain_gap_marks_before_context_inexact_for_dense_same_millisecond() -> None:
+    events = [
+        event_at(1, "2026-07-01T09:09:59.999Z", "before-1.exe"),
+        event_at(2, "2026-07-01T09:09:59.999Z", "before-2.exe"),
+        event_at(3, "2026-07-01T09:09:59.999Z", "before-3.exe"),
+        event_at(4, "2026-07-01T09:30:00.000Z", "after.exe"),
+    ]
+    with FakeLocalTraceServer({"/events": {"body": events_route(events)}}) as server:
+        result = run_script(
+            "localtrace_explain_gap.py",
+            [
+                "--from",
+                "2026-07-01T09:10:00.000Z",
+                "--to",
+                "2026-07-01T09:20:00.000Z",
+                "--limit",
+                "2",
+            ],
+            server.base_url,
+        )
+
+    assert result.returncode == 0
+    body = output_json(result)
+    assert body["before"]["observed_at"] == "2026-07-01T09:09:59.999Z"
+    assert body["before_context_truncated"] is True
+    assert body["before_context_exact"] is False
+    assert body["after"]["id"] == 4
 
 
 def test_scripts_return_machine_readable_error_when_core_is_unavailable() -> None:

@@ -59,7 +59,7 @@ def main() -> int:
                 }
             )
             return 1
-        before = _nearest_before(
+        before, before_context_truncated = _nearest_before(
             args.base_url,
             rfc3339_utc_datetime(start, "--from"),
             context_days=context_days,
@@ -79,6 +79,8 @@ def main() -> int:
         result["truncated"] = False
         result["source_event_limit"] = limit
         result["context_days"] = context_days
+        result["before_context_truncated"] = before_context_truncated
+        result["before_context_exact"] = not before_context_truncated
         print_json(result)
     except LocalTraceValidationError as exc:
         return fail(str(exc), code=2)
@@ -93,7 +95,7 @@ def _nearest_before(
     *,
     context_days: int,
     limit: int,
-) -> dict[str, Any] | None:
+) -> tuple[dict[str, Any] | None, bool]:
     earliest = start - timedelta(days=context_days)
     return _nearest_before_between(base_url, earliest, start, limit=limit)
 
@@ -104,7 +106,7 @@ def _nearest_before_between(
     window_end: datetime,
     *,
     limit: int,
-) -> dict[str, Any] | None:
+) -> tuple[dict[str, Any] | None, bool]:
     body = events_between(
         base_url,
         format_rfc3339_utc(window_start),
@@ -113,17 +115,17 @@ def _nearest_before_between(
     )
     events, truncated = apply_event_limit(body.get("events", []), limit)
     if not truncated:
-        return events[-1] if events else None
+        return events[-1] if events else None, False
 
     if window_end - window_start <= timedelta(milliseconds=1):
-        raise LocalTraceError(
-            "gap context before window exceeds event limit at timestamp resolution"
-        )
+        return events[-1] if events else None, True
 
     midpoint = window_start + (window_end - window_start) / 2
-    nearest = _nearest_before_between(base_url, midpoint, window_end, limit=limit)
+    nearest, nearest_truncated = _nearest_before_between(
+        base_url, midpoint, window_end, limit=limit
+    )
     if nearest is not None:
-        return nearest
+        return nearest, nearest_truncated
     return _nearest_before_between(base_url, window_start, midpoint, limit=limit)
 
 
