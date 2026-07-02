@@ -316,6 +316,8 @@ observed_at ascending
 id ascending
 ```
 
+Recent events may support descending order later, but v1 spec starts with predictable ascending ranges.
+
 ## Event Schema Acceptance Checklist
 
 - [ ] `observed_at` and `received_at` are distinct.
