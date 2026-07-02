@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>LocalTrace</title>
-    <link rel="stylesheet" href="/web/styles.css?v=20260702-now-overflow" />
+    <link rel="stylesheet" href="/web/styles.css?v=20260702-single-page" />
   </head>
   <body>
     <svg class="icon-sprite" aria-hidden="true">
@@ -39,11 +39,11 @@
           </div>
         </div>
         <nav class="nav-list" aria-label="Primary">
-          <button class="nav-item active" type="button" data-view="todayView">
+          <button class="nav-item active" type="button" data-section="todayView">
             <svg class="icon" aria-hidden="true"><use href="#icon-activity"></use></svg>
             <span>Today</span>
           </button>
-          <button class="nav-item" type="button" data-view="settingsPanel">
+          <button class="nav-item" type="button" data-section="settingsPanel">
             <svg class="icon" aria-hidden="true"><use href="#icon-settings"></use></svg>
             <span>Settings</span>
           </button>
@@ -160,7 +160,7 @@
             </div>
           </section>
 
-          <section id="settingsPanel" class="view" hidden>
+          <section id="settingsPanel" class="view">
             <div class="settings-layout">
               <article class="card">
                 <div class="section-heading">
@@ -256,6 +256,6 @@
       </div>
     </div>
 
-    <script type="module" src="/web/app.js?v=20260702-now-overflow"></script>
+    <script type="module" src="/web/app.js?v=20260702-single-page"></script>
   </body>
 </html>

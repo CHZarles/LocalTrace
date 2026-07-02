@@ -325,6 +325,10 @@ def test_http_routes_expose_web_settings_and_local_json_apis(tmp_path: Path) -> 
         assert "Recent events" not in html
         assert "eventsTable" not in html
         assert "settingsPanel" in html
+        assert 'id="settingsPanel" class="view" hidden' not in html
+        assert 'data-section="todayView"' in html
+        assert 'data-section="settingsPanel"' in html
+        assert "data-view=" not in html
         assert "/web/app.js" in html
         assert 'src="/web/app.js?v=' in html
         assert 'href="/web/styles.css?v=' in html
@@ -343,6 +347,8 @@ def test_http_routes_expose_web_settings_and_local_json_apis(tmp_path: Path) -> 
         assert "/events?limit=500&order=desc" in script
         assert "renderToday" in script
         assert "buildTimelineModel" in script
+        assert ".scrollIntoView(" in script
+        assert "view.hidden" not in script
         assert "avatar.append(badge)" not in script
         assert "restart required" in script
 

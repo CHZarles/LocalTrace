@@ -263,6 +263,8 @@ h3 {
 }
 
 main {
+  display: grid;
+  gap: var(--space5);
   width: min(1260px, 100%);
   margin: 0 auto;
   padding: var(--space5) clamp(14px, 3vw, 32px) 42px;
@@ -271,6 +273,7 @@ main {
 .view {
   display: grid;
   gap: var(--space4);
+  scroll-margin-top: 96px;
 }
 
 .hero-grid {

@@ -1,5 +1,5 @@
 const state = {
-  activeView: "todayView",
+  activeSection: "todayView",
   topFilter: "all",
   events: [],
   settings: null,
@@ -57,14 +57,10 @@ function renderAll() {
 
 function renderShell() {
   for (const button of document.querySelectorAll(".nav-item")) {
-    const active = button.dataset.view === state.activeView;
+    const active = button.dataset.section === state.activeSection;
     button.classList.toggle("active", active);
   }
-  for (const view of document.querySelectorAll(".view")) {
-    view.hidden = view.id !== state.activeView;
-  }
-  $("pageTitle").textContent =
-    state.activeView === "settingsPanel" ? "Settings" : "Today";
+  $("pageTitle").textContent = "Today";
 }
 
 function renderToday() {
@@ -701,9 +697,13 @@ function formatTime(value) {
   }).format(date);
 }
 
-function setView(viewId) {
-  state.activeView = viewId;
+function setSection(sectionId) {
+  state.activeSection = sectionId;
   renderShell();
+  document.getElementById(sectionId)?.scrollIntoView({
+    behavior: "smooth",
+    block: "start"
+  });
 }
 
 function setStatus(text) {
@@ -718,7 +718,7 @@ function setBusy(busy) {
 }
 
 for (const button of document.querySelectorAll(".nav-item")) {
-  button.addEventListener("click", () => setView(button.dataset.view));
+  button.addEventListener("click", () => setSection(button.dataset.section));
 }
 for (const button of document.querySelectorAll(".segment")) {
   button.addEventListener("click", () => {
