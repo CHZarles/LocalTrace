@@ -1,4 +1,5 @@
 import json
+from dataclasses import asdict
 from pathlib import Path
 
 import pytest
@@ -25,7 +26,6 @@ def test_missing_config_uses_local_only_defaults(tmp_path: Path) -> None:
     assert config.capture.store_exe_path is False
     assert config.capture.track_browser is True
     assert config.capture.track_audio is True
-    assert config.privacy.default_title_storage is False
     assert config.data_dir == tmp_path
     assert config.db_path == tmp_path / "localtrace.db"
 
@@ -55,8 +55,20 @@ def test_missing_config_is_saved_with_defaults(tmp_path: Path) -> None:
     saved = json.loads(config_path.read_text(encoding="utf-8"))
     assert saved["api"]["port"] == 8765
     assert saved["capture"]["store_titles"] is False
-    assert saved["privacy"]["default_title_storage"] is False
+    assert saved["privacy"] == {}
     assert "host" not in saved["api"]
+
+
+def test_legacy_default_title_storage_key_is_ignored(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        json.dumps({"privacy": {"default_title_storage": True}}),
+        encoding="utf-8",
+    )
+
+    config = load_config(config_path, data_dir=tmp_path)
+
+    assert "default_title_storage" not in asdict(config.privacy)
 
 
 def test_invalid_config_json_is_rejected(tmp_path: Path) -> None:

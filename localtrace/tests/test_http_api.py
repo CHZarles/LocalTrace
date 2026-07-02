@@ -161,7 +161,7 @@ def test_settings_api_rejects_unknown_or_unsafe_values(tmp_path: Path) -> None:
         {"api": {"port": 0}},
         {"capture": {"poll_ms": "fast"}},
         {"capture": {"unknown": True}},
-        {"privacy": {"default_title_storage": True}},
+        {"privacy": {"unknown": True}},
         {"unknown": {}},
     ]
 
@@ -389,35 +389,6 @@ def test_post_events_keeps_titles_and_exe_path_when_configured(tmp_path: Path) -
     assert event["title"] == "Project notes"
     assert event["payload"]["title"] == "Nested project title"
     assert event["payload"]["exe_path"] == "C:/Program Files/Code/Code.exe"
-
-
-def test_default_title_storage_does_not_override_disabled_title_storage(
-    tmp_path: Path,
-) -> None:
-    config = default_config(data_dir=tmp_path)
-    config.privacy.default_title_storage = True
-    initialize_database(config.db_path)
-    service = LocalTraceService(config)
-
-    service.post_events(
-        {
-            "observed_at": "2026-07-01T10:30:00.000Z",
-            "source": "browser_extension",
-            "kind": "tab_active",
-            "entity_type": "domain",
-            "entity": "github.com",
-            "title": "Sensitive tab title",
-            "payload": {
-                "activity": "focus",
-                "title": "Nested sensitive title",
-                "tab_title": "Nested tab title",
-            },
-        }
-    )
-
-    event = service.get_events({})[1]["events"][0]
-    assert event["title"] is None
-    assert event["payload"] == {"activity": "focus"}
 
 
 def test_post_events_rejects_disallowed_event_kind(tmp_path: Path) -> None:
