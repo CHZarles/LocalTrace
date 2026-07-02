@@ -54,6 +54,47 @@ python -m localtrace_packaging.package_release --skip-exe-check
 
 The smoke mode creates placeholder `.exe` files and must not be shipped.
 
+## GitHub Release
+
+LocalTrace uses a dedicated Windows release workflow:
+
+```text
+.github/workflows/localtrace-release-windows.yml
+```
+
+The workflow is intentionally separate from the older WorkTrace installer
+workflow. LocalTrace release tags use this prefix:
+
+```text
+localtrace-v*
+```
+
+For example:
+
+```bash
+git tag localtrace-v0.1.0
+git push origin localtrace-v0.1.0
+```
+
+On a `localtrace-v*` tag push, GitHub Actions runs the Windows packaging script
+and attaches this file to the GitHub Release:
+
+```text
+LocalTrace-windows.zip
+```
+
+The workflow can also be started manually from GitHub Actions. Manual runs upload
+`LocalTrace-windows.zip` as an Actions artifact without requiring a tag.
+
+The release workflow runs:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\localtrace\packaging\build-windows.ps1 -Python python
+```
+
+The workflow verifies the generated zip contains the documented release layout
+before uploading it.
+
 ## Install
 
 Extract `LocalTrace-windows.zip`, open PowerShell in the extracted
