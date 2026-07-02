@@ -45,6 +45,18 @@ def test_config_can_be_saved_and_loaded(tmp_path: Path) -> None:
     assert "host" not in config_path.read_text(encoding="utf-8")
 
 
+@pytest.mark.parametrize("port", [0, -1, 65536])
+def test_invalid_stored_api_port_falls_back_to_default(
+    tmp_path: Path, port: int
+) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(json.dumps({"api": {"port": port}}), encoding="utf-8")
+
+    config = load_config(config_path, data_dir=tmp_path)
+
+    assert config.api.port == 8765
+
+
 def test_missing_config_is_saved_with_defaults(tmp_path: Path) -> None:
     config_path = tmp_path / "config.json"
 
