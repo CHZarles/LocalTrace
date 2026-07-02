@@ -484,7 +484,7 @@ def _validate_event_contract(source: str, kind: str, entity_type: str) -> None:
 
 
 def _stored_title(value: Any, config: LocalTraceConfig) -> str | None:
-    if not config.capture.store_titles:
+    if not _title_storage_enabled(config):
         return None
     return value if isinstance(value, str) and value else None
 
@@ -496,12 +496,16 @@ def _stored_payload(
     for key, value in payload.items():
         if key in ALWAYS_FILTERED_PAYLOAD_FIELDS:
             continue
-        if key in TITLE_PAYLOAD_FIELDS and not config.capture.store_titles:
+        if key in TITLE_PAYLOAD_FIELDS and not _title_storage_enabled(config):
             continue
         if key in EXE_PATH_FIELDS and not config.capture.store_exe_path:
             continue
         stored[key] = value
     return stored
+
+
+def _title_storage_enabled(config: LocalTraceConfig) -> bool:
+    return config.capture.store_titles and config.privacy.default_title_storage
 
 
 def _privacy_action(rules: list[dict[str, str]], event: dict[str, Any]) -> str | None:
