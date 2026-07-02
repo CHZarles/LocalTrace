@@ -73,6 +73,7 @@ function renderToday() {
   renderSummary(model);
   renderTop(model);
   renderTimeline(model);
+  renderFlow(model);
   renderEvents(model.todayEvents);
 }
 
@@ -246,7 +247,14 @@ function renderNowRow(target, { label, event, fallback }) {
   const value = document.createElement("div");
   value.className = "row-value";
   if (event) {
-    value.append(entityAvatar(event.entity_type, event.entity, displayEntity(event)));
+    value.append(
+      entityAvatar(
+        event.entity_type,
+        event.entity,
+        displayEntity(event),
+        event.payload?.activity || "focus"
+      )
+    );
     const text = document.createElement("div");
     const title = document.createElement("strong");
     const sub = document.createElement("span");
@@ -265,6 +273,9 @@ function renderSummary(model) {
   $("audioTotal").textContent = formatDuration(model.audioSeconds);
   $("focusSwitches").textContent = String(model.focusSwitches);
   $("todayEventsCount").textContent = String(model.todayEvents.length);
+  $("summaryMeta").textContent = model.todayEvents.length
+    ? `${model.focusSegments.length} focus segments, ${model.audioSegments.length} audio segments`
+    : "Waiting for activity";
 }
 
 function renderTop(model) {
@@ -273,14 +284,17 @@ function renderTop(model) {
   }
   const items = model.topItems
     .filter((item) => state.topFilter === "all" || item.kind === state.topFilter)
-    .slice(0, 10);
+    .slice(0, 8);
+  const maxSeconds = Math.max(1, ...items.map((item) => item.seconds));
   $("topMeta").textContent = items.length
     ? `${items.length} lanes by observed duration`
     : "No activity yet";
-  $("topList").replaceChildren(...items.map(renderTopItem));
+  $("topList").replaceChildren(
+    ...items.map((item, index) => renderTopItem(item, index, maxSeconds))
+  );
 }
 
-function renderTopItem(item, index) {
+function renderTopItem(item, index, maxSeconds) {
   const row = document.createElement("div");
   row.className = "top-item";
   const rank = document.createElement("span");
@@ -294,8 +308,17 @@ function renderTopItem(item, index) {
   sub.textContent = `${item.kind} - ${item.audio ? "audio" : "focus"}`;
   const duration = document.createElement("b");
   duration.textContent = formatDuration(item.seconds);
+  const meter = document.createElement("span");
+  meter.className = item.audio ? "top-meter audio" : "top-meter focus";
+  meter.style.width = `${Math.max(4, (item.seconds / maxSeconds) * 100)}%`;
   body.append(title, sub);
-  row.append(rank, entityAvatar(item.kind, item.entity, item.label), body, duration);
+  row.append(
+    rank,
+    entityAvatar(item.kind, item.entity, item.label, item.activity),
+    body,
+    duration,
+    meter
+  );
   return row;
 }
 
@@ -304,15 +327,51 @@ function renderTimeline(model) {
   $("timelineEmpty").hidden = lanes.length !== 0;
   $("timelineGrid").hidden = lanes.length === 0;
   $("timelineMeta").textContent = lanes.length
-    ? `${lanes.length} top lanes from raw events`
+    ? `${lanes.length} top lanes from today`
     : "No timeline activity yet";
   $("timelineAxis").replaceChildren(...renderAxisTicks());
   $("timelineLanes").replaceChildren(...lanes.map(renderTimelineLane));
 }
 
+function renderFlow(model) {
+  const items = model.focusSegments
+    .slice()
+    .sort((a, b) => b.start - a.start)
+    .slice(0, 12);
+  $("flowList").replaceChildren(...items.map(renderFlowItem));
+  if (!items.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-state compact";
+    empty.textContent = "No focus flow yet.";
+    $("flowList").append(empty);
+  }
+}
+
+function renderFlowItem(segment) {
+  const item = document.createElement("div");
+  item.className = "flow-item";
+  const time = document.createElement("span");
+  time.className = "flow-time";
+  time.textContent = formatTime(segment.start);
+  const body = document.createElement("div");
+  body.className = "flow-body";
+  const title = document.createElement("strong");
+  const meta = document.createElement("span");
+  title.textContent = segment.label;
+  meta.textContent = `${segment.kind} - ${formatDuration(segment.seconds)}`;
+  body.append(title, meta);
+  item.append(
+    time,
+    entityAvatar(segment.kind, segment.entity, segment.label, segment.activity),
+    body
+  );
+  return item;
+}
+
 function renderAxisTicks() {
   return [0, 360, 720, 1080, 1440].map((minute) => {
     const tick = document.createElement("span");
+    if (minute === 1440) tick.className = "end";
     tick.style.left = `${(minute / 1440) * 100}%`;
     tick.textContent = minute === 1440 ? "24:00" : `${String(minute / 60).padStart(2, "0")}:00`;
     return tick;
@@ -437,7 +496,14 @@ function entityCell(event) {
   const td = document.createElement("td");
   const wrap = document.createElement("div");
   wrap.className = "entity-cell";
-  wrap.append(entityAvatar(event.entity_type, event.entity, displayEntity(event)));
+  wrap.append(
+    entityAvatar(
+      event.entity_type,
+      event.entity,
+      displayEntity(event),
+      event.payload?.activity || "focus"
+    )
+  );
   const text = document.createElement("div");
   const title = document.createElement("strong");
   const sub = document.createElement("span");
@@ -460,13 +526,36 @@ function actionCell(id) {
   return td;
 }
 
-function entityAvatar(kind, entity, label) {
+function entityAvatar(kind, entity, label, activity = "focus") {
   const avatar = document.createElement("span");
   avatar.className = "entity-avatar";
   avatar.dataset.kind = kind || "app";
-  avatar.textContent = firstGlyph(kind === "domain" ? entity : label);
+  avatar.dataset.activity = activity;
   avatar.style.setProperty("--avatar-hue", String(hashHue(`${kind}:${entity}`)));
+  avatar.append(iconForEntity(kind, activity));
+  const badge = document.createElement("b");
+  badge.textContent = firstGlyph(kind === "domain" ? entity : label);
+  avatar.append(badge);
   return avatar;
+}
+
+function iconForEntity(kind, activity) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-hidden", "true");
+  svg.classList.add("entity-icon");
+  const paths =
+    activity === "audio"
+      ? ["M4 14a8 8 0 0 1 16 0", "M6 14h2v6H6a2 2 0 0 1-2-2v-2a2 2 0 0 1 2-2Z", "M16 14h2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-2v-6Z"]
+      : kind === "domain"
+        ? ["M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z", "M3.6 9h16.8", "M3.6 15h16.8", "M12 3a13 13 0 0 1 0 18", "M12 3a13 13 0 0 0 0 18"]
+        : ["M4 5h16v11H4Z", "M8 20h8", "M10 16v4", "M14 16v4"];
+  for (const d of paths) {
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", d);
+    svg.append(path);
+  }
+  return svg;
 }
 
 function settingsFromForm() {

@@ -7,6 +7,28 @@
     <link rel="stylesheet" href="/web/styles.css" />
   </head>
   <body>
+    <svg class="icon-sprite" aria-hidden="true">
+      <symbol id="icon-activity" viewBox="0 0 24 24">
+        <path d="M3 12h4l2.3-7 5.4 14 2.3-7h4" />
+      </symbol>
+      <symbol id="icon-settings" viewBox="0 0 24 24">
+        <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" />
+        <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.3a2 2 0 1 1-4 0V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.4 7a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6V3a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1A2 2 0 1 1 20 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.8 1Z" />
+      </symbol>
+      <symbol id="icon-refresh" viewBox="0 0 24 24">
+        <path d="M21 12a9 9 0 0 1-15.2 6.5" />
+        <path d="M3 12A9 9 0 0 1 18.2 5.5" />
+        <path d="M18 2v4h4" />
+        <path d="M6 22v-4H2" />
+      </symbol>
+      <symbol id="icon-pause" viewBox="0 0 24 24">
+        <path d="M8 5v14" />
+        <path d="M16 5v14" />
+      </symbol>
+      <symbol id="icon-play" viewBox="0 0 24 24">
+        <path d="m8 5 11 7-11 7Z" />
+      </symbol>
+    </svg>
     <div class="app-shell">
       <aside class="nav-rail">
         <div class="brand">
@@ -18,15 +40,16 @@
         </div>
         <nav class="nav-list" aria-label="Primary">
           <button class="nav-item active" type="button" data-view="todayView">
-            <span class="nav-icon" aria-hidden="true"></span>
+            <svg class="icon" aria-hidden="true"><use href="#icon-activity"></use></svg>
             <span>Today</span>
           </button>
           <button class="nav-item" type="button" data-view="settingsPanel">
-            <span class="nav-icon" aria-hidden="true"></span>
+            <svg class="icon" aria-hidden="true"><use href="#icon-settings"></use></svg>
             <span>Settings</span>
           </button>
         </nav>
         <button id="refreshButton" class="secondary nav-refresh" type="button">
+          <svg class="button-icon" aria-hidden="true"><use href="#icon-refresh"></use></svg>
           Refresh
         </button>
       </aside>
@@ -39,8 +62,14 @@
           </div>
           <div class="top-actions">
             <span id="trackingPill" class="status-pill">Tracking</span>
-            <button id="pauseButton" class="secondary" type="button">Pause</button>
-            <button id="resumeButton" class="secondary" type="button">Resume</button>
+            <button id="pauseButton" class="secondary" type="button">
+              <svg class="button-icon" aria-hidden="true"><use href="#icon-pause"></use></svg>
+              Pause
+            </button>
+            <button id="resumeButton" class="secondary" type="button">
+              <svg class="button-icon" aria-hidden="true"><use href="#icon-play"></use></svg>
+              Resume
+            </button>
           </div>
         </header>
 
@@ -49,7 +78,10 @@
             <div class="hero-grid">
               <article class="card now-card">
                 <div class="section-heading">
-                  <h3>Now</h3>
+                  <div>
+                    <h3>Now</h3>
+                    <p class="section-note">Current focus and media</p>
+                  </div>
                   <span id="nowFreshness" class="status-pill muted">Waiting</span>
                 </div>
                 <div class="now-list">
@@ -61,7 +93,10 @@
 
               <article class="card summary-card">
                 <div class="section-heading">
-                  <h3>Today summary</h3>
+                  <div>
+                    <h3>Today summary</h3>
+                    <p class="section-note" id="summaryMeta">Today so far</p>
+                  </div>
                 </div>
                 <div class="metric-grid">
                   <div>
@@ -84,39 +119,55 @@
               </article>
             </div>
 
-            <article class="card">
-              <div class="section-heading wrap">
-                <div>
-                  <h3>Today Top</h3>
-                  <p class="section-note" id="topMeta">No activity yet</p>
-                </div>
-                <div class="segmented" role="group" aria-label="Top filter">
-                  <button class="segment active" type="button" data-filter="all">All</button>
-                  <button class="segment" type="button" data-filter="app">Apps</button>
-                  <button class="segment" type="button" data-filter="domain">Web</button>
-                </div>
-              </div>
-              <div class="top-list" id="topList"></div>
-            </article>
+            <div class="workbench-grid">
+              <div class="main-stack">
+                <article class="card timeline-card">
+                  <div class="section-heading wrap">
+                    <div>
+                      <h3>Timeline</h3>
+                      <p class="section-note" id="timelineMeta">Top lanes from today</p>
+                    </div>
+                    <div class="legend">
+                      <span><i class="legend-focus"></i>Focus</span>
+                      <span><i class="legend-audio"></i>Audio</span>
+                    </div>
+                  </div>
+                  <p class="empty-state" id="timelineEmpty" hidden>No timeline activity yet.</p>
+                  <div class="timeline-grid" id="timelineGrid">
+                    <div class="timeline-label-spacer"></div>
+                    <div class="timeline-axis" id="timelineAxis"></div>
+                    <div class="timeline-lanes" id="timelineLanes"></div>
+                  </div>
+                </article>
 
-            <article class="card timeline-card">
-              <div class="section-heading wrap">
-                <div>
-                  <h3>Timeline</h3>
-                  <p class="section-note" id="timelineMeta">Top lanes from today</p>
-                </div>
-                <div class="legend">
-                  <span><i class="legend-focus"></i>Focus</span>
-                  <span><i class="legend-audio"></i>Audio</span>
-                </div>
+                <article class="card flow-card">
+                  <div class="section-heading">
+                    <div>
+                      <h3>Recent flow</h3>
+                      <p class="section-note">Latest focus changes</p>
+                    </div>
+                  </div>
+                  <div class="flow-list" id="flowList"></div>
+                </article>
               </div>
-              <p class="empty-state" id="timelineEmpty" hidden>No timeline activity yet.</p>
-              <div class="timeline-grid" id="timelineGrid">
-                <div class="timeline-label-spacer"></div>
-                <div class="timeline-axis" id="timelineAxis"></div>
-                <div class="timeline-lanes" id="timelineLanes"></div>
-              </div>
-            </article>
+
+              <aside class="side-stack">
+                <article class="card">
+                  <div class="section-heading wrap">
+                    <div>
+                      <h3>Today Top</h3>
+                      <p class="section-note" id="topMeta">No activity yet</p>
+                    </div>
+                    <div class="segmented" role="group" aria-label="Top filter">
+                      <button class="segment active" type="button" data-filter="all">All</button>
+                      <button class="segment" type="button" data-filter="app">Apps</button>
+                      <button class="segment" type="button" data-filter="domain">Web</button>
+                    </div>
+                  </div>
+                  <div class="top-list" id="topList"></div>
+                </article>
+              </aside>
+            </div>
 
             <article class="card events-card">
               <div class="section-heading">
