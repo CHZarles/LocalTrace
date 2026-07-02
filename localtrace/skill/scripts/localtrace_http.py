@@ -387,42 +387,53 @@ def _span_counts(events: list[dict[str, Any]], field: str) -> dict[str, dict[str
 
 def _gap_explanation(
     inside_count: int,
-    gap_seconds: int,
-    previous_delta: int | None,
-    next_delta: int | None,
+    gap_seconds: float,
+    previous_delta: float | None,
+    next_delta: float | None,
 ) -> str:
+    gap_text = _format_seconds(gap_seconds)
     if inside_count:
         return (
             f"{inside_count} stored event(s) were observed in this "
-            f"{gap_seconds}-second window; nearest context is included for "
+            f"{gap_text}-second window; nearest context is included for "
             "sparse-window review."
         )
     if previous_delta is not None and next_delta is not None:
+        previous_text = _format_seconds(previous_delta)
+        next_text = _format_seconds(next_delta)
         return (
-            f"No stored events were observed in this {gap_seconds}-second window; "
-            f"nearest context events are {previous_delta} seconds before and "
-            f"{next_delta} seconds after."
+            f"No stored events were observed in this {gap_text}-second window; "
+            f"nearest context events are {previous_text} seconds before and "
+            f"{next_text} seconds after."
         )
     if previous_delta is not None:
+        previous_text = _format_seconds(previous_delta)
         return (
-            f"No stored events were observed in this {gap_seconds}-second window; "
-            f"the nearest context event is {previous_delta} seconds before."
+            f"No stored events were observed in this {gap_text}-second window; "
+            f"the nearest context event is {previous_text} seconds before."
         )
     if next_delta is not None:
+        next_text = _format_seconds(next_delta)
         return (
-            f"No stored events were observed in this {gap_seconds}-second window; "
-            f"the nearest context event is {next_delta} seconds after."
+            f"No stored events were observed in this {gap_text}-second window; "
+            f"the nearest context event is {next_text} seconds after."
         )
     return (
-        f"No stored events were observed in this {gap_seconds}-second window, "
+        f"No stored events were observed in this {gap_text}-second window, "
         "and no context events were found."
     )
 
 
-def _seconds_between(start: str, end: str) -> int:
+def _seconds_between(start: str, end: str) -> float:
     start_dt = datetime.fromisoformat(start.replace("Z", "+00:00"))
     end_dt = datetime.fromisoformat(end.replace("Z", "+00:00"))
-    return int((end_dt - start_dt).total_seconds())
+    return round((end_dt - start_dt).total_seconds(), 3)
+
+
+def _format_seconds(value: float) -> str:
+    if value.is_integer():
+        return str(int(value))
+    return f"{value:.3f}".rstrip("0").rstrip(".")
 
 
 def _sort_events(events: list[dict[str, Any]]) -> list[dict[str, Any]]:

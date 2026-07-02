@@ -552,6 +552,34 @@ def test_explain_gap_script_reports_before_inside_and_after_context() -> None:
     assert after_query["limit"] == ["1"]
 
 
+def test_explain_gap_preserves_millisecond_precision() -> None:
+    events = [
+        event_at(1, "2026-07-01T09:09:59.750Z", "before.exe"),
+        event_at(2, "2026-07-01T09:10:00.500Z", "after.exe"),
+    ]
+    with FakeLocalTraceServer({"/events": {"body": events_route(events)}}) as server:
+        result = run_script(
+            "localtrace_explain_gap.py",
+            [
+                "--from",
+                "2026-07-01T09:10:00.000Z",
+                "--to",
+                "2026-07-01T09:10:00.250Z",
+            ],
+            server.base_url,
+        )
+
+    assert result.returncode == 0
+    body = output_json(result)
+    assert body["gap_seconds"] == 0.25
+    assert body["previous_event_delta_seconds"] == 0.25
+    assert body["next_event_delta_seconds"] == 0.25
+    assert body["explanation"] == (
+        "No stored events were observed in this 0.25-second window; "
+        "nearest context events are 0.25 seconds before and 0.25 seconds after."
+    )
+
+
 def test_explain_gap_searches_context_across_day_boundary() -> None:
     events = [
         event_at(1, "2026-07-01T23:59:00.000Z", "before.exe"),
