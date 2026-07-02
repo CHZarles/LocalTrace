@@ -166,13 +166,22 @@ def test_health_script_returns_core_health_json() -> None:
     assert server.requests == ["/health"]
 
 
-def test_recent_events_script_returns_newest_events_from_complete_scan() -> None:
+def test_recent_events_script_scans_backward_from_requested_end() -> None:
     with FakeLocalTraceServer(
-        {"/events": {"body": {"ok": True, "events": sample_events()}}}
+        {"/events": {"body": events_route(sample_events())}}
     ) as server:
         result = run_script(
             "localtrace_recent_events.py",
-            ["--limit", "2", "--scan-limit", "5"],
+            [
+                "--limit",
+                "2",
+                "--scan-limit",
+                "5",
+                "--to",
+                "2026-07-02T00:00:00.000Z",
+                "--lookback-days",
+                "2",
+            ],
             server.base_url,
         )
 
@@ -181,19 +190,31 @@ def test_recent_events_script_returns_newest_events_from_complete_scan() -> None
     assert body["events"] == sample_events()[-2:]
     assert body["recent_limit"] == 2
     assert body["scan_limit"] == 5
+    assert body["search_from"] == "2026-07-01T00:00:00.000Z"
+    assert body["search_to"] == "2026-07-02T00:00:00.000Z"
+    assert body["windows_scanned"] == 1
     assert body["truncated"] is False
     path, query = parse_request(server.requests[0])
     assert path == "/events"
+    assert query["from"] == ["2026-07-01T00:00:00.000Z"]
+    assert query["to"] == ["2026-07-02T00:00:00.000Z"]
     assert query["limit"] == ["6"]
 
 
-def test_recent_events_refuses_partial_output_when_scan_limit_is_exceeded() -> None:
+def test_recent_events_refuses_partial_window_when_scan_limit_is_exceeded() -> None:
     with FakeLocalTraceServer(
-        {"/events": {"body": {"ok": True, "events": sample_events()}}}
+        {"/events": {"body": events_route(sample_events())}}
     ) as server:
         result = run_script(
             "localtrace_recent_events.py",
-            ["--limit", "2", "--scan-limit", "2"],
+            [
+                "--limit",
+                "2",
+                "--scan-limit",
+                "2",
+                "--to",
+                "2026-07-02T00:00:00.000Z",
+            ],
             server.base_url,
         )
 
@@ -201,9 +222,11 @@ def test_recent_events_refuses_partial_output_when_scan_limit_is_exceeded() -> N
     assert output_json(result) == {
         "ok": False,
         "partial": True,
-        "error": "recent events exceed scan limit; increase --scan-limit",
+        "error": "recent events window exceeds scan limit; increase --scan-limit",
         "truncated": True,
         "scan_limit": 2,
+        "window_from": "2026-07-01T00:00:00.000Z",
+        "window_to": "2026-07-02T00:00:00.000Z",
     }
     path, query = parse_request(server.requests[0])
     assert path == "/events"
@@ -297,8 +320,30 @@ def test_day_summary_script_derives_counts_and_observed_spans() -> None:
     assert body["event_count"] == 3
     assert body["observed_start"] == "2026-07-01T09:00:00.000Z"
     assert body["observed_end"] == "2026-07-01T10:00:00.000Z"
-    assert body["by_source"] == {"browser_extension": 1, "windows_probe": 2}
-    assert body["by_kind"] == {"app_active": 2, "tab_active": 1}
+    assert body["by_source"] == {
+        "browser_extension": {
+            "count": 1,
+            "first_observed_at": "2026-07-01T09:30:00.000Z",
+            "last_observed_at": "2026-07-01T09:30:00.000Z",
+        },
+        "windows_probe": {
+            "count": 2,
+            "first_observed_at": "2026-07-01T09:00:00.000Z",
+            "last_observed_at": "2026-07-01T10:00:00.000Z",
+        },
+    }
+    assert body["by_kind"] == {
+        "app_active": {
+            "count": 2,
+            "first_observed_at": "2026-07-01T09:00:00.000Z",
+            "last_observed_at": "2026-07-01T10:00:00.000Z",
+        },
+        "tab_active": {
+            "count": 1,
+            "first_observed_at": "2026-07-01T09:30:00.000Z",
+            "last_observed_at": "2026-07-01T09:30:00.000Z",
+        },
+    }
     assert body["by_entity"][0] == {
         "entity_type": "app",
         "entity": "Code.exe",
@@ -334,7 +379,13 @@ def test_explain_gap_script_reports_before_inside_and_after_context() -> None:
     assert body["inside_event_count"] == 0
     assert body["before"]["id"] == 1
     assert body["after"]["id"] == 2
-    assert body["explanation"] == "No stored events were observed in this window."
+    assert body["gap_seconds"] == 600
+    assert body["previous_event_delta_seconds"] == 600
+    assert body["next_event_delta_seconds"] == 600
+    assert body["explanation"] == (
+        "No stored events were observed in this 600-second window; "
+        "nearest same-day events are 600 seconds before and 600 seconds after."
+    )
     assert len(server.requests) == 3
     before_path, before_query = parse_request(server.requests[1])
     assert before_path == "/events"

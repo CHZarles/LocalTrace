@@ -4,7 +4,6 @@ import argparse
 import ipaddress
 import json
 import os
-from collections import Counter
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -117,7 +116,18 @@ def rfc3339_utc(value: str, label: str) -> str:
         raise LocalTraceValidationError(f"{label} must be RFC3339 UTC") from exc
     if parsed.tzinfo is None or parsed.utcoffset() != timedelta(0):
         raise LocalTraceValidationError(f"{label} must be RFC3339 UTC")
-    return _format_rfc3339_utc(parsed)
+    return format_rfc3339_utc(parsed)
+
+
+def rfc3339_utc_datetime(value: str, label: str) -> datetime:
+    normalized = rfc3339_utc(value, label)
+    return datetime.fromisoformat(normalized.replace("Z", "+00:00"))
+
+
+def format_rfc3339_utc(value: datetime) -> str:
+    return (
+        value.astimezone(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    )
 
 
 def parse_date(value: str) -> date:
@@ -137,7 +147,7 @@ def ensure_ordered_range(start: str, end: str) -> None:
 def day_bounds(day: date) -> tuple[str, str]:
     start = datetime(day.year, day.month, day.day, tzinfo=UTC)
     end = start + timedelta(days=1)
-    return _format_rfc3339_utc(start), _format_rfc3339_utc(end)
+    return format_rfc3339_utc(start), format_rfc3339_utc(end)
 
 
 def range_day_bounds(start: str, end: str) -> tuple[str, str]:
@@ -147,7 +157,7 @@ def range_day_bounds(start: str, end: str) -> tuple[str, str]:
     day_end = datetime(end_dt.year, end_dt.month, end_dt.day, tzinfo=UTC) + timedelta(
         days=1
     )
-    return _format_rfc3339_utc(day_start), _format_rfc3339_utc(day_end)
+    return format_rfc3339_utc(day_start), format_rfc3339_utc(day_end)
 
 
 def events_between(
@@ -174,8 +184,6 @@ def events_between(
 
 def summarize_day(events: list[dict[str, Any]], day: date) -> dict[str, Any]:
     ordered = _sort_events(events)
-    by_source = Counter(str(event.get("source", "")) for event in ordered)
-    by_kind = Counter(str(event.get("kind", "")) for event in ordered)
     entities: dict[tuple[str, str], dict[str, Any]] = {}
 
     for event in ordered:
@@ -200,8 +208,8 @@ def summarize_day(events: list[dict[str, Any]], day: date) -> dict[str, Any]:
         "event_count": len(ordered),
         "observed_start": ordered[0]["observed_at"] if ordered else None,
         "observed_end": ordered[-1]["observed_at"] if ordered else None,
-        "by_source": dict(sorted(by_source.items())),
-        "by_kind": dict(sorted(by_kind.items())),
+        "by_source": _span_counts(ordered, "source"),
+        "by_kind": _span_counts(ordered, "kind"),
         "by_entity": sorted(
             entities.values(),
             key=lambda item: (-int(item["count"]), item["entity_type"], item["entity"]),
@@ -221,31 +229,104 @@ def explain_gap(events: list[dict[str, Any]], start: str, end: str) -> dict[str,
     inside = [event for event in ordered if start <= str(event["observed_at"]) < end]
     after = [event for event in ordered if str(event["observed_at"]) >= end]
 
-    if inside:
-        explanation = "Stored events were observed in this window."
-    else:
-        explanation = "No stored events were observed in this window."
+    return gap_context_result(
+        start,
+        end,
+        before[-1] if before else None,
+        inside,
+        after[0] if after else None,
+    )
 
+
+def gap_context_result(
+    start: str,
+    end: str,
+    before: dict[str, Any] | None,
+    inside: list[dict[str, Any]],
+    after: dict[str, Any] | None,
+) -> dict[str, Any]:
+    gap_seconds = _seconds_between(start, end)
+    previous_delta = (
+        _seconds_between(str(before["observed_at"]), start) if before else None
+    )
+    next_delta = _seconds_between(end, str(after["observed_at"])) if after else None
     return {
         "ok": True,
         "from": start,
         "to": end,
         "gap_detected": not inside,
         "inside_event_count": len(inside),
-        "before": before[-1] if before else None,
+        "gap_seconds": gap_seconds,
+        "previous_event_delta_seconds": previous_delta,
+        "next_event_delta_seconds": next_delta,
+        "before": before,
         "inside": inside,
-        "after": after[0] if after else None,
-        "explanation": explanation,
+        "after": after,
+        "explanation": _gap_explanation(
+            len(inside), gap_seconds, previous_delta, next_delta
+        ),
     }
+
+
+def _span_counts(events: list[dict[str, Any]], field: str) -> dict[str, dict[str, Any]]:
+    spans: dict[str, dict[str, Any]] = {}
+    for event in events:
+        observed_at = str(event["observed_at"])
+        key = str(event.get(field, ""))
+        span = spans.setdefault(
+            key,
+            {
+                "count": 0,
+                "first_observed_at": observed_at,
+                "last_observed_at": observed_at,
+            },
+        )
+        span["count"] += 1
+        span["last_observed_at"] = observed_at
+    return dict(sorted(spans.items()))
+
+
+def _gap_explanation(
+    inside_count: int,
+    gap_seconds: int,
+    previous_delta: int | None,
+    next_delta: int | None,
+) -> str:
+    if inside_count:
+        return (
+            f"{inside_count} stored event(s) were observed in this "
+            f"{gap_seconds}-second window; nearest context is included for "
+            "sparse-window review."
+        )
+    if previous_delta is not None and next_delta is not None:
+        return (
+            f"No stored events were observed in this {gap_seconds}-second window; "
+            f"nearest same-day events are {previous_delta} seconds before and "
+            f"{next_delta} seconds after."
+        )
+    if previous_delta is not None:
+        return (
+            f"No stored events were observed in this {gap_seconds}-second window; "
+            f"the nearest same-day event is {previous_delta} seconds before."
+        )
+    if next_delta is not None:
+        return (
+            f"No stored events were observed in this {gap_seconds}-second window; "
+            f"the nearest same-day event is {next_delta} seconds after."
+        )
+    return (
+        f"No stored events were observed in this {gap_seconds}-second window, "
+        "and no same-day context events were found."
+    )
+
+
+def _seconds_between(start: str, end: str) -> int:
+    start_dt = datetime.fromisoformat(start.replace("Z", "+00:00"))
+    end_dt = datetime.fromisoformat(end.replace("Z", "+00:00"))
+    return int((end_dt - start_dt).total_seconds())
 
 
 def _sort_events(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return sorted(
         events, key=lambda event: (str(event["observed_at"]), int(event["id"]))
-    )
-
-
-def _format_rfc3339_utc(value: datetime) -> str:
-    return (
-        value.astimezone(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
     )

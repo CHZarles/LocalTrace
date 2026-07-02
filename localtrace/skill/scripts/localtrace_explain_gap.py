@@ -11,6 +11,7 @@ from localtrace_http import (
     ensure_ordered_range,
     events_between,
     fail,
+    gap_context_result,
     parse_date,
     parse_positive_int,
     print_json,
@@ -73,23 +74,15 @@ def main() -> int:
             return 1
         _after_start, day_end = day_bounds(parse_date(end[:10]))
         after_body = events_between(args.base_url, end, day_end, limit=1)
-        if inside:
-            explanation = "Stored events were observed in this window."
-        else:
-            explanation = "No stored events were observed in this window."
-        result = {
-            "ok": True,
-            "from": start,
-            "to": end,
-            "gap_detected": not inside,
-            "inside_event_count": len(inside),
-            "before": before[-1] if before else None,
-            "inside": inside,
-            "after": _first_or_none(after_body.get("events", [])),
-            "explanation": explanation,
-            "truncated": False,
-            "source_event_limit": limit,
-        }
+        result = gap_context_result(
+            start,
+            end,
+            before[-1] if before else None,
+            inside,
+            _first_or_none(after_body.get("events", [])),
+        )
+        result["truncated"] = False
+        result["source_event_limit"] = limit
         print_json(result)
     except LocalTraceValidationError as exc:
         return fail(str(exc), code=2)

@@ -22,7 +22,8 @@ user configured a different port.
 ## Tools
 
 - `scripts/localtrace_health.py`: print `GET /health`.
-- `scripts/localtrace_recent_events.py`: print recent raw events.
+- `scripts/localtrace_recent_events.py`: print recent raw events by scanning
+  backward from `--to` in bounded 24-hour windows.
 - `scripts/localtrace_events_between.py`: print raw events in an RFC3339 UTC
   range.
 - `scripts/localtrace_day_summary.py`: compute a same-day summary from raw
