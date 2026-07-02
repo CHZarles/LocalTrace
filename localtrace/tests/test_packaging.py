@@ -161,8 +161,12 @@ def test_windows_build_script_invokes_pyinstaller_for_both_exes() -> None:
     )
 
     assert "PyInstaller" in script
+    assert ".ProviderPath" in script
     assert "--name localtrace" in script
     assert "--name localtrace-winprobe" in script
+    assert '"--add-data=${webDir}:web"' in script
+    assert '"--add-data",' not in script
+    assert "$webDir;web" not in script
     assert "localtrace_launcher.py" in script
     assert "localtrace_winprobe_launcher.py" in script
     assert "Start-Process -Verb RunAs" not in script
