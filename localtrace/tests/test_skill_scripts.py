@@ -149,6 +149,18 @@ def event_at(
     }
 
 
+def many_events(count: int, entity: str = "busy-app.exe") -> list[dict[str, Any]]:
+    return [
+        event_at(
+            index + 1,
+            f"2026-07-01T{index // 3600:02d}:{(index // 60) % 60:02d}:"
+            f"{index % 60:02d}.000Z",
+            entity,
+        )
+        for index in range(count)
+    ]
+
+
 def events_route(events: list[dict[str, Any]]):
     def route(path: str) -> dict[str, Any]:
         _request_path, query = parse_request(path)
@@ -331,17 +343,9 @@ def test_recent_events_accepts_scan_limit_at_core_cap() -> None:
 
 
 def test_recent_events_accepts_exact_core_cap_response() -> None:
-    capped_events = [
-        event_at(
-            index + 1,
-            f"2026-07-01T{index // 3600:02d}:{(index // 60) % 60:02d}:"
-            f"{index % 60:02d}.000Z",
-            f"app-{index}.exe",
-        )
-        for index in range(5000)
-    ]
+    capped_events = many_events(5000)
     with FakeLocalTraceServer(
-        {"/events": {"body": {"ok": True, "events": capped_events}}}
+        {"/events": {"body": events_route(capped_events)}}
     ) as server:
         result = run_script(
             "localtrace_recent_events.py",
@@ -361,6 +365,35 @@ def test_recent_events_accepts_exact_core_cap_response() -> None:
     assert body["ok"] is True
     assert body["scan_limit"] == 5000
     assert [event["id"] for event in body["events"]] == [5000]
+
+
+def test_recent_events_marks_partial_for_more_than_core_cap() -> None:
+    capped_events = many_events(5001)
+    with FakeLocalTraceServer(
+        {"/events": {"body": events_route(capped_events)}}
+    ) as server:
+        result = run_script(
+            "localtrace_recent_events.py",
+            [
+                "--limit",
+                "1",
+                "--scan-limit",
+                "5000",
+                "--to",
+                "2026-07-02T00:00:00.000Z",
+            ],
+            server.base_url,
+        )
+
+    assert result.returncode == 1
+    body = output_json(result)
+    assert body["ok"] is False
+    assert body["partial"] is True
+    assert (
+        body["error"]
+        == "recent events window exceeds scan limit; increase --scan-limit"
+    )
+    assert body["scan_limit"] == 5000
 
 
 def test_events_between_script_validates_range_and_filters() -> None:
@@ -550,6 +583,28 @@ def test_explain_gap_searches_context_across_day_boundary() -> None:
     assert after_query["to"] == ["2026-07-03T00:01:00.000Z"]
 
 
+def test_explain_gap_marks_before_context_inexact_when_none_exists() -> None:
+    events = [event_at(1, "2026-07-01T09:30:00.000Z", "after.exe")]
+    with FakeLocalTraceServer({"/events": {"body": events_route(events)}}) as server:
+        result = run_script(
+            "localtrace_explain_gap.py",
+            [
+                "--from",
+                "2026-07-01T09:10:00.000Z",
+                "--to",
+                "2026-07-01T09:20:00.000Z",
+            ],
+            server.base_url,
+        )
+
+    assert result.returncode == 0
+    body = output_json(result)
+    assert body["before"] is None
+    assert body["before_context_truncated"] is False
+    assert body["before_context_exact"] is False
+    assert body["after"]["id"] == 1
+
+
 def test_explain_gap_finds_nearest_before_in_dense_context_window() -> None:
     events = [
         event_at(1, "2026-07-01T09:00:00.000Z", "before-1.exe"),
@@ -639,6 +694,50 @@ def test_scripts_return_machine_readable_error_for_non_object_json() -> None:
     assert output_json(result) == {
         "ok": False,
         "error": "LocalTrace request failed: expected JSON object response",
+    }
+
+
+def test_scripts_return_machine_readable_error_for_http_200_error_body() -> None:
+    with FakeLocalTraceServer(
+        {"/events": {"body": {"ok": False, "error": "store unavailable"}}}
+    ) as server:
+        result = run_script(
+            "localtrace_events_between.py",
+            [
+                "--from",
+                "2026-07-01T00:00:00.000Z",
+                "--to",
+                "2026-07-02T00:00:00.000Z",
+            ],
+            server.base_url,
+        )
+
+    assert result.returncode == 1
+    assert output_json(result) == {
+        "ok": False,
+        "error": "LocalTrace request failed: store unavailable",
+    }
+
+
+def test_scripts_return_machine_readable_error_for_non_array_events() -> None:
+    with FakeLocalTraceServer(
+        {"/events": {"body": {"ok": True, "events": {"id": 1}}}}
+    ) as server:
+        result = run_script(
+            "localtrace_events_between.py",
+            [
+                "--from",
+                "2026-07-01T00:00:00.000Z",
+                "--to",
+                "2026-07-02T00:00:00.000Z",
+            ],
+            server.base_url,
+        )
+
+    assert result.returncode == 1
+    assert output_json(result) == {
+        "ok": False,
+        "error": "LocalTrace request failed: events must be a JSON array",
     }
 
 
@@ -755,17 +854,9 @@ def test_day_summary_accepts_limit_at_core_cap() -> None:
 
 
 def test_day_summary_accepts_exact_core_cap_response() -> None:
-    capped_events = [
-        event_at(
-            index + 1,
-            f"2026-07-01T{index // 3600:02d}:{(index // 60) % 60:02d}:"
-            f"{index % 60:02d}.000Z",
-            "busy-app.exe",
-        )
-        for index in range(5000)
-    ]
+    capped_events = many_events(5000)
     with FakeLocalTraceServer(
-        {"/events": {"body": {"ok": True, "events": capped_events}}}
+        {"/events": {"body": events_route(capped_events)}}
     ) as server:
         result = run_script(
             "localtrace_day_summary.py",
@@ -779,6 +870,25 @@ def test_day_summary_accepts_exact_core_cap_response() -> None:
     assert body["event_count"] == 5000
     assert body["source_event_limit"] == 5000
     assert body["by_entity"][0]["count"] == 5000
+
+
+def test_day_summary_marks_partial_for_more_than_core_cap() -> None:
+    capped_events = many_events(5001)
+    with FakeLocalTraceServer(
+        {"/events": {"body": events_route(capped_events)}}
+    ) as server:
+        result = run_script(
+            "localtrace_day_summary.py",
+            ["--date", "2026-07-01", "--limit", "5000"],
+            server.base_url,
+        )
+
+    assert result.returncode == 1
+    body = output_json(result)
+    assert body["ok"] is False
+    assert body["partial"] is True
+    assert body["error"] == "day summary exceeds event limit; increase --limit"
+    assert body["source_event_limit"] == 5000
 
 
 def test_explain_gap_refuses_partial_output_when_event_limit_is_exceeded() -> None:

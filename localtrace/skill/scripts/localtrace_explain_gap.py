@@ -9,9 +9,11 @@ from localtrace_http import (
     LocalTraceValidationError,
     add_base_url_argument,
     apply_event_limit,
+    collect_events_between,
     ensure_ordered_range,
     event_request_limit,
     events_between,
+    events_from_response,
     fail,
     format_rfc3339_utc,
     gap_context_result,
@@ -45,15 +47,13 @@ def main() -> int:
         context_days = parse_positive_int(
             args.context_days, "--context-days", maximum=30
         )
-        inside_request_limit = event_request_limit(limit)
-        inside_body = events_between(
-            args.base_url, start, end, limit=inside_request_limit
+        inside, inside_collect_partial = collect_events_between(
+            args.base_url,
+            start,
+            end,
+            limit=limit,
         )
-        inside, inside_truncated = apply_event_limit(
-            inside_body.get("events", []),
-            limit,
-        )
-        if inside_truncated:
+        if inside_collect_partial:
             print_json(
                 {
                     "ok": False,
@@ -79,13 +79,15 @@ def main() -> int:
             end,
             before,
             inside,
-            _first_or_none(after_body.get("events", [])),
+            _first_or_none(events_from_response(after_body)),
         )
         result["truncated"] = False
         result["source_event_limit"] = limit
         result["context_days"] = context_days
         result["before_context_truncated"] = before_context_truncated
-        result["before_context_exact"] = not before_context_truncated
+        result["before_context_exact"] = (
+            before is not None and not before_context_truncated
+        )
         print_json(result)
     except LocalTraceValidationError as exc:
         return fail(str(exc), code=2)
@@ -119,8 +121,9 @@ def _nearest_before_between(
         format_rfc3339_utc(window_end),
         limit=request_limit,
     )
-    events, truncated = apply_event_limit(body.get("events", []), limit)
-    if not truncated:
+    body_events = events_from_response(body)
+    events, _truncated = apply_event_limit(body_events, limit)
+    if len(body_events) < request_limit:
         return events[-1] if events else None, False
 
     if window_end - window_start <= timedelta(milliseconds=1):

@@ -73,6 +73,8 @@ def request_json(
         raise LocalTraceError(
             "LocalTrace request failed: expected JSON object response"
         )
+    if body.get("ok") is False and isinstance(body.get("error"), str):
+        raise LocalTraceError(f"LocalTrace request failed: {body['error']}")
     return body
 
 
@@ -182,6 +184,95 @@ def events_between(
             "limit": limit,
         },
     )
+
+
+def events_from_response(body: dict[str, Any]) -> list[dict[str, Any]]:
+    events = body.get("events", [])
+    if not isinstance(events, list):
+        raise LocalTraceError("LocalTrace request failed: events must be a JSON array")
+    return events
+
+
+def collect_events_between(
+    base_url: str,
+    start: str,
+    end: str,
+    *,
+    limit: int,
+    source: str | None = None,
+    kind: str | None = None,
+) -> tuple[list[dict[str, Any]], bool]:
+    start_dt = datetime.fromisoformat(start.replace("Z", "+00:00"))
+    end_dt = datetime.fromisoformat(end.replace("Z", "+00:00"))
+    return _collect_events_between(
+        base_url,
+        start_dt,
+        end_dt,
+        limit=limit,
+        source=source,
+        kind=kind,
+    )
+
+
+def _collect_events_between(
+    base_url: str,
+    start: datetime,
+    end: datetime,
+    *,
+    limit: int,
+    source: str | None,
+    kind: str | None,
+) -> tuple[list[dict[str, Any]], bool]:
+    if limit < 1:
+        return [], True
+
+    request_limit = event_request_limit(limit)
+    body = events_between(
+        base_url,
+        format_rfc3339_utc(start),
+        format_rfc3339_utc(end),
+        source=source,
+        kind=kind,
+        limit=request_limit,
+    )
+    events = events_from_response(body)
+    if len(events) < request_limit:
+        return events, False
+    if len(events) > limit:
+        return events[:limit], True
+    if end - start <= timedelta(milliseconds=1):
+        return events[:limit], True
+
+    midpoint = start + (end - start) / 2
+    left, left_partial = _collect_events_between(
+        base_url,
+        start,
+        midpoint,
+        limit=limit,
+        source=source,
+        kind=kind,
+    )
+    if left_partial:
+        return left[:limit], True
+    if len(left) >= limit:
+        right_probe, right_partial = _collect_events_between(
+            base_url,
+            midpoint,
+            end,
+            limit=1,
+            source=source,
+            kind=kind,
+        )
+        return left[:limit], right_partial or bool(right_probe)
+    right, right_partial = _collect_events_between(
+        base_url,
+        midpoint,
+        end,
+        limit=limit - len(left),
+        source=source,
+        kind=kind,
+    )
+    return [*left, *right], right_partial
 
 
 def summarize_day(events: list[dict[str, Any]], day: date) -> dict[str, Any]:

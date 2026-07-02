@@ -9,9 +9,7 @@ from localtrace_http import (
     LocalTraceError,
     LocalTraceValidationError,
     add_base_url_argument,
-    apply_event_limit,
-    event_request_limit,
-    events_between,
+    collect_events_between,
     fail,
     format_rfc3339_utc,
     parse_positive_int,
@@ -96,15 +94,13 @@ def _scan_recent_events(
         window_start = window_end - timedelta(days=1)
         window_from_text = format_rfc3339_utc(window_start)
         window_to_text = format_rfc3339_utc(window_end)
-        request_limit = event_request_limit(scan_limit)
-        body = events_between(
+        events, collect_partial = collect_events_between(
             base_url,
             window_from_text,
             window_to_text,
-            limit=request_limit,
+            limit=scan_limit,
         )
-        events, truncated = apply_event_limit(body.get("events", []), scan_limit)
-        if truncated:
+        if collect_partial:
             return {
                 "ok": False,
                 "partial": True,

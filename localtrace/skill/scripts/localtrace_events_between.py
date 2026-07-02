@@ -8,6 +8,7 @@ from localtrace_http import (
     add_base_url_argument,
     ensure_ordered_range,
     events_between,
+    events_from_response,
     fail,
     parse_positive_int,
     print_json,
@@ -30,16 +31,16 @@ def main() -> int:
         end = rfc3339_utc(args.end, "--to")
         ensure_ordered_range(start, end)
         limit = parse_positive_int(args.limit, "--limit")
-        print_json(
-            events_between(
-                args.base_url,
-                start,
-                end,
-                source=args.source,
-                kind=args.kind,
-                limit=limit,
-            )
+        body = events_between(
+            args.base_url,
+            start,
+            end,
+            source=args.source,
+            kind=args.kind,
+            limit=limit,
         )
+        events_from_response(body)
+        print_json(body)
     except LocalTraceValidationError as exc:
         return fail(str(exc), code=2)
     except LocalTraceError as exc:

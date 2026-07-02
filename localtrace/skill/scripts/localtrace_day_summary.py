@@ -6,10 +6,8 @@ from localtrace_http import (
     LocalTraceError,
     LocalTraceValidationError,
     add_base_url_argument,
-    apply_event_limit,
+    collect_events_between,
     day_bounds,
-    event_request_limit,
-    events_between,
     fail,
     parse_date,
     parse_positive_int,
@@ -31,10 +29,10 @@ def main() -> int:
         day = parse_date(args.date)
         limit = parse_positive_int(args.limit, "--limit")
         start, end = day_bounds(day)
-        request_limit = event_request_limit(limit)
-        body = events_between(args.base_url, start, end, limit=request_limit)
-        events, truncated = apply_event_limit(body.get("events", []), limit)
-        if truncated:
+        events, collect_partial = collect_events_between(
+            args.base_url, start, end, limit=limit
+        )
+        if collect_partial:
             print_json(
                 {
                     "ok": False,
@@ -46,7 +44,7 @@ def main() -> int:
             )
             return 1
         summary = summarize_day(events, day)
-        summary["truncated"] = truncated
+        summary["truncated"] = False
         summary["source_event_limit"] = limit
         print_json(summary)
     except LocalTraceValidationError as exc:
