@@ -353,6 +353,12 @@ def test_http_routes_expose_web_settings_and_local_json_apis(tmp_path: Path) -> 
         assert ".nav-rail" in styles
         assert ".timeline-grid" in styles
         assert ".entity-avatar" in styles
+        assert ".row-value > div" in styles
+        assert ".timeline-lane-label > div" in styles
+        assert ".row-value .entity-avatar" in styles
+        assert ".timeline-lane-label .entity-avatar" in styles
+        assert ".entity-icon" in styles
+        assert "display: block;" in styles
         assert ".entity-avatar b" not in styles
 
         status, body = request_json(base_url, "/settings")
