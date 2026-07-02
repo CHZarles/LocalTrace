@@ -141,7 +141,6 @@ def test_settings_api_returns_loopback_and_persists_approved_updates(
                 "track_browser": False,
                 "track_audio": False,
             },
-            "privacy": {"default_title_storage": True},
         }
     )
 
@@ -149,11 +148,9 @@ def test_settings_api_returns_loopback_and_persists_approved_updates(
     assert body["settings"]["api"] == {"host": "127.0.0.1", "port": 9876}
     assert body["settings"]["capture"]["poll_ms"] == 1500
     assert body["settings"]["capture"]["store_titles"] is True
-    assert body["settings"]["privacy"]["default_title_storage"] is True
     persisted = json.loads(config_path.read_text(encoding="utf-8"))
     assert persisted["api"]["port"] == 9876
     assert persisted["capture"]["heartbeat_seconds"] == 90
-    assert persisted["privacy"]["default_title_storage"] is True
 
 
 def test_settings_api_rejects_unknown_or_unsafe_values(tmp_path: Path) -> None:
@@ -164,7 +161,7 @@ def test_settings_api_rejects_unknown_or_unsafe_values(tmp_path: Path) -> None:
         {"api": {"port": 0}},
         {"capture": {"poll_ms": "fast"}},
         {"capture": {"unknown": True}},
-        {"privacy": {"unknown": True}},
+        {"privacy": {"default_title_storage": True}},
         {"unknown": {}},
     ]
 
@@ -368,7 +365,6 @@ def test_post_events_keeps_titles_and_exe_path_when_configured(tmp_path: Path) -
     config = default_config(data_dir=tmp_path)
     config.capture.store_titles = True
     config.capture.store_exe_path = True
-    config.privacy.default_title_storage = True
     initialize_database(config.db_path)
     service = LocalTraceService(config)
 
@@ -393,35 +389,6 @@ def test_post_events_keeps_titles_and_exe_path_when_configured(tmp_path: Path) -
     assert event["title"] == "Project notes"
     assert event["payload"]["title"] == "Nested project title"
     assert event["payload"]["exe_path"] == "C:/Program Files/Code/Code.exe"
-
-
-def test_privacy_title_default_blocks_title_storage_when_disabled(
-    tmp_path: Path,
-) -> None:
-    config = default_config(data_dir=tmp_path)
-    config.capture.store_titles = True
-    config.privacy.default_title_storage = False
-    initialize_database(config.db_path)
-    service = LocalTraceService(config)
-
-    service.post_events(
-        {
-            "observed_at": "2026-07-01T10:30:00.000Z",
-            "source": "browser_extension",
-            "kind": "tab_active",
-            "entity_type": "domain",
-            "entity": "github.com",
-            "title": "Sensitive tab title",
-            "payload": {
-                "activity": "focus",
-                "title": "Nested sensitive title",
-            },
-        }
-    )
-
-    event = service.get_events({})[1]["events"][0]
-    assert event["title"] is None
-    assert event["payload"] == {"activity": "focus"}
 
 
 def test_default_title_storage_does_not_override_disabled_title_storage(

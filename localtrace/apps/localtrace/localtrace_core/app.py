@@ -122,7 +122,6 @@ class LocalTraceService:
 
         api = updates.get("api", {})
         capture = updates.get("capture", {})
-        privacy = updates.get("privacy", {})
         restart_required = []
 
         if "port" in api and api["port"] != self.config.api.port:
@@ -130,8 +129,6 @@ class LocalTraceService:
             self.config.api.port = api["port"]
         for key, value in capture.items():
             setattr(self.config.capture, key, value)
-        for key, value in privacy.items():
-            setattr(self.config.privacy, key, value)
 
         if self.config_path is not None:
             save_config(self.config, self.config_path)
@@ -387,9 +384,6 @@ def _settings_payload(config: LocalTraceConfig) -> dict[str, Any]:
             "track_browser": config.capture.track_browser,
             "track_audio": config.capture.track_audio,
         },
-        "privacy": {
-            "default_title_storage": config.privacy.default_title_storage,
-        },
     }
 
 
@@ -397,11 +391,11 @@ def _validate_settings_payload(payload: dict[str, Any]) -> dict[str, dict[str, A
     if not isinstance(payload, dict):
         raise ValueError("settings payload must be an object")
 
-    allowed_sections = {"api", "capture", "privacy"}
+    allowed_sections = {"api", "capture"}
     if set(payload) - allowed_sections:
         raise ValueError("unknown settings section")
 
-    updates: dict[str, dict[str, Any]] = {"api": {}, "capture": {}, "privacy": {}}
+    updates: dict[str, dict[str, Any]] = {"api": {}, "capture": {}}
     for section in allowed_sections:
         value = payload.get(section, {})
         if not isinstance(value, dict):
@@ -435,14 +429,6 @@ def _validate_settings_payload(payload: dict[str, Any]) -> dict[str, dict[str, A
     for key in bool_fields:
         if key in capture:
             updates["capture"][key] = _bool_value(capture[key], f"capture.{key}")
-
-    privacy = payload.get("privacy", {})
-    if set(privacy) - {"default_title_storage"}:
-        raise ValueError("unknown privacy setting")
-    if "default_title_storage" in privacy:
-        updates["privacy"]["default_title_storage"] = _bool_value(
-            privacy["default_title_storage"], "privacy.default_title_storage"
-        )
 
     return updates
 
@@ -505,7 +491,7 @@ def _stored_payload(
 
 
 def _title_storage_enabled(config: LocalTraceConfig) -> bool:
-    return config.capture.store_titles and config.privacy.default_title_storage
+    return config.capture.store_titles
 
 
 def _privacy_action(rules: list[dict[str, str]], event: dict[str, Any]) -> str | None:

@@ -76,7 +76,6 @@ function renderSettings(settings) {
   $("storeExePath").checked = settings.capture.store_exe_path;
   $("trackBrowser").checked = settings.capture.track_browser;
   $("trackAudio").checked = settings.capture.track_audio;
-  $("defaultTitleStorage").checked = settings.privacy.default_title_storage;
 }
 
 function renderRules(rules) {
@@ -129,9 +128,6 @@ function settingsFromForm() {
       store_exe_path: $("storeExePath").checked,
       track_browser: $("trackBrowser").checked,
       track_audio: $("trackAudio").checked
-    },
-    privacy: {
-      default_title_storage: $("defaultTitleStorage").checked
     }
   };
 }
