@@ -124,12 +124,5 @@ Active LocalTrace files:
 - `localtrace/skill/`: local trace helper scripts.
 - `localtrace/docs/`: product and engineering docs.
 
-Legacy WorkTrace runtime code:
-
-- `core/`
-- `collectors/`
-- root `Cargo.toml` / `Cargo.lock`
-- `schemas/`
-
-Those legacy runtime directories are retained only as temporary reference while
-LocalTrace cleanup continues. New LocalTrace work should not add features there.
+Legacy WorkTrace client/runtime code has been removed from the active main
+branch. Use Git history if old implementation details are needed for reference.

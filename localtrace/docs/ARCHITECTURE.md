@@ -252,11 +252,12 @@ localtrace-skill
 
 ## Legacy WorkTrace Code Reuse
 
-Legacy WorkTrace code is reference material, not the new architecture.
+Legacy WorkTrace code is reference material in Git history, not the new
+architecture.
 
 May reuse ideas or small code sections from:
 
-- `collectors/windows_collector/src/main.rs`
+- old Windows collector history, where it supports the LocalTrace probe role
 - old browser extension history, as already migrated into `localtrace/extension/`
 - old UI information architecture, only where it supports LocalTrace's local
   capture scope
