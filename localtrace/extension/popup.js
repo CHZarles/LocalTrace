@@ -12,7 +12,7 @@ function byId(id) {
 }
 
 async function load() {
-  const settings = await chrome.storage.sync.get(DEFAULT_SETTINGS);
+  const settings = await chrome.storage.local.get(DEFAULT_SETTINGS);
   byId("enabled").checked = settings.enabled !== false;
   byId("sendTitle").checked = settings.sendTitle === true;
   byId("trackBgAudio").checked = settings.trackBackgroundAudio !== false;
@@ -22,7 +22,6 @@ async function load() {
 
   const { status } = await chrome.storage.local.get("status");
   renderStatus(status);
-  forceEmit();
 }
 
 function settingsFromForm() {
@@ -98,7 +97,7 @@ async function save() {
   const settings = settingsFromForm();
   byId("port").value = String(settings.port);
   renderEndpoint();
-  await chrome.storage.sync.set(settings);
+  await chrome.storage.local.set(settings);
 }
 
 async function testHealth() {
@@ -117,36 +116,11 @@ async function testHealth() {
   }
 }
 
-async function forceEmit() {
-  try {
-    await chrome.runtime.sendMessage({ type: "forceEmit" });
-  } catch {
-    // Ignore popup wake-up errors.
-  }
-}
-
-async function repair() {
-  const button = byId("repair");
-  button.disabled = true;
-  try {
-    await chrome.runtime.sendMessage({ type: "repair" });
-    await forceEmit();
-  } catch {
-    // Ignore repair errors; status will show current state.
-  } finally {
-    setTimeout(() => {
-      button.disabled = false;
-    }, 400);
-  }
-}
-
 for (const id of ["enabled", "sendTitle", "trackBgAudio", "keepAlive", "port"]) {
   byId(id).addEventListener("change", save);
 }
 
 byId("testHealth").addEventListener("click", testHealth);
-byId("forceEmit").addEventListener("click", forceEmit);
-byId("repair").addEventListener("click", repair);
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName === "local" && changes.status) {

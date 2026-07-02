@@ -77,8 +77,21 @@ async function persistState() {
 }
 
 async function getSettings() {
-  const stored = await chrome.storage.sync.get(DEFAULT_SETTINGS);
+  const stored = await chrome.storage.local.get(DEFAULT_SETTINGS);
   return { ...DEFAULT_SETTINGS, ...stored };
+}
+
+async function ensureDefaultSettings() {
+  const stored = await chrome.storage.local.get(Object.keys(DEFAULT_SETTINGS));
+  const missing = {};
+  for (const [key, value] of Object.entries(DEFAULT_SETTINGS)) {
+    if (stored[key] === undefined) {
+      missing[key] = value;
+    }
+  }
+  if (Object.keys(missing).length > 0) {
+    await chrome.storage.local.set(missing);
+  }
 }
 
 function detectBrowser() {
@@ -409,10 +422,7 @@ async function bootstrap() {
 
 chrome.runtime.onInstalled.addListener(async () => {
   await ensureStateLoaded();
-  const stored = await chrome.storage.sync.get(null);
-  if (!stored || Object.keys(stored).length === 0) {
-    await chrome.storage.sync.set(DEFAULT_SETTINGS);
-  }
+  await ensureDefaultSettings();
   await ensureHeartbeatAlarm();
   await setStatus({ ok: true, info: "installed" });
   await emitActiveTabEventSafe({ force: true });
@@ -455,7 +465,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 });
 
 chrome.storage.onChanged.addListener(async (changes, areaName) => {
-  if (areaName !== "sync") return;
+  if (areaName !== "local") return;
   if (
     changes.enabled ||
     changes.port ||
@@ -479,13 +489,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
-  if (type === "forceEmit") {
-    emitActiveTabEventSafe({ force: true })
-      .then(() => sendResponse({ ok: true }))
-      .catch((caught) => sendResponse({ ok: false, error: String(caught) }));
-    return true;
-  }
-
   if (type === "diagnose") {
     (async () => {
       await ensureStateLoaded();
@@ -498,39 +501,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         offscreen: lastOffscreen,
         state: { ...STATE }
       };
-    })()
-      .then((data) => sendResponse(data))
-      .catch((caught) => sendResponse({ ok: false, error: String(caught) }));
-    return true;
-  }
-
-  if (type === "repair") {
-    (async () => {
-      await ensureStateLoaded();
-      const settings = await getSettings();
-      await checkOffscreen(settings);
-      await ensureHeartbeatAlarm();
-      if (
-        lastOffscreen.supported &&
-        settings.keepAlive !== false &&
-        settings.enabled !== false
-      ) {
-        try {
-          if (await chrome.offscreen.hasDocument()) {
-            await chrome.offscreen.closeDocument();
-          }
-        } catch {
-          // Ignore refresh errors.
-        }
-        await syncOffscreenDocument(settings);
-      }
-      STATE.consecutiveErrors = 0;
-      STATE.lastError = null;
-      STATE.lastErrorAtMs = 0;
-      await persistState();
-      await setStatus({ ok: true, info: "repaired" });
-      await emitActiveTabEventSafe({ force: true });
-      return { ok: true };
     })()
       .then((data) => sendResponse(data))
       .catch((caught) => sendResponse({ ok: false, error: String(caught) }));
