@@ -1,0 +1,92 @@
+name: LocalTrace Release (Windows)
+
+on:
+  push:
+    tags:
+      - "localtrace-v*"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  windows-zip:
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install packaging dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pyinstaller==6.14.1
+
+      - name: Build LocalTrace Windows zip
+        id: package
+        shell: pwsh
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File .\localtrace\packaging\build-windows.ps1 -Python python
+
+          $zip = Join-Path $env:GITHUB_WORKSPACE "localtrace\dist\windows\LocalTrace-windows.zip"
+          if (!(Test-Path $zip)) {
+            throw "Missing LocalTrace release zip: $zip"
+          }
+
+          $name = "${env:GITHUB_REF_NAME}"
+          if ([string]::IsNullOrWhiteSpace($name)) {
+            $name = "manual-${env:GITHUB_RUN_NUMBER}"
+          }
+
+          "ZIP_PATH=$zip" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "ARTIFACT_NAME=LocalTrace-$name-windows" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Verify release zip layout
+        shell: pwsh
+        run: |
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = "localtrace\dist\windows\LocalTrace-windows.zip"
+          $archive = [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path $zip))
+          try {
+            $names = $archive.Entries | ForEach-Object { $_.FullName }
+            $required = @(
+              "LocalTrace/localtrace.exe",
+              "LocalTrace/localtrace-winprobe.exe",
+              "LocalTrace/extension/localtrace-extension.zip",
+              "LocalTrace/scripts/install-localtrace.ps1",
+              "LocalTrace/scripts/uninstall-localtrace.ps1",
+              "LocalTrace/web/index.html",
+              "LocalTrace/web/app.js",
+              "LocalTrace/web/styles.css",
+              "LocalTrace/manifest.json",
+              "LocalTrace/README.md"
+            )
+            foreach ($entry in $required) {
+              if ($names -notcontains $entry) {
+                throw "Release zip missing required entry: $entry"
+              }
+            }
+          } finally {
+            $archive.Dispose()
+          }
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.package.outputs.ARTIFACT_NAME }}
+          path: ${{ steps.package.outputs.ZIP_PATH }}
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/localtrace-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.package.outputs.ZIP_PATH }}
+          generate_release_notes: true
