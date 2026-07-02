@@ -3,110 +3,241 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>LocalTrace Settings</title>
+    <title>LocalTrace</title>
     <link rel="stylesheet" href="/web/styles.css" />
   </head>
   <body>
-    <header class="topbar">
-      <div>
-        <h1>LocalTrace</h1>
-        <p id="statusLine">Loading</p>
+    <div class="app-shell">
+      <aside class="nav-rail">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">LT</div>
+          <div>
+            <h1>LocalTrace</h1>
+            <p id="statusLine">Loading</p>
+          </div>
+        </div>
+        <nav class="nav-list" aria-label="Primary">
+          <button class="nav-item active" type="button" data-view="todayView">
+            <span class="nav-icon" aria-hidden="true"></span>
+            <span>Today</span>
+          </button>
+          <button class="nav-item" type="button" data-view="settingsPanel">
+            <span class="nav-icon" aria-hidden="true"></span>
+            <span>Settings</span>
+          </button>
+        </nav>
+        <button id="refreshButton" class="secondary nav-refresh" type="button">
+          Refresh
+        </button>
+      </aside>
+
+      <div class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Local capture</p>
+            <h2 id="pageTitle">Today</h2>
+          </div>
+          <div class="top-actions">
+            <span id="trackingPill" class="status-pill">Tracking</span>
+            <button id="pauseButton" class="secondary" type="button">Pause</button>
+            <button id="resumeButton" class="secondary" type="button">Resume</button>
+          </div>
+        </header>
+
+        <main>
+          <section id="todayView" class="view">
+            <div class="hero-grid">
+              <article class="card now-card">
+                <div class="section-heading">
+                  <h3>Now</h3>
+                  <span id="nowFreshness" class="status-pill muted">Waiting</span>
+                </div>
+                <div class="now-list">
+                  <div class="now-row" id="nowFocus"></div>
+                  <div class="now-row" id="nowTab"></div>
+                  <div class="now-row" id="nowAudio"></div>
+                </div>
+              </article>
+
+              <article class="card summary-card">
+                <div class="section-heading">
+                  <h3>Today summary</h3>
+                </div>
+                <div class="metric-grid">
+                  <div>
+                    <span>Focus</span>
+                    <strong id="focusTotal">0m</strong>
+                  </div>
+                  <div>
+                    <span>Audio</span>
+                    <strong id="audioTotal">0m</strong>
+                  </div>
+                  <div>
+                    <span>Switches</span>
+                    <strong id="focusSwitches">0</strong>
+                  </div>
+                  <div>
+                    <span>Events</span>
+                    <strong id="todayEventsCount">0</strong>
+                  </div>
+                </div>
+              </article>
+            </div>
+
+            <article class="card">
+              <div class="section-heading wrap">
+                <div>
+                  <h3>Today Top</h3>
+                  <p class="section-note" id="topMeta">No activity yet</p>
+                </div>
+                <div class="segmented" role="group" aria-label="Top filter">
+                  <button class="segment active" type="button" data-filter="all">All</button>
+                  <button class="segment" type="button" data-filter="app">Apps</button>
+                  <button class="segment" type="button" data-filter="domain">Web</button>
+                </div>
+              </div>
+              <div class="top-list" id="topList"></div>
+            </article>
+
+            <article class="card timeline-card">
+              <div class="section-heading wrap">
+                <div>
+                  <h3>Timeline</h3>
+                  <p class="section-note" id="timelineMeta">Top lanes from today</p>
+                </div>
+                <div class="legend">
+                  <span><i class="legend-focus"></i>Focus</span>
+                  <span><i class="legend-audio"></i>Audio</span>
+                </div>
+              </div>
+              <p class="empty-state" id="timelineEmpty" hidden>No timeline activity yet.</p>
+              <div class="timeline-grid" id="timelineGrid">
+                <div class="timeline-label-spacer"></div>
+                <div class="timeline-axis" id="timelineAxis"></div>
+                <div class="timeline-lanes" id="timelineLanes"></div>
+              </div>
+            </article>
+
+            <article class="card events-card">
+              <div class="section-heading">
+                <div>
+                  <h3>Recent events</h3>
+                  <p class="section-note" id="eventsCount">Loading events</p>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table class="events-table">
+                  <thead>
+                    <tr>
+                      <th>Time</th>
+                      <th>Entity</th>
+                      <th>Kind</th>
+                      <th>Activity</th>
+                      <th>Source</th>
+                    </tr>
+                  </thead>
+                  <tbody id="eventsTable"></tbody>
+                </table>
+              </div>
+              <p class="empty-state" id="eventsEmpty" hidden>No captured activity yet.</p>
+            </article>
+          </section>
+
+          <section id="settingsPanel" class="view" hidden>
+            <div class="settings-layout">
+              <article class="card">
+                <div class="section-heading">
+                  <h3>Health</h3>
+                </div>
+                <dl class="metrics" id="healthMetrics"></dl>
+              </article>
+
+              <article class="card">
+                <div class="section-heading">
+                  <h3>Core settings</h3>
+                  <button id="saveSettings" type="button">Save</button>
+                </div>
+                <form id="settingsForm" class="settings-grid">
+                  <label>
+                    <span>Port</span>
+                    <input id="apiPort" name="apiPort" type="number" min="1" max="65535" />
+                  </label>
+                  <label>
+                    <span>Poll ms</span>
+                    <input id="pollMs" name="pollMs" type="number" min="100" step="100" />
+                  </label>
+                  <label>
+                    <span>Heartbeat sec</span>
+                    <input id="heartbeatSeconds" name="heartbeatSeconds" type="number" min="1" />
+                  </label>
+                  <label>
+                    <span>Idle cutoff sec</span>
+                    <input id="idleCutoffSeconds" name="idleCutoffSeconds" type="number" min="1" />
+                  </label>
+                  <label class="toggle">
+                    <span>Store titles</span>
+                    <input id="storeTitles" name="storeTitles" type="checkbox" />
+                  </label>
+                  <label class="toggle">
+                    <span>Store exe path</span>
+                    <input id="storeExePath" name="storeExePath" type="checkbox" />
+                  </label>
+                  <label class="toggle">
+                    <span>Track browser</span>
+                    <input id="trackBrowser" name="trackBrowser" type="checkbox" />
+                  </label>
+                  <label class="toggle">
+                    <span>Track audio</span>
+                    <input id="trackAudio" name="trackAudio" type="checkbox" />
+                  </label>
+                </form>
+              </article>
+
+              <article class="card">
+                <div class="section-heading">
+                  <h3>Privacy</h3>
+                  <button id="addRule" type="button">Add Rule</button>
+                </div>
+                <form id="ruleForm" class="rule-form">
+                  <label>
+                    <span>Entity</span>
+                    <select id="ruleEntityType" name="ruleEntityType">
+                      <option value="domain">domain</option>
+                      <option value="app">app</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Pattern</span>
+                    <input id="rulePattern" name="rulePattern" type="text" autocomplete="off" />
+                  </label>
+                  <label>
+                    <span>Action</span>
+                    <select id="ruleAction" name="ruleAction">
+                      <option value="mask">mask</option>
+                      <option value="drop">drop</option>
+                    </select>
+                  </label>
+                </form>
+                <div class="table-wrap">
+                  <table class="rules-table">
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>Entity</th>
+                        <th>Pattern</th>
+                        <th>Action</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody id="rulesTable"></tbody>
+                  </table>
+                </div>
+              </article>
+            </div>
+          </section>
+        </main>
       </div>
-      <div class="top-actions">
-        <button id="refreshButton" type="button">Refresh</button>
-        <button id="pauseButton" type="button">Pause</button>
-        <button id="resumeButton" type="button">Resume</button>
-      </div>
-    </header>
-
-    <main>
-      <section class="band">
-        <div class="section-heading">
-          <h2>Health</h2>
-        </div>
-        <dl class="metrics" id="healthMetrics"></dl>
-      </section>
-
-      <section class="band">
-        <div class="section-heading">
-          <h2>Settings</h2>
-          <button id="saveSettings" type="button">Save</button>
-        </div>
-        <form id="settingsForm" class="settings-grid">
-          <label>
-            <span>Port</span>
-            <input id="apiPort" name="apiPort" type="number" min="1" max="65535" />
-          </label>
-          <label>
-            <span>Poll ms</span>
-            <input id="pollMs" name="pollMs" type="number" min="100" step="100" />
-          </label>
-          <label>
-            <span>Heartbeat sec</span>
-            <input id="heartbeatSeconds" name="heartbeatSeconds" type="number" min="1" />
-          </label>
-          <label>
-            <span>Idle cutoff sec</span>
-            <input id="idleCutoffSeconds" name="idleCutoffSeconds" type="number" min="1" />
-          </label>
-          <label class="toggle">
-            <span>Store titles</span>
-            <input id="storeTitles" name="storeTitles" type="checkbox" />
-          </label>
-          <label class="toggle">
-            <span>Store exe path</span>
-            <input id="storeExePath" name="storeExePath" type="checkbox" />
-          </label>
-          <label class="toggle">
-            <span>Track browser</span>
-            <input id="trackBrowser" name="trackBrowser" type="checkbox" />
-          </label>
-          <label class="toggle">
-            <span>Track audio</span>
-            <input id="trackAudio" name="trackAudio" type="checkbox" />
-          </label>
-        </form>
-      </section>
-
-      <section class="band">
-        <div class="section-heading">
-          <h2>Privacy</h2>
-          <button id="addRule" type="button">Add Rule</button>
-        </div>
-        <form id="ruleForm" class="rule-form">
-          <label>
-            <span>Entity</span>
-            <select id="ruleEntityType" name="ruleEntityType">
-              <option value="domain">domain</option>
-              <option value="app">app</option>
-            </select>
-          </label>
-          <label>
-            <span>Pattern</span>
-            <input id="rulePattern" name="rulePattern" type="text" autocomplete="off" />
-          </label>
-          <label>
-            <span>Action</span>
-            <select id="ruleAction" name="ruleAction">
-              <option value="mask">mask</option>
-              <option value="drop">drop</option>
-            </select>
-          </label>
-        </form>
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Entity</th>
-              <th>Pattern</th>
-              <th>Action</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="rulesTable"></tbody>
-        </table>
-      </section>
-    </main>
+    </div>
 
     <script type="module" src="/web/app.js"></script>
   </body>
