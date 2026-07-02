@@ -1,9 +1,13 @@
+import importlib
 import json
 import sqlite3
+import sys
 import threading
 from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
+
+import pytest
 
 from localtrace_core.app import LocalTraceService, create_http_server
 from localtrace_core.config import default_config
@@ -54,6 +58,24 @@ def request_text(base_url: str, path: str) -> tuple[int, str, str]:
     with urlopen(base_url + path, timeout=5) as response:
         content_type = response.headers.get("Content-Type", "")
         return response.status, content_type, response.read().decode("utf-8")
+
+
+def test_web_dir_prefers_assets_next_to_runtime_executable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from localtrace_core import app as app_module
+
+    runtime_web_dir = tmp_path / "web"
+    runtime_web_dir.mkdir()
+
+    try:
+        with monkeypatch.context() as patch:
+            patch.setattr(sys, "executable", str(tmp_path / "localtrace.exe"))
+            reloaded = importlib.reload(app_module)
+
+            assert runtime_web_dir == reloaded.WEB_DIR
+    finally:
+        importlib.reload(app_module)
 
 
 def test_health_reports_local_service_status(tmp_path: Path) -> None:
@@ -308,9 +330,33 @@ def test_http_routes_expose_web_settings_and_local_json_apis(tmp_path: Path) -> 
         assert "/tracking/status" in script
         assert "restart required" in script
 
+        status, content_type, styles = request_text(base_url, "/web/styles.css")
+        assert status == 200
+        assert "text/css" in content_type
+        assert ":root" in styles
+
         status, body = request_json(base_url, "/settings")
         assert status == 200
         assert body["settings"]["api"]["host"] == "127.0.0.1"
+
+        status, body = request_json(
+            base_url,
+            "/privacy/rules",
+            method="POST",
+            payload={
+                "entity_type": "domain",
+                "pattern": "github.com",
+                "action": "mask",
+            },
+        )
+        assert status == 201
+        rule_id = body["rule"]["id"]
+
+        status, body = request_json(
+            base_url, f"/privacy/rules/{rule_id}", method="DELETE"
+        )
+        assert status == 200
+        assert body == {"ok": True, "deleted": True}
 
         status, body = request_json(base_url, "/tracking/pause", method="POST")
         assert status == 200

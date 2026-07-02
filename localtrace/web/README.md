@@ -13,3 +13,9 @@ Manual smoke steps:
 8. Delete the rule and confirm it is removed.
 9. Pause tracking and confirm `POST /events` does not store a new event.
 10. Resume tracking and confirm `POST /events` stores a new event.
+
+Asset layout:
+
+- Source-tree runs serve assets from `localtrace/web`.
+- Packaged runs should place the `web/` directory next to the LocalTrace runtime
+  executable.

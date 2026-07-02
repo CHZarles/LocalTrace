@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from datetime import UTC, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -48,7 +49,16 @@ TITLE_PAYLOAD_FIELDS = {"title", "window_title", "tab_title"}
 MASKED_PAYLOAD_FIELDS = (
     ALWAYS_FILTERED_PAYLOAD_FIELDS | EXE_PATH_FIELDS | TITLE_PAYLOAD_FIELDS
 )
-WEB_DIR = Path(__file__).resolve().parents[3] / "web"
+
+
+def _default_web_dir() -> Path:
+    runtime_web_dir = Path(sys.executable).resolve().parent / "web"
+    if runtime_web_dir.is_dir():
+        return runtime_web_dir
+    return Path(__file__).resolve().parents[3] / "web"
+
+
+WEB_DIR = _default_web_dir()
 STATIC_CONTENT_TYPES = {
     ".html": "text/html; charset=utf-8",
     ".css": "text/css; charset=utf-8",
