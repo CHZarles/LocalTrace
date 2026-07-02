@@ -4,6 +4,7 @@ import argparse
 import json
 import shutil
 import sys
+import tomllib
 import zipfile
 from datetime import UTC, datetime
 from pathlib import Path
@@ -207,7 +208,7 @@ def _write_release_readme(destination: Path) -> None:
 def _write_manifest(destination: Path, *, exe_build_skipped: bool) -> None:
     payload: dict[str, Any] = {
         "name": "LocalTrace",
-        "version": "0.1.0",
+        "version": _project_version(),
         "built_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "exe_build_skipped": exe_build_skipped,
         "artifacts": {
@@ -233,6 +234,12 @@ def _write_zip_from_dir(source_dir: Path, destination: Path) -> None:
         for path in sorted(source_dir.rglob("*")):
             if path.is_file():
                 archive.write(path, path.relative_to(source_dir.parent).as_posix())
+
+
+def _project_version() -> str:
+    with (LOCALTRACE_ROOT / "pyproject.toml").open("rb") as file:
+        project = tomllib.load(file)
+    return str(project["project"]["version"])
 
 
 def _reset_dir(path: Path) -> None:

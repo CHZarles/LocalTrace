@@ -25,6 +25,10 @@ $normalizedInstallDir = Get-NormalizedPath -Path $InstallDir
 if ($normalizedReleaseRoot -ieq $normalizedInstallDir) {
   throw "ReleaseRoot and InstallDir must be different. Run this script from an extracted release directory, not from the installed app directory."
 }
+$releaseRootPrefix = "$normalizedReleaseRoot$([System.IO.Path]::DirectorySeparatorChar)"
+if ($normalizedInstallDir.StartsWith($releaseRootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+  throw "InstallDir must not be inside ReleaseRoot. Choose an install directory outside the extracted release directory."
+}
 
 $coreExe = Join-Path $InstallDir "localtrace.exe"
 

@@ -176,6 +176,8 @@ def test_install_script_rejects_running_from_installed_copy() -> None:
 
     assert "[System.IO.Path]::GetFullPath" in script
     assert "ReleaseRoot and InstallDir must be different" in script
+    assert "InstallDir must not be inside ReleaseRoot" in script
+    assert ".StartsWith($releaseRootPrefix" in script
 
 
 def test_install_script_computes_autostart_target_after_install_dir_default() -> None:
@@ -214,6 +216,16 @@ def test_powershell_scripts_parse_when_powershell_is_available() -> None:
             text=True,
         )
         assert result.returncode == 0, result.stderr
+
+
+def test_manifest_version_is_read_from_pyproject() -> None:
+    source = (
+        LOCALTRACE_ROOT / "localtrace_packaging" / "package_release.py"
+    ).read_text(encoding="utf-8")
+
+    assert '"version": "0.1.0"' not in source
+    assert "tomllib" in source
+    assert "_project_version()" in source
 
 
 def test_packaging_docs_are_in_mkdocs_nav() -> None:
