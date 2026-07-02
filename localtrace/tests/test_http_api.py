@@ -316,10 +316,26 @@ def test_http_routes_expose_web_settings_and_local_json_apis(tmp_path: Path) -> 
         assert status == 200
         assert "text/html" in content_type
         assert "LocalTrace" in html
+        assert "Today" in html
+        assert "Now" in html
+        assert "Today Top" in html
+        assert "Timeline" in html
+        assert "Recent flow" not in html
+        assert "flowList" not in html
+        assert "Recent events" not in html
+        assert "eventsTable" not in html
+        assert "settingsPanel" in html
+        assert 'id="settingsPanel" class="view" hidden' not in html
+        assert 'data-section="todayView"' in html
+        assert 'data-section="settingsPanel"' in html
+        assert "data-view=" not in html
         assert "/web/app.js" in html
+        assert 'src="/web/app.js?v=' in html
+        assert 'href="/web/styles.css?v=' in html
         assert "Dashboard" not in html
-        assert "Timeline" not in html
         assert "Reports" not in html
+        assert "Planner" not in html
+        assert "Review" not in html
 
         status, content_type, script = request_text(base_url, "/web/app.js")
         assert status == 200
@@ -328,12 +344,28 @@ def test_http_routes_expose_web_settings_and_local_json_apis(tmp_path: Path) -> 
         assert "/settings" in script
         assert "/privacy/rules" in script
         assert "/tracking/status" in script
+        assert "/events?limit=500&order=desc" in script
+        assert "renderToday" in script
+        assert "buildTimelineModel" in script
+        assert ".scrollIntoView(" in script
+        assert "view.hidden" not in script
+        assert "avatar.append(badge)" not in script
         assert "restart required" in script
 
         status, content_type, styles = request_text(base_url, "/web/styles.css")
         assert status == 200
         assert "text/css" in content_type
         assert ":root" in styles
+        assert ".nav-rail" in styles
+        assert ".timeline-grid" in styles
+        assert ".entity-avatar" in styles
+        assert ".row-value > div" in styles
+        assert ".timeline-lane-label > div" in styles
+        assert ".row-value .entity-avatar" in styles
+        assert ".timeline-lane-label .entity-avatar" in styles
+        assert ".entity-icon" in styles
+        assert "display: block;" in styles
+        assert ".entity-avatar b" not in styles
 
         status, body = request_json(base_url, "/settings")
         assert status == 200
@@ -637,6 +669,31 @@ def test_get_events_filters_by_time_source_kind_and_limit(tmp_path: Path) -> Non
 
     assert status == 200
     assert [event["entity"] for event in body["events"]] == ["github.com"]
+
+
+def test_get_events_supports_explicit_desc_order_for_recent_views(
+    tmp_path: Path,
+) -> None:
+    service = make_service(tmp_path)
+    for index, entity in enumerate(["Code.exe", "chrome.exe", "WindowsTerminal.exe"]):
+        service.post_events(
+            {
+                "observed_at": f"2026-07-01T10:0{index}:00.000Z",
+                "source": "windows_probe",
+                "kind": "app_active",
+                "entity_type": "app",
+                "entity": entity,
+                "payload": {"activity": "focus"},
+            }
+        )
+
+    status, body = service.get_events({"limit": "2", "order": "desc"})
+
+    assert status == 200
+    assert [event["entity"] for event in body["events"]] == [
+        "WindowsTerminal.exe",
+        "chrome.exe",
+    ]
 
 
 def test_get_events_excludes_to_boundary(tmp_path: Path) -> None:

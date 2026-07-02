@@ -204,6 +204,7 @@ def list_events(db_path: Path, filters: dict[str, str]) -> list[dict[str, Any]]:
     limit = _limit(filters.get("limit"))
     params.append(limit)
 
+    order_by = _order_by(filters.get("order"))
     query = f"""
         SELECT
           id,
@@ -218,7 +219,7 @@ def list_events(db_path: Path, filters: dict[str, str]) -> list[dict[str, Any]]:
           payload_json
         FROM events
         {where}
-        ORDER BY observed_at ASC, id ASC
+        ORDER BY {order_by}
         LIMIT ?
     """
 
@@ -250,3 +251,9 @@ def _limit(raw: str | None) -> int:
     except ValueError:
         return 200
     return min(max(value, 1), 5000)
+
+
+def _order_by(raw: str | None) -> str:
+    if raw == "desc":
+        return "observed_at DESC, id DESC"
+    return "observed_at ASC, id ASC"

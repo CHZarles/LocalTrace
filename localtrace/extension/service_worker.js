@@ -17,6 +17,14 @@ const STATE = {
   lastWindowId: null,
   lastActivity: null,
   lastSentAtMs: 0,
+  lastFocusDomain: null,
+  lastFocusTabId: null,
+  lastFocusWindowId: null,
+  lastFocusSentAtMs: 0,
+  lastAudioDomain: null,
+  lastAudioTabId: null,
+  lastAudioWindowId: null,
+  lastAudioSentAtMs: 0,
   lastAttemptAtMs: 0,
   lastOkAtMs: 0,
   consecutiveErrors: 0,
@@ -61,8 +69,25 @@ async function ensureStateLoaded() {
         STATE[key] = storedState[key];
       }
     }
+    migrateLegacyActivityState();
   } catch {
     // Keep defaults when storage is unavailable.
+  }
+}
+
+function migrateLegacyActivityState() {
+  if (!STATE.lastActivity || !STATE.lastDomain) return;
+  if (STATE.lastActivity === "audio" && !STATE.lastAudioDomain) {
+    STATE.lastAudioDomain = STATE.lastDomain;
+    STATE.lastAudioTabId = STATE.lastTabId;
+    STATE.lastAudioWindowId = STATE.lastWindowId;
+    STATE.lastAudioSentAtMs = STATE.lastSentAtMs;
+  }
+  if (STATE.lastActivity === "focus" && !STATE.lastFocusDomain) {
+    STATE.lastFocusDomain = STATE.lastDomain;
+    STATE.lastFocusTabId = STATE.lastTabId;
+    STATE.lastFocusWindowId = STATE.lastWindowId;
+    STATE.lastFocusSentAtMs = STATE.lastSentAtMs;
   }
 }
 
@@ -268,9 +293,10 @@ async function sendEvent(settings, event, updateState) {
   try {
     STATE.lastAttemptAtMs = Date.now();
     await postEvent(settings, event);
-    updateState();
-    STATE.lastSentAtMs = Date.now();
-    STATE.lastOkAtMs = Date.now();
+    const sentAtMs = Date.now();
+    updateState(sentAtMs);
+    STATE.lastSentAtMs = sentAtMs;
+    STATE.lastOkAtMs = sentAtMs;
     STATE.consecutiveErrors = 0;
     STATE.lastError = null;
     STATE.lastErrorAtMs = 0;
@@ -288,25 +314,30 @@ async function sendEvent(settings, event, updateState) {
 
 async function maybeEmitAudioStop(settings, reason) {
   await ensureStateLoaded();
-  if (STATE.lastActivity !== "audio") return;
-  if (!STATE.lastDomain) return;
+  if (!STATE.lastAudioDomain) return;
 
-  const key = `tab_audio_stop:${STATE.lastDomain}:${STATE.lastWindowId}:${STATE.lastTabId}:${reason}`;
+  const key = `tab_audio_stop:${STATE.lastAudioDomain}:${STATE.lastAudioWindowId}:${STATE.lastAudioTabId}:${reason}`;
   const event = buildTabAudioStopEvent({
     observedAt: nowIso(),
     seq: reserveSeq(STATE, key),
     browser: detectBrowser(),
-    domain: STATE.lastDomain,
-    tabId: STATE.lastTabId,
-    windowId: STATE.lastWindowId,
+    domain: STATE.lastAudioDomain,
+    tabId: STATE.lastAudioTabId,
+    windowId: STATE.lastAudioWindowId,
     reason
   });
 
   await sendEvent(settings, event, () => {
-    STATE.lastDomain = null;
-    STATE.lastTabId = null;
-    STATE.lastWindowId = null;
-    STATE.lastActivity = null;
+    STATE.lastAudioDomain = null;
+    STATE.lastAudioTabId = null;
+    STATE.lastAudioWindowId = null;
+    STATE.lastAudioSentAtMs = 0;
+    if (STATE.lastActivity === "audio") {
+      STATE.lastDomain = null;
+      STATE.lastTabId = null;
+      STATE.lastWindowId = null;
+      STATE.lastActivity = null;
+    }
   });
 }
 
@@ -315,8 +346,8 @@ async function chooseAudibleTab() {
   const candidates = (audibleTabs || []).filter((tab) => safeHostname(tab.url || ""));
   if (!candidates.length) return null;
 
-  if (typeof STATE.lastTabId === "number") {
-    const sameTab = candidates.find((tab) => tab.id === STATE.lastTabId);
+  if (typeof STATE.lastAudioTabId === "number") {
+    const sameTab = candidates.find((tab) => tab.id === STATE.lastAudioTabId);
     if (sameTab) return sameTab;
   }
 
@@ -324,50 +355,59 @@ async function chooseAudibleTab() {
   return candidates[0];
 }
 
-async function emitActiveTabEvent({ force = false } = {}) {
-  await ensureStateLoaded();
+function activityState(activity) {
+  if (activity === "audio") {
+    return {
+      domain: STATE.lastAudioDomain,
+      tabId: STATE.lastAudioTabId,
+      windowId: STATE.lastAudioWindowId,
+      sentAtMs: STATE.lastAudioSentAtMs
+    };
+  }
+  return {
+    domain: STATE.lastFocusDomain,
+    tabId: STATE.lastFocusTabId,
+    windowId: STATE.lastFocusWindowId,
+    sentAtMs: STATE.lastFocusSentAtMs
+  };
+}
 
-  const settings = await getSettings();
-  await checkOffscreen(settings);
-  await syncOffscreenDocument(settings);
-  if (settings.enabled === false) return;
-
-  await ensureHeartbeatAlarm();
-
-  const browserFocused = await isBrowserFocused();
-  let tab = null;
-  let activity = "focus";
-
-  if (browserFocused) {
-    await maybeEmitAudioStop(settings, "browser_focused");
-    const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-    tab = tabs && tabs.length ? tabs[0] : null;
-  } else if (settings.trackBackgroundAudio !== false) {
-    tab = await chooseAudibleTab();
-    if (!tab) {
-      await maybeEmitAudioStop(settings, "no_audible_tabs");
-      return;
-    }
-    activity = "audio";
+function recordActivityState(activity, domain, tab, sentAtMs) {
+  if (activity === "audio") {
+    STATE.lastAudioDomain = domain;
+    STATE.lastAudioTabId = tab.id;
+    STATE.lastAudioWindowId = tab.windowId;
+    STATE.lastAudioSentAtMs = sentAtMs;
   } else {
-    return;
+    STATE.lastFocusDomain = domain;
+    STATE.lastFocusTabId = tab.id;
+    STATE.lastFocusWindowId = tab.windowId;
+    STATE.lastFocusSentAtMs = sentAtMs;
   }
 
-  if (!tab || typeof tab.id !== "number" || typeof tab.windowId !== "number") return;
+  STATE.lastDomain = domain;
+  STATE.lastTabId = tab.id;
+  STATE.lastWindowId = tab.windowId;
+  STATE.lastActivity = activity;
+}
+
+async function maybeEmitTabActivity(settings, tab, activity, force) {
+  if (!tab || typeof tab.id !== "number" || typeof tab.windowId !== "number") {
+    return;
+  }
 
   const domain = safeHostname(tab.url || "");
   if (!domain) return;
 
+  const last = activityState(activity);
   const changed =
-    activity !== STATE.lastActivity ||
-    domain !== STATE.lastDomain ||
-    tab.id !== STATE.lastTabId ||
-    tab.windowId !== STATE.lastWindowId;
+    domain !== last.domain ||
+    tab.id !== last.tabId ||
+    tab.windowId !== last.windowId;
 
   const heartbeatSeconds =
     Number(settings.heartbeatSeconds) || DEFAULT_SETTINGS.heartbeatSeconds;
-  const heartbeatDue =
-    Date.now() - STATE.lastSentAtMs >= heartbeatSeconds * 1000;
+  const heartbeatDue = Date.now() - last.sentAtMs >= heartbeatSeconds * 1000;
 
   if (!force && !changed && !heartbeatDue) return;
 
@@ -382,12 +422,39 @@ async function emitActiveTabEvent({ force = false } = {}) {
   });
   if (!event) return;
 
-  await sendEvent(settings, event, () => {
-    STATE.lastDomain = domain;
-    STATE.lastTabId = tab.id;
-    STATE.lastWindowId = tab.windowId;
-    STATE.lastActivity = activity;
+  await sendEvent(settings, event, (sentAtMs) => {
+    recordActivityState(activity, domain, tab, sentAtMs);
   });
+}
+
+async function emitActiveTabEvent({ force = false } = {}) {
+  await ensureStateLoaded();
+
+  const settings = await getSettings();
+  await checkOffscreen(settings);
+  await syncOffscreenDocument(settings);
+  if (settings.enabled === false) return;
+
+  await ensureHeartbeatAlarm();
+
+  const browserFocused = await isBrowserFocused();
+
+  if (browserFocused) {
+    const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+    const tab = tabs && tabs.length ? tabs[0] : null;
+    await maybeEmitTabActivity(settings, tab, "focus", force);
+  }
+
+  if (settings.trackBackgroundAudio !== false) {
+    const tab = await chooseAudibleTab();
+    if (!tab) {
+      await maybeEmitAudioStop(settings, "no_audible_tabs");
+      return;
+    }
+    await maybeEmitTabActivity(settings, tab, "audio", force);
+  } else {
+    await maybeEmitAudioStop(settings, "tracking_disabled");
+  }
 }
 
 async function emitActiveTabEventSafe(options) {
@@ -454,8 +521,8 @@ chrome.tabs.onUpdated.addListener(async (_tabId, changeInfo) => {
 });
 
 chrome.tabs.onRemoved.addListener(async (tabId) => {
-  if (STATE.lastActivity !== "audio") return;
-  if (typeof STATE.lastTabId === "number" && tabId !== STATE.lastTabId) return;
+  if (typeof STATE.lastAudioTabId !== "number") return;
+  if (tabId !== STATE.lastAudioTabId) return;
   await emitActiveTabEventSafe({ force: true });
 });
 
