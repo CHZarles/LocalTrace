@@ -7,7 +7,6 @@ $ErrorActionPreference = "Stop"
 
 $runKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
 $runName = "LocalTrace"
-$coreExe = Join-Path $InstallDir "localtrace.exe"
 
 if ([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
   throw "LOCALAPPDATA is not set."
@@ -26,6 +25,8 @@ $normalizedInstallDir = Get-NormalizedPath -Path $InstallDir
 if ($normalizedReleaseRoot -ieq $normalizedInstallDir) {
   throw "ReleaseRoot and InstallDir must be different. Run this script from an extracted release directory, not from the installed app directory."
 }
+
+$coreExe = Join-Path $InstallDir "localtrace.exe"
 
 $requiredItems = @(
   "localtrace.exe",

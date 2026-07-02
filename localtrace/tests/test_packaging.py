@@ -1,4 +1,5 @@
 import json
+import shutil
 import subprocess
 import sys
 import tomllib
@@ -26,12 +27,11 @@ def run_packager(*args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def test_pyproject_exposes_core_and_winprobe_console_scripts() -> None:
+def test_pyproject_keeps_packaging_helpers_out_of_runtime_scripts() -> None:
     pyproject = tomllib.loads((LOCALTRACE_ROOT / "pyproject.toml").read_text())
 
-    assert pyproject["project"]["scripts"]["localtrace"] == (
-        "localtrace_core.__main__:main"
-    )
+    assert "localtrace" not in pyproject["project"]["scripts"]
+    assert "localtrace-package-release" not in pyproject["project"]["scripts"]
     assert pyproject["project"]["scripts"]["localtrace-winprobe"] == (
         "localtrace_winprobe.__main__:main"
     )
@@ -176,6 +176,44 @@ def test_install_script_rejects_running_from_installed_copy() -> None:
 
     assert "[System.IO.Path]::GetFullPath" in script
     assert "ReleaseRoot and InstallDir must be different" in script
+
+
+def test_install_script_computes_autostart_target_after_install_dir_default() -> None:
+    script = (
+        LOCALTRACE_ROOT / "packaging" / "scripts" / "install-localtrace.ps1"
+    ).read_text(encoding="utf-8")
+
+    default_index = script.index("if ([string]::IsNullOrWhiteSpace($InstallDir))")
+    core_exe_index = script.index('$coreExe = Join-Path $InstallDir "localtrace.exe"')
+
+    assert core_exe_index > default_index
+
+
+def test_powershell_scripts_parse_when_powershell_is_available() -> None:
+    powershell = shutil.which("pwsh") or shutil.which("powershell")
+    if powershell is None:
+        pytest.skip("PowerShell is not available in this environment")
+
+    scripts = [
+        LOCALTRACE_ROOT / "packaging" / "build-windows.ps1",
+        LOCALTRACE_ROOT / "packaging" / "scripts" / "install-localtrace.ps1",
+        LOCALTRACE_ROOT / "packaging" / "scripts" / "uninstall-localtrace.ps1",
+    ]
+    for script in scripts:
+        command = (
+            "$tokens = $null; $errors = $null; "
+            f"[System.Management.Automation.Language.Parser]::ParseFile('{script}', "
+            "[ref]$tokens, [ref]$errors) | Out-Null; "
+            "if ($errors.Count -gt 0) { $errors | ForEach-Object { "
+            "Write-Error $_ }; exit 1 }"
+        )
+        result = subprocess.run(
+            [powershell, "-NoProfile", "-Command", command],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, result.stderr
 
 
 def test_packaging_docs_are_in_mkdocs_nav() -> None:
