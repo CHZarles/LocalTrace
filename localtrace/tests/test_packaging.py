@@ -61,6 +61,24 @@ def test_packager_creates_release_zip_with_expected_layout(tmp_path: Path) -> No
     assert "LocalTrace/README.md" in names
 
 
+def test_packager_output_is_reproducible(tmp_path: Path) -> None:
+    first_dir = tmp_path / "first"
+    second_dir = tmp_path / "second"
+
+    first = run_packager("--dist-dir", str(first_dir), "--skip-exe-check")
+    second = run_packager("--dist-dir", str(second_dir), "--skip-exe-check")
+
+    assert first.returncode == 0, first.stderr
+    assert second.returncode == 0, second.stderr
+    assert (first_dir / "LocalTrace-windows.zip").read_bytes() == (
+        second_dir / "LocalTrace-windows.zip"
+    ).read_bytes()
+
+    with zipfile.ZipFile(first_dir / "LocalTrace-windows.zip") as archive:
+        manifest = json.loads(archive.read("LocalTrace/manifest.json"))
+    assert "built_at" not in manifest
+
+
 @pytest.mark.parametrize(
     "forbidden_part",
     [

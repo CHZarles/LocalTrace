@@ -6,7 +6,6 @@ import shutil
 import sys
 import tomllib
 import zipfile
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +15,7 @@ RELEASE_ZIP_NAME = "LocalTrace-windows.zip"
 EXTENSION_ZIP_NAME = "localtrace-extension.zip"
 CORE_EXE = "localtrace.exe"
 WINPROBE_EXE = "localtrace-winprobe.exe"
+ZIP_ENTRY_DATE = (1980, 1, 1, 0, 0, 0)
 
 EXTENSION_RUNTIME_FILES = (
     "manifest.json",
@@ -165,7 +165,7 @@ def _write_extension_zip(destination: Path) -> None:
             source = source_dir / name
             if not source.is_file():
                 raise FileNotFoundError(f"Missing extension runtime file: {source}")
-            archive.write(source, name)
+            _write_file_to_zip(archive, source, name)
 
 
 def _write_release_readme(destination: Path) -> None:
@@ -209,7 +209,6 @@ def _write_manifest(destination: Path, *, exe_build_skipped: bool) -> None:
     payload: dict[str, Any] = {
         "name": "LocalTrace",
         "version": _project_version(),
-        "built_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "exe_build_skipped": exe_build_skipped,
         "artifacts": {
             "core_exe": CORE_EXE,
@@ -233,7 +232,16 @@ def _write_zip_from_dir(source_dir: Path, destination: Path) -> None:
     with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for path in sorted(source_dir.rglob("*")):
             if path.is_file():
-                archive.write(path, path.relative_to(source_dir.parent).as_posix())
+                _write_file_to_zip(
+                    archive, path, path.relative_to(source_dir.parent).as_posix()
+                )
+
+
+def _write_file_to_zip(archive: zipfile.ZipFile, source: Path, arcname: str) -> None:
+    info = zipfile.ZipInfo(arcname, date_time=ZIP_ENTRY_DATE)
+    info.compress_type = zipfile.ZIP_DEFLATED
+    info.external_attr = (0o644 & 0xFFFF) << 16
+    archive.writestr(info, source.read_bytes())
 
 
 def _project_version() -> str:
