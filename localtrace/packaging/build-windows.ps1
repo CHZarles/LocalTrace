@@ -1,11 +1,13 @@
 param(
-  [string]$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path,
+  [string]$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).ProviderPath,
   [string]$DistDir = "",
   [string]$Python = "python",
   [switch]$SkipReleaseZip
 )
 
 $ErrorActionPreference = "Stop"
+
+$RepoRoot = (Resolve-Path $RepoRoot).ProviderPath
 
 if ([string]::IsNullOrWhiteSpace($DistDir)) {
   $DistDir = Join-Path $RepoRoot "dist\pyinstaller"
@@ -36,7 +38,7 @@ $coreArgs = @(
   "--onefile",
   "--name", "localtrace",
   "--paths", (Join-Path $RepoRoot "apps\localtrace"),
-  "--add-data", "$webDir;web",
+  "--add-data=${webDir}:web",
   "--distpath", $DistDir,
   "--workpath", (Join-Path $buildDir "localtrace"),
   "--specpath", $specDir,
