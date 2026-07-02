@@ -46,7 +46,9 @@ def fail(message: str, code: int = 1) -> int:
     return code
 
 
-def request_json(base_url: str, path: str, params: dict[str, Any] | None = None) -> Any:
+def request_json(
+    base_url: str, path: str, params: dict[str, Any] | None = None
+) -> dict[str, Any]:
     base_url = normalize_base_url(base_url)
     url = f"{base_url}{path}"
     if params:
@@ -55,7 +57,7 @@ def request_json(base_url: str, path: str, params: dict[str, Any] | None = None)
 
     try:
         with HTTP_OPENER.open(url, timeout=5) as response:
-            return json.loads(response.read())
+            body = json.loads(response.read())
     except HTTPError as exc:
         detail = _read_error_detail(exc)
         raise LocalTraceError(
@@ -67,6 +69,11 @@ def request_json(base_url: str, path: str, params: dict[str, Any] | None = None)
         raise LocalTraceError(
             "LocalTrace request failed: invalid JSON response"
         ) from exc
+    if not isinstance(body, dict):
+        raise LocalTraceError(
+            "LocalTrace request failed: expected JSON object response"
+        )
+    return body
 
 
 def _read_error_detail(exc: HTTPError) -> str:
@@ -213,12 +220,10 @@ def summarize_day(events: list[dict[str, Any]], day: date) -> dict[str, Any]:
 
 
 def apply_event_limit(
-    events: list[dict[str, Any]], limit: int, request_limit: int | None = None
+    events: list[dict[str, Any]], limit: int
 ) -> tuple[list[dict[str, Any]], bool]:
     if len(events) > limit:
         return events[:limit], True
-    if request_limit == CORE_EVENT_CAP and len(events) >= CORE_EVENT_CAP:
-        return events, True
     return events, False
 
 

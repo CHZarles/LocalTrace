@@ -5,7 +5,6 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from localtrace_http import (
-    CORE_EVENT_CAP,
     LocalTraceError,
     LocalTraceValidationError,
     add_base_url_argument,
@@ -53,17 +52,15 @@ def main() -> int:
         inside, inside_truncated = apply_event_limit(
             inside_body.get("events", []),
             limit,
-            request_limit=inside_request_limit,
         )
         if inside_truncated:
             print_json(
                 {
                     "ok": False,
                     "partial": True,
-                    "error": "gap explanation exceeds event limit or core event cap",
+                    "error": "gap explanation exceeds event limit; increase --limit",
                     "truncated": True,
                     "source_event_limit": limit,
-                    "core_event_cap": CORE_EVENT_CAP,
                 }
             )
             return 1
@@ -122,9 +119,7 @@ def _nearest_before_between(
         format_rfc3339_utc(window_end),
         limit=request_limit,
     )
-    events, truncated = apply_event_limit(
-        body.get("events", []), limit, request_limit=request_limit
-    )
+    events, truncated = apply_event_limit(body.get("events", []), limit)
     if not truncated:
         return events[-1] if events else None, False
 

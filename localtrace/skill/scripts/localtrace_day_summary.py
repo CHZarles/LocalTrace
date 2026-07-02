@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 
 from localtrace_http import (
-    CORE_EVENT_CAP,
     LocalTraceError,
     LocalTraceValidationError,
     add_base_url_argument,
@@ -34,18 +33,15 @@ def main() -> int:
         start, end = day_bounds(day)
         request_limit = event_request_limit(limit)
         body = events_between(args.base_url, start, end, limit=request_limit)
-        events, truncated = apply_event_limit(
-            body.get("events", []), limit, request_limit=request_limit
-        )
+        events, truncated = apply_event_limit(body.get("events", []), limit)
         if truncated:
             print_json(
                 {
                     "ok": False,
                     "partial": True,
-                    "error": "day summary exceeds event limit or core event cap",
+                    "error": "day summary exceeds event limit; increase --limit",
                     "truncated": True,
                     "source_event_limit": limit,
-                    "core_event_cap": CORE_EVENT_CAP,
                 }
             )
             return 1

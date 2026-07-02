@@ -103,17 +103,16 @@ def _scan_recent_events(
             window_to_text,
             limit=request_limit,
         )
-        events, truncated = apply_event_limit(
-            body.get("events", []), scan_limit, request_limit=request_limit
-        )
+        events, truncated = apply_event_limit(body.get("events", []), scan_limit)
         if truncated:
             return {
                 "ok": False,
                 "partial": True,
-                "error": ("recent events window exceeds scan limit or core event cap"),
+                "error": (
+                    "recent events window exceeds scan limit; increase --scan-limit"
+                ),
                 "truncated": True,
                 "scan_limit": scan_limit,
-                "core_event_cap": CORE_EVENT_CAP,
                 "window_from": window_from_text,
                 "window_to": window_to_text,
             }
