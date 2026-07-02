@@ -341,6 +341,7 @@ def test_http_routes_expose_web_settings_and_local_json_apis(tmp_path: Path) -> 
         assert "/events?limit=500&order=desc" in script
         assert "renderToday" in script
         assert "buildTimelineModel" in script
+        assert "avatar.append(badge)" not in script
         assert "restart required" in script
 
         status, content_type, styles = request_text(base_url, "/web/styles.css")
@@ -350,6 +351,7 @@ def test_http_routes_expose_web_settings_and_local_json_apis(tmp_path: Path) -> 
         assert ".nav-rail" in styles
         assert ".timeline-grid" in styles
         assert ".entity-avatar" in styles
+        assert ".entity-avatar b" not in styles
 
         status, body = request_json(base_url, "/settings")
         assert status == 200

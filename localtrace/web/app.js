@@ -452,9 +452,6 @@ function entityAvatar(kind, entity, label, activity = "focus") {
   avatar.dataset.activity = activity;
   avatar.style.setProperty("--avatar-hue", String(hashHue(`${kind}:${entity}`)));
   avatar.append(iconForEntity(kind, activity));
-  const badge = document.createElement("b");
-  badge.textContent = firstGlyph(kind === "domain" ? entity : label);
-  avatar.append(badge);
   return avatar;
 }
 
@@ -674,11 +671,6 @@ function displayEntity(event) {
   const entity = event?.entity || "";
   if (!entity) return "unknown";
   return entity;
-}
-
-function firstGlyph(value) {
-  const text = String(value || "?").trim();
-  return (text[0] || "?").toUpperCase();
 }
 
 function hashHue(input) {
