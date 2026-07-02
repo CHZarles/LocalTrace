@@ -12,4 +12,5 @@ nav:
   - Event Schema: EVENT_SCHEMA.md
   - Workflow: WORKFLOW.md
   - Infrastructure: INFRASTRUCTURE.md
+  - Packaging: PACKAGING.md
   - Issues: ISSUES.md
