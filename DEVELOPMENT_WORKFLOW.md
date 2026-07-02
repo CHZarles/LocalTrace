@@ -1,8 +1,8 @@
-# WorkTrace 开发流程
+# LocalTrace 开发流程
 
 状态：开发执行规则。
 
-本文档定义 WorkTrace 的日常开发流程：
+本文档定义 LocalTrace 的日常开发流程：
 
 ```text
 issue -> branch -> context check when needed -> code + tests

@@ -104,10 +104,9 @@ The output zip is:
 localtrace\dist\windows\LocalTrace-windows.zip
 ```
 
-## Legacy Code
+## Removed Prototype Code
 
-The old WorkTrace Flutter client, WinUI prototype, root browser extension,
-client design docs, old Windows installer workflow, and old Rust runtime have
-been removed from the active development path.
+Earlier prototype client/runtime code, client design docs, and installer
+workflow have been removed from the active development path.
 
 Use Git history if old implementation details are needed for reference.

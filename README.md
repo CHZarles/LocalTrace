@@ -4,8 +4,7 @@ LocalTrace is a local-only Windows activity trace. It records foreground app
 focus, non-browser background audio, and browser tab activity into a local
 SQLite database, then renders the current day in a built-in web UI.
 
-The active product path is `localtrace/`. Older WorkTrace desktop-client
-artifacts have been removed from the main development path.
+The active product path is `localtrace/`.
 
 ## What It Does
 
@@ -124,5 +123,5 @@ Active LocalTrace files:
 - `localtrace/skill/`: local trace helper scripts.
 - `localtrace/docs/`: product and engineering docs.
 
-Legacy WorkTrace client/runtime code has been removed from the active main
+Earlier prototype client/runtime code has been removed from the active main
 branch. Use Git history if old implementation details are needed for reference.

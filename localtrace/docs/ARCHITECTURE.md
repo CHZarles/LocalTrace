@@ -250,9 +250,9 @@ Skill:
 localtrace-skill
 ```
 
-## Legacy WorkTrace Code Reuse
+## Historical Code Reuse
 
-Legacy WorkTrace code is reference material in Git history, not the new
+Historical prototype code is reference material in Git history, not the new
 architecture.
 
 May reuse ideas or small code sections from:
@@ -264,8 +264,8 @@ May reuse ideas or small code sections from:
 
 Must not preserve:
 
-- Flutter client as core runtime.
-- Reports/Planner/Review model.
+- Separate desktop client as core runtime.
+- Task planning, report generation, or block-review workflow model.
 - Derived block/timeline storage.
 - Old endpoint compatibility unless explicitly specified.
 

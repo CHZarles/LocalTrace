@@ -120,9 +120,3 @@ Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8765/health
 
 The web UI Health section should show a recent `Windows probe` timestamp after
 you switch foreground apps.
-
-## LocalTrace Does Not Use The Old Client
-
-There is no Flutter Windows client, WinUI prototype, root `extension/`, or old
-`dev/package-windows.ps1` flow in the active LocalTrace path. Use
-`localtrace/packaging/` and `localtrace/extension/` instead.
