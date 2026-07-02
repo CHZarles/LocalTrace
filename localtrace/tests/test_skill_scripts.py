@@ -132,6 +132,22 @@ def sample_events() -> list[dict[str, Any]]:
     ]
 
 
+def event_at(
+    event_id: int, observed_at: str, entity: str = "Code.exe"
+) -> dict[str, Any]:
+    return {
+        "id": event_id,
+        "observed_at": observed_at,
+        "received_at": observed_at,
+        "source": "windows_probe",
+        "kind": "app_active",
+        "entity_type": "app",
+        "entity": entity,
+        "title": None,
+        "payload": {"activity": "focus"},
+    }
+
+
 def events_route(events: list[dict[str, Any]]):
     def route(path: str) -> dict[str, Any]:
         _request_path, query = parse_request(path)
@@ -231,6 +247,60 @@ def test_recent_events_refuses_partial_window_when_scan_limit_is_exceeded() -> N
     path, query = parse_request(server.requests[0])
     assert path == "/events"
     assert query["limit"] == ["3"]
+
+
+def test_recent_events_accumulates_across_backward_windows() -> None:
+    events = [
+        event_at(1, "2026-06-30T23:00:00.000Z", "older.exe"),
+        event_at(2, "2026-07-01T23:00:00.000Z", "newer.exe"),
+    ]
+    with FakeLocalTraceServer({"/events": {"body": events_route(events)}}) as server:
+        result = run_script(
+            "localtrace_recent_events.py",
+            [
+                "--limit",
+                "2",
+                "--scan-limit",
+                "5",
+                "--to",
+                "2026-07-02T00:00:00.000Z",
+                "--lookback-days",
+                "3",
+            ],
+            server.base_url,
+        )
+
+    assert result.returncode == 0
+    body = output_json(result)
+    assert [event["id"] for event in body["events"]] == [1, 2]
+    assert body["windows_scanned"] == 2
+    assert body["lookback_exhausted"] is False
+    assert len(server.requests) == 2
+
+
+def test_recent_events_reports_lookback_exhausted() -> None:
+    events = [event_at(1, "2026-07-01T23:00:00.000Z")]
+    with FakeLocalTraceServer({"/events": {"body": events_route(events)}}) as server:
+        result = run_script(
+            "localtrace_recent_events.py",
+            [
+                "--limit",
+                "2",
+                "--scan-limit",
+                "5",
+                "--to",
+                "2026-07-02T00:00:00.000Z",
+                "--lookback-days",
+                "1",
+            ],
+            server.base_url,
+        )
+
+    assert result.returncode == 0
+    body = output_json(result)
+    assert [event["id"] for event in body["events"]] == [1]
+    assert body["windows_scanned"] == 1
+    assert body["lookback_exhausted"] is True
 
 
 def test_recent_events_rejects_scan_limit_above_detection_cap() -> None:
@@ -384,17 +454,50 @@ def test_explain_gap_script_reports_before_inside_and_after_context() -> None:
     assert body["next_event_delta_seconds"] == 600
     assert body["explanation"] == (
         "No stored events were observed in this 600-second window; "
-        "nearest same-day events are 600 seconds before and 600 seconds after."
+        "nearest context events are 600 seconds before and 600 seconds after."
     )
     assert len(server.requests) == 3
     before_path, before_query = parse_request(server.requests[1])
     assert before_path == "/events"
+    assert before_query["from"] == ["2026-06-30T09:10:00.000Z"]
     assert before_query["to"] == ["2026-07-01T09:10:00.000Z"]
     assert before_query["limit"] == ["1001"]
     after_path, after_query = parse_request(server.requests[2])
     assert after_path == "/events"
     assert after_query["from"] == ["2026-07-01T09:20:00.000Z"]
+    assert after_query["to"] == ["2026-07-02T09:20:00.000Z"]
     assert after_query["limit"] == ["1"]
+
+
+def test_explain_gap_searches_context_across_day_boundary() -> None:
+    events = [
+        event_at(1, "2026-07-01T23:59:00.000Z", "before.exe"),
+        event_at(2, "2026-07-02T00:02:00.000Z", "after.exe"),
+    ]
+    with FakeLocalTraceServer({"/events": {"body": events_route(events)}}) as server:
+        result = run_script(
+            "localtrace_explain_gap.py",
+            [
+                "--from",
+                "2026-07-02T00:00:00.000Z",
+                "--to",
+                "2026-07-02T00:01:00.000Z",
+            ],
+            server.base_url,
+        )
+
+    assert result.returncode == 0
+    body = output_json(result)
+    assert body["before"]["id"] == 1
+    assert body["after"]["id"] == 2
+    assert body["previous_event_delta_seconds"] == 60
+    assert body["next_event_delta_seconds"] == 60
+    before_path, before_query = parse_request(server.requests[1])
+    assert before_path == "/events"
+    assert before_query["from"] == ["2026-07-01T00:00:00.000Z"]
+    after_path, after_query = parse_request(server.requests[2])
+    assert after_path == "/events"
+    assert after_query["to"] == ["2026-07-03T00:01:00.000Z"]
 
 
 def test_scripts_return_machine_readable_error_when_core_is_unavailable() -> None:
@@ -441,7 +544,29 @@ def test_scripts_reject_non_loopback_base_url_before_http_request() -> None:
     assert result.returncode == 2
     assert output_json(result) == {
         "ok": False,
-        "error": "base URL must use a loopback host",
+        "error": "base URL must use 127.0.0.1",
+    }
+
+
+def test_scripts_reject_localhost_base_url_before_http_request() -> None:
+    result = run_script("localtrace_health.py", ["--base-url", "http://localhost"])
+
+    assert result.returncode == 2
+    assert output_json(result) == {
+        "ok": False,
+        "error": "base URL must use 127.0.0.1",
+    }
+
+
+def test_scripts_reject_base_url_with_path_before_http_request() -> None:
+    result = run_script(
+        "localtrace_health.py", ["--base-url", "http://127.0.0.1:8765/api"]
+    )
+
+    assert result.returncode == 2
+    assert output_json(result) == {
+        "ok": False,
+        "error": "base URL must not include a path, query, or fragment",
     }
 
 

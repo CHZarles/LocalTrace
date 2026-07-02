@@ -1,21 +1,22 @@
 from __future__ import annotations
 
 import argparse
+from datetime import timedelta
 
 from localtrace_http import (
     LocalTraceError,
     LocalTraceValidationError,
     add_base_url_argument,
     apply_event_limit,
-    day_bounds,
     ensure_ordered_range,
     events_between,
     fail,
+    format_rfc3339_utc,
     gap_context_result,
-    parse_date,
     parse_positive_int,
     print_json,
     rfc3339_utc,
+    rfc3339_utc_datetime,
 )
 
 
@@ -31,6 +32,7 @@ def main() -> int:
     parser.add_argument("--from", dest="start", required=True)
     parser.add_argument("--to", dest="end", required=True)
     parser.add_argument("--limit", default="1000")
+    parser.add_argument("--context-days", default="1")
     args = parser.parse_args()
 
     try:
@@ -38,6 +40,9 @@ def main() -> int:
         end = rfc3339_utc(args.end, "--to")
         ensure_ordered_range(start, end)
         limit = parse_positive_int(args.limit, "--limit", maximum=4999)
+        context_days = parse_positive_int(
+            args.context_days, "--context-days", maximum=30
+        )
         inside_body = events_between(args.base_url, start, end, limit=limit + 1)
         inside, inside_truncated = apply_event_limit(
             inside_body.get("events", []), limit
@@ -53,8 +58,12 @@ def main() -> int:
                 }
             )
             return 1
-        day_start, _day_end = day_bounds(parse_date(start[:10]))
-        before_body = events_between(args.base_url, day_start, start, limit=limit + 1)
+        before_start = format_rfc3339_utc(
+            rfc3339_utc_datetime(start, "--from") - timedelta(days=context_days)
+        )
+        before_body = events_between(
+            args.base_url, before_start, start, limit=limit + 1
+        )
         before, before_truncated = apply_event_limit(
             before_body.get("events", []), limit
         )
@@ -72,8 +81,10 @@ def main() -> int:
                 }
             )
             return 1
-        _after_start, day_end = day_bounds(parse_date(end[:10]))
-        after_body = events_between(args.base_url, end, day_end, limit=1)
+        after_end = format_rfc3339_utc(
+            rfc3339_utc_datetime(end, "--to") + timedelta(days=context_days)
+        )
+        after_body = events_between(args.base_url, end, after_end, limit=1)
         result = gap_context_result(
             start,
             end,
@@ -83,6 +94,7 @@ def main() -> int:
         )
         result["truncated"] = False
         result["source_event_limit"] = limit
+        result["context_days"] = context_days
         print_json(result)
     except LocalTraceValidationError as exc:
         return fail(str(exc), code=2)

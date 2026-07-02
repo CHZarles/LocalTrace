@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import ipaddress
 import json
 import os
 from datetime import UTC, date, datetime, timedelta
@@ -95,18 +94,13 @@ def normalize_base_url(base_url: str) -> str:
     parsed = urlparse(base_url)
     if parsed.scheme != "http":
         raise LocalTraceValidationError("base URL must use http")
-    if not parsed.hostname or not _is_loopback_host(parsed.hostname):
-        raise LocalTraceValidationError("base URL must use a loopback host")
+    if parsed.hostname != "127.0.0.1":
+        raise LocalTraceValidationError("base URL must use 127.0.0.1")
+    if parsed.path not in {"", "/"} or parsed.params or parsed.query or parsed.fragment:
+        raise LocalTraceValidationError(
+            "base URL must not include a path, query, or fragment"
+        )
     return base_url.rstrip("/")
-
-
-def _is_loopback_host(host: str) -> bool:
-    if host.casefold() == "localhost":
-        return True
-    try:
-        return ipaddress.ip_address(host).is_loopback
-    except ValueError:
-        return False
 
 
 def rfc3339_utc(value: str, label: str) -> str:
@@ -301,22 +295,22 @@ def _gap_explanation(
     if previous_delta is not None and next_delta is not None:
         return (
             f"No stored events were observed in this {gap_seconds}-second window; "
-            f"nearest same-day events are {previous_delta} seconds before and "
+            f"nearest context events are {previous_delta} seconds before and "
             f"{next_delta} seconds after."
         )
     if previous_delta is not None:
         return (
             f"No stored events were observed in this {gap_seconds}-second window; "
-            f"the nearest same-day event is {previous_delta} seconds before."
+            f"the nearest context event is {previous_delta} seconds before."
         )
     if next_delta is not None:
         return (
             f"No stored events were observed in this {gap_seconds}-second window; "
-            f"the nearest same-day event is {next_delta} seconds after."
+            f"the nearest context event is {next_delta} seconds after."
         )
     return (
         f"No stored events were observed in this {gap_seconds}-second window, "
-        "and no same-day context events were found."
+        "and no context events were found."
     )
 
 

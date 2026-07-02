@@ -16,8 +16,9 @@ Default core URL:
 http://127.0.0.1:8765
 ```
 
-Override it with `--base-url` or `LOCALTRACE_BASE_URL` when testing or when the
-user configured a different port.
+Override the port with `--base-url` or `LOCALTRACE_BASE_URL` when testing or
+when the user configured a different port. The host must remain `127.0.0.1`,
+with no path, query string, or fragment.
 
 ## Tools
 

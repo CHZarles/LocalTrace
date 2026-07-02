@@ -18,7 +18,8 @@ stops once it has enough events. If a window exceeds `--scan-limit`, it returns 
 partial-error JSON payload instead of silently truncating.
 
 Use `--base-url` or `LOCALTRACE_BASE_URL` to target a non-default LocalTrace
-port. The default is `http://127.0.0.1:8765`.
+port on `127.0.0.1`. The default is `http://127.0.0.1:8765`; base URLs with
+`localhost`, paths, query strings, or fragments are rejected.
 
 Constraints:
 
