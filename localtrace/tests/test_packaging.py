@@ -150,6 +150,24 @@ def test_windows_build_script_invokes_pyinstaller_for_both_exes() -> None:
     assert "Start-Process -Verb RunAs" not in script
 
 
+def test_core_launcher_propagates_main_exit_status() -> None:
+    launcher = (
+        LOCALTRACE_ROOT / "packaging" / "launchers" / "localtrace_launcher.py"
+    ).read_text(encoding="utf-8")
+
+    assert "raise SystemExit(main())" in launcher
+
+
+def test_install_script_fails_fast_for_missing_required_artifacts() -> None:
+    script = (
+        LOCALTRACE_ROOT / "packaging" / "scripts" / "install-localtrace.ps1"
+    ).read_text(encoding="utf-8")
+
+    assert 'throw "Release root missing required artifact:' in script
+    assert "continue" not in script
+    assert "Set-ItemProperty" in script
+
+
 def test_packaging_docs_are_in_mkdocs_nav() -> None:
     mkdocs = (LOCALTRACE_ROOT / "mkdocs.yml").read_text(encoding="utf-8")
     docs = (LOCALTRACE_ROOT / "docs" / "PACKAGING.md").read_text(encoding="utf-8")

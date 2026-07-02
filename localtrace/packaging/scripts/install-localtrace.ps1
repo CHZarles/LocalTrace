@@ -12,16 +12,7 @@ $coreExe = Join-Path $InstallDir "localtrace.exe"
 if ([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
   throw "LOCALAPPDATA is not set."
 }
-if (-not (Test-Path (Join-Path $ReleaseRoot "localtrace.exe"))) {
-  throw "Release root must contain localtrace.exe: $ReleaseRoot"
-}
-if (-not (Test-Path (Join-Path $ReleaseRoot "localtrace-winprobe.exe"))) {
-  throw "Release root must contain localtrace-winprobe.exe: $ReleaseRoot"
-}
-
-New-Item -ItemType Directory -Force $InstallDir | Out-Null
-
-$items = @(
+$requiredItems = @(
   "localtrace.exe",
   "localtrace-winprobe.exe",
   "manifest.json",
@@ -31,10 +22,18 @@ $items = @(
   "scripts"
 )
 
-foreach ($item in $items) {
+foreach ($item in $requiredItems) {
+  $source = Join-Path $ReleaseRoot $item
+  if (-not (Test-Path $source)) {
+    throw "Release root missing required artifact: $item"
+  }
+}
+
+New-Item -ItemType Directory -Force $InstallDir | Out-Null
+
+foreach ($item in $requiredItems) {
   $source = Join-Path $ReleaseRoot $item
   $target = Join-Path $InstallDir $item
-  if (-not (Test-Path $source)) { continue }
   if (Test-Path $target) { Remove-Item -Recurse -Force $target }
   Copy-Item -Recurse -Force $source $target
 }
