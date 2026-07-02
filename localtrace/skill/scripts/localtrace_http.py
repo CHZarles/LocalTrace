@@ -84,8 +84,8 @@ def parse_positive_int(value: str | int, label: str) -> int:
 
 def normalize_base_url(base_url: str) -> str:
     parsed = urlparse(base_url)
-    if parsed.scheme not in {"http", "https"}:
-        raise LocalTraceValidationError("base URL must use http or https")
+    if parsed.scheme != "http":
+        raise LocalTraceValidationError("base URL must use http")
     if not parsed.hostname or not _is_loopback_host(parsed.hostname):
         raise LocalTraceValidationError("base URL must use a loopback host")
     return base_url.rstrip("/")

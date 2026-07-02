@@ -32,6 +32,17 @@ def main() -> int:
         start, end = day_bounds(day)
         body = events_between(args.base_url, start, end, limit=limit + 1)
         events, truncated = apply_event_limit(body.get("events", []), limit)
+        if truncated:
+            print_json(
+                {
+                    "ok": False,
+                    "partial": True,
+                    "error": "day summary exceeds event limit; increase --limit",
+                    "truncated": True,
+                    "source_event_limit": limit,
+                }
+            )
+            return 1
         summary = summarize_day(events, day)
         summary["truncated"] = truncated
         summary["source_event_limit"] = limit

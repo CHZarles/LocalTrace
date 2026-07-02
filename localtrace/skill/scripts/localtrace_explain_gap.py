@@ -36,6 +36,17 @@ def main() -> int:
         query_start, query_end = range_day_bounds(start, end)
         body = events_between(args.base_url, query_start, query_end, limit=limit + 1)
         events, truncated = apply_event_limit(body.get("events", []), limit)
+        if truncated:
+            print_json(
+                {
+                    "ok": False,
+                    "partial": True,
+                    "error": "gap explanation exceeds event limit; increase --limit",
+                    "truncated": True,
+                    "source_event_limit": limit,
+                }
+            )
+            return 1
         result = explain_gap(events, start, end)
         result["truncated"] = truncated
         result["source_event_limit"] = limit
