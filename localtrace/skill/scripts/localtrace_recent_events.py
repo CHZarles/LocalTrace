@@ -5,10 +5,12 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from localtrace_http import (
+    CORE_EVENT_CAP,
     LocalTraceError,
     LocalTraceValidationError,
     add_base_url_argument,
     apply_event_limit,
+    event_request_limit,
     events_between,
     fail,
     format_rfc3339_utc,
@@ -17,7 +19,6 @@ from localtrace_http import (
     rfc3339_utc_datetime,
 )
 
-MAX_DETECTION_LIMIT = 4999
 MAX_LOOKBACK_DAYS = 3660
 
 
@@ -25,21 +26,17 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Print recent LocalTrace events.")
     add_base_url_argument(parser)
     parser.add_argument("--limit", default="25")
-    parser.add_argument("--scan-limit", default="4999")
+    parser.add_argument("--scan-limit", default=str(CORE_EVENT_CAP))
     parser.add_argument("--lookback-days", default="30")
     parser.add_argument("--to")
     args = parser.parse_args()
 
     try:
-        limit = parse_positive_int(args.limit, "--limit", maximum=MAX_DETECTION_LIMIT)
-        scan_limit = parse_positive_int(
-            args.scan_limit, "--scan-limit", maximum=MAX_DETECTION_LIMIT
-        )
+        limit = parse_positive_int(args.limit, "--limit")
+        scan_limit = parse_positive_int(args.scan_limit, "--scan-limit")
         lookback_days = parse_positive_int(
             args.lookback_days, "--lookback-days", maximum=MAX_LOOKBACK_DAYS
         )
-        if scan_limit < limit:
-            raise LocalTraceValidationError("--scan-limit must be at least --limit")
         search_to = _search_to(args.to)
     except LocalTraceValidationError as exc:
         return fail(str(exc), code=2)
@@ -99,22 +96,24 @@ def _scan_recent_events(
         window_start = window_end - timedelta(days=1)
         window_from_text = format_rfc3339_utc(window_start)
         window_to_text = format_rfc3339_utc(window_end)
+        request_limit = event_request_limit(scan_limit)
         body = events_between(
             base_url,
             window_from_text,
             window_to_text,
-            limit=scan_limit + 1,
+            limit=request_limit,
         )
-        events, truncated = apply_event_limit(body.get("events", []), scan_limit)
+        events, truncated = apply_event_limit(
+            body.get("events", []), scan_limit, request_limit=request_limit
+        )
         if truncated:
             return {
                 "ok": False,
                 "partial": True,
-                "error": (
-                    "recent events window exceeds scan limit; increase --scan-limit"
-                ),
+                "error": ("recent events window exceeds scan limit or core event cap"),
                 "truncated": True,
                 "scan_limit": scan_limit,
+                "core_event_cap": CORE_EVENT_CAP,
                 "window_from": window_from_text,
                 "window_to": window_to_text,
             }

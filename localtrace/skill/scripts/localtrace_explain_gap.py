@@ -5,11 +5,13 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from localtrace_http import (
+    CORE_EVENT_CAP,
     LocalTraceError,
     LocalTraceValidationError,
     add_base_url_argument,
     apply_event_limit,
     ensure_ordered_range,
+    event_request_limit,
     events_between,
     fail,
     format_rfc3339_utc,
@@ -40,22 +42,28 @@ def main() -> int:
         start = rfc3339_utc(args.start, "--from")
         end = rfc3339_utc(args.end, "--to")
         ensure_ordered_range(start, end)
-        limit = parse_positive_int(args.limit, "--limit", maximum=4999)
+        limit = parse_positive_int(args.limit, "--limit")
         context_days = parse_positive_int(
             args.context_days, "--context-days", maximum=30
         )
-        inside_body = events_between(args.base_url, start, end, limit=limit + 1)
+        inside_request_limit = event_request_limit(limit)
+        inside_body = events_between(
+            args.base_url, start, end, limit=inside_request_limit
+        )
         inside, inside_truncated = apply_event_limit(
-            inside_body.get("events", []), limit
+            inside_body.get("events", []),
+            limit,
+            request_limit=inside_request_limit,
         )
         if inside_truncated:
             print_json(
                 {
                     "ok": False,
                     "partial": True,
-                    "error": "gap explanation exceeds event limit; increase --limit",
+                    "error": "gap explanation exceeds event limit or core event cap",
                     "truncated": True,
                     "source_event_limit": limit,
+                    "core_event_cap": CORE_EVENT_CAP,
                 }
             )
             return 1
@@ -107,13 +115,16 @@ def _nearest_before_between(
     *,
     limit: int,
 ) -> tuple[dict[str, Any] | None, bool]:
+    request_limit = event_request_limit(limit)
     body = events_between(
         base_url,
         format_rfc3339_utc(window_start),
         format_rfc3339_utc(window_end),
-        limit=limit + 1,
+        limit=request_limit,
     )
-    events, truncated = apply_event_limit(body.get("events", []), limit)
+    events, truncated = apply_event_limit(
+        body.get("events", []), limit, request_limit=request_limit
+    )
     if not truncated:
         return events[-1] if events else None, False
 

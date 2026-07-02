@@ -239,9 +239,10 @@ def test_recent_events_refuses_partial_window_when_scan_limit_is_exceeded() -> N
     assert output_json(result) == {
         "ok": False,
         "partial": True,
-        "error": "recent events window exceeds scan limit; increase --scan-limit",
+        "error": "recent events window exceeds scan limit or core event cap",
         "truncated": True,
         "scan_limit": 2,
+        "core_event_cap": 5000,
         "window_from": "2026-07-01T00:00:00.000Z",
         "window_to": "2026-07-02T00:00:00.000Z",
     }
@@ -304,14 +305,65 @@ def test_recent_events_reports_lookback_exhausted() -> None:
     assert body["lookback_exhausted"] is True
 
 
-def test_recent_events_rejects_scan_limit_above_detection_cap() -> None:
-    result = run_script("localtrace_recent_events.py", ["--scan-limit", "5000"])
+def test_recent_events_accepts_scan_limit_at_core_cap() -> None:
+    with FakeLocalTraceServer({"/events": {"body": events_route([])}}) as server:
+        result = run_script(
+            "localtrace_recent_events.py",
+            [
+                "--limit",
+                "1",
+                "--scan-limit",
+                "5000",
+                "--to",
+                "2026-07-02T00:00:00.000Z",
+                "--lookback-days",
+                "1",
+            ],
+            server.base_url,
+        )
 
-    assert result.returncode == 2
-    assert output_json(result) == {
-        "ok": False,
-        "error": "--scan-limit must be at most 4999",
-    }
+    assert result.returncode == 0
+    body = output_json(result)
+    assert body["scan_limit"] == 5000
+    assert body["events"] == []
+    path, query = parse_request(server.requests[0])
+    assert path == "/events"
+    assert query["limit"] == ["5000"]
+
+
+def test_recent_events_marks_partial_when_core_cap_is_reached() -> None:
+    capped_events = [
+        event_at(
+            index + 1,
+            f"2026-07-01T{index // 3600:02d}:{(index // 60) % 60:02d}:"
+            f"{index % 60:02d}.000Z",
+            f"app-{index}.exe",
+        )
+        for index in range(5000)
+    ]
+    with FakeLocalTraceServer(
+        {"/events": {"body": {"ok": True, "events": capped_events}}}
+    ) as server:
+        result = run_script(
+            "localtrace_recent_events.py",
+            [
+                "--limit",
+                "1",
+                "--scan-limit",
+                "5000",
+                "--to",
+                "2026-07-02T00:00:00.000Z",
+            ],
+            server.base_url,
+        )
+
+    assert result.returncode == 1
+    body = output_json(result)
+    assert body["ok"] is False
+    assert body["partial"] is True
+    assert body["error"] == "recent events window exceeds scan limit or core event cap"
+    assert body["scan_limit"] == 5000
+    assert body["core_event_cap"] == 5000
 
 
 def test_events_between_script_validates_range_and_filters() -> None:
@@ -656,7 +708,7 @@ def test_day_summary_refuses_partial_output_when_event_limit_is_exceeded() -> No
     body = output_json(result)
     assert body["ok"] is False
     assert body["partial"] is True
-    assert body["error"] == "day summary exceeds event limit; increase --limit"
+    assert body["error"] == "day summary exceeds event limit or core event cap"
     assert body["truncated"] is True
     assert body["source_event_limit"] == 2
     path, query = parse_request(server.requests[0])
@@ -664,15 +716,52 @@ def test_day_summary_refuses_partial_output_when_event_limit_is_exceeded() -> No
     assert query["limit"] == ["3"]
 
 
-def test_day_summary_rejects_limit_above_detection_cap() -> None:
-    result = run_script(
-        "localtrace_day_summary.py", ["--date", "2026-07-01", "--limit", "5000"]
-    )
+def test_day_summary_accepts_limit_at_core_cap() -> None:
+    with FakeLocalTraceServer(
+        {"/events": {"body": {"ok": True, "events": sample_events()}}}
+    ) as server:
+        result = run_script(
+            "localtrace_day_summary.py",
+            ["--date", "2026-07-01", "--limit", "5000"],
+            server.base_url,
+        )
 
-    assert result.returncode == 2
+    assert result.returncode == 0
+    body = output_json(result)
+    assert body["source_event_limit"] == 5000
+    assert body["event_count"] == 3
+    path, query = parse_request(server.requests[0])
+    assert path == "/events"
+    assert query["limit"] == ["5000"]
+
+
+def test_day_summary_marks_partial_when_core_cap_is_reached() -> None:
+    capped_events = [
+        event_at(
+            index + 1,
+            f"2026-07-01T{index // 3600:02d}:{(index // 60) % 60:02d}:"
+            f"{index % 60:02d}.000Z",
+            f"app-{index}.exe",
+        )
+        for index in range(5000)
+    ]
+    with FakeLocalTraceServer(
+        {"/events": {"body": {"ok": True, "events": capped_events}}}
+    ) as server:
+        result = run_script(
+            "localtrace_day_summary.py",
+            ["--date", "2026-07-01", "--limit", "5000"],
+            server.base_url,
+        )
+
+    assert result.returncode == 1
     assert output_json(result) == {
         "ok": False,
-        "error": "--limit must be at most 4999",
+        "partial": True,
+        "error": "day summary exceeds event limit or core event cap",
+        "truncated": True,
+        "source_event_limit": 5000,
+        "core_event_cap": 5000,
     }
 
 
@@ -706,7 +795,7 @@ def test_explain_gap_refuses_partial_output_when_event_limit_is_exceeded() -> No
     body = output_json(result)
     assert body["ok"] is False
     assert body["partial"] is True
-    assert body["error"] == "gap explanation exceeds event limit; increase --limit"
+    assert body["error"] == "gap explanation exceeds event limit or core event cap"
     assert body["truncated"] is True
     assert body["source_event_limit"] == 2
     path, query = parse_request(server.requests[0])

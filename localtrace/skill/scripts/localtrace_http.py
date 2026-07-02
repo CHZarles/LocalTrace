@@ -10,6 +10,7 @@ from urllib.parse import urlencode, urlparse
 from urllib.request import HTTPRedirectHandler, build_opener
 
 DEFAULT_BASE_URL = "http://127.0.0.1:8765"
+CORE_EVENT_CAP = 5000
 
 
 class LocalTraceError(Exception):
@@ -212,9 +213,17 @@ def summarize_day(events: list[dict[str, Any]], day: date) -> dict[str, Any]:
 
 
 def apply_event_limit(
-    events: list[dict[str, Any]], limit: int
+    events: list[dict[str, Any]], limit: int, request_limit: int | None = None
 ) -> tuple[list[dict[str, Any]], bool]:
-    return events[:limit], len(events) > limit
+    if len(events) > limit:
+        return events[:limit], True
+    if request_limit == CORE_EVENT_CAP and len(events) >= CORE_EVENT_CAP:
+        return events, True
+    return events, False
+
+
+def event_request_limit(limit: int) -> int:
+    return min(limit + 1, CORE_EVENT_CAP)
 
 
 def explain_gap(events: list[dict[str, Any]], start: str, end: str) -> dict[str, Any]:
