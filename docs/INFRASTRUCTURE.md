@@ -24,15 +24,15 @@ MkDocs + Material
 
 Role:
 
-- Build `localtrace/docs` into a navigable local/static site.
+- Build `docs/` into a navigable local/static site.
 - Make specs, architecture, workflow, event schema, and issue rules easy to review.
 - Provide stable links from issues and PRs to spec sections.
 
 Planned files:
 
 ```text
-localtrace/mkdocs.yml
-localtrace/docs/*.md
+mkdocs.yml
+docs/*.md
 ```
 
 Expected commands:
@@ -75,7 +75,7 @@ Role:
 Expected command:
 
 ```bash
-markdownlint-cli2 "localtrace/**/*.md"
+markdownlint-cli2 "docs/**/*.md"
 ```
 
 P0 action:
@@ -103,9 +103,9 @@ Role:
 Expected commands:
 
 ```bash
-ruff check localtrace
-ruff format --check localtrace
-pytest localtrace
+ruff check .
+ruff format --check .
+pytest
 ```
 
 P1 requirement:
@@ -409,14 +409,14 @@ approval before files are added or changed.
 Configuration files expected later:
 
 ```text
-localtrace/mkdocs.yml
-localtrace/.markdownlint-cli2.yaml
-localtrace/pyproject.toml
-localtrace/.pre-commit-config.yaml
-localtrace/.github/workflows/ci.yml
-localtrace/.github/workflows/pr-agent-review.yml
-localtrace/.github/workflows/release.yml
-localtrace/.taskmaster/*
+mkdocs.yml
+.markdownlint-cli2.yaml
+pyproject.toml
+.pre-commit-config.yaml
+.github/workflows/localtrace-ci.yml
+.github/workflows/pr-agent-review.yml
+.github/workflows/localtrace-release-windows.yml
+.taskmaster/*
 ```
 
 Review requirements:
@@ -433,7 +433,7 @@ Review requirements:
 
 Use this sequence for normal development after P0 spec approval:
 
-1. Docs define the target behavior in `localtrace/docs`.
+1. Docs define the target behavior in `docs/`.
 2. MkDocs serves the docs for human review.
 3. Markdown lint keeps docs reviewable.
 4. Codebase Memory records accepted decisions after the human approves them.

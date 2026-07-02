@@ -10,7 +10,6 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-
 COMMENT_MARKER = "<!-- localtrace-pr-agent-review -->"
 DEFAULT_BASE_URL = "https://api.openai.com/v1"
 MAX_DOC_CHARS = 5000
@@ -24,12 +23,12 @@ DOC_PATHS = [
     "WINDOWS_DEV.md",
     "RELEASING.md",
     "DEVELOPMENT_WORKFLOW.md",
-    "localtrace/docs/WORKFLOW.md",
-    "localtrace/docs/LOCALTRACE_SPEC.md",
-    "localtrace/docs/ARCHITECTURE.md",
-    "localtrace/docs/EVENT_SCHEMA.md",
-    "localtrace/docs/INFRASTRUCTURE.md",
-    "localtrace/docs/ISSUES.md",
+    "docs/WORKFLOW.md",
+    "docs/LOCALTRACE_SPEC.md",
+    "docs/ARCHITECTURE.md",
+    "docs/EVENT_SCHEMA.md",
+    "docs/INFRASTRUCTURE.md",
+    "docs/ISSUES.md",
 ]
 
 
@@ -77,7 +76,9 @@ def build_prompt(
     repo: str, token: str, pr: dict[str, Any], diff_path: Path, repo_root: Path
 ) -> str:
     docs = "\n\n".join(read_doc(repo_root, path) for path in DOC_PATHS)
-    issues = "\n\n".join(fetch_issue(repo, token, number) for number in issue_numbers(pr))
+    issues = "\n\n".join(
+        fetch_issue(repo, token, number) for number in issue_numbers(pr)
+    )
     diff = truncate(diff_path.read_text(encoding="utf-8"), MAX_DIFF_CHARS)
 
     return f"""
@@ -183,7 +184,8 @@ def read_doc(repo_root: Path, path: str) -> str:
     file_path = repo_root / path
     if not file_path.exists():
         return f"## {path}\nMissing."
-    return f"## {path}\n{truncate(file_path.read_text(encoding='utf-8'), MAX_DOC_CHARS)}"
+    text = file_path.read_text(encoding="utf-8")
+    return f"## {path}\n{truncate(text, MAX_DOC_CHARS)}"
 
 
 def configuration_comment() -> str:
@@ -261,7 +263,9 @@ def request_json(
 
     request = urllib.request.Request(url, data=body, headers=headers, method=method)
     try:
-        with urllib.request.urlopen(request, timeout=REQUEST_TIMEOUT_SECONDS) as response:
+        with urllib.request.urlopen(
+            request, timeout=REQUEST_TIMEOUT_SECONDS
+        ) as response:
             raw = response.read().decode("utf-8")
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")

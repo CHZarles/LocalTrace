@@ -4,7 +4,7 @@ LocalTrace is a local-only Windows activity trace. It records foreground app
 focus, non-browser background audio, and browser tab activity into a local
 SQLite database, then renders the current day in a built-in web UI.
 
-The active product path is `localtrace/`.
+The repository root is the active LocalTrace project root.
 
 ## What It Does
 
@@ -74,14 +74,14 @@ http://127.0.0.1:8765/
 ```
 
 For packaging details, see
-[localtrace/docs/PACKAGING.md](localtrace/docs/PACKAGING.md).
+[docs/PACKAGING.md](docs/PACKAGING.md).
 
 ## Browser Extension
 
 The active extension source is:
 
 ```text
-localtrace/extension/
+extension/
 ```
 
 For development, load that directory as an unpacked extension in Chrome or Edge.
@@ -93,13 +93,13 @@ LocalTrace release zip and load the extracted directory.
 Common local checks:
 
 ```bash
-node --check localtrace/web/app.js
-node --test localtrace/extension/*.test.mjs
-localtrace/.venv/bin/python -m pytest localtrace/tests -q
-localtrace/.venv/bin/python -m ruff check localtrace
-localtrace/.venv/bin/python -m ruff format --check localtrace
-npm --prefix localtrace run lint:md
-localtrace/.venv/bin/mkdocs build --strict -f localtrace/mkdocs.yml
+node --check web/app.js
+node --test extension/*.test.mjs
+.venv/bin/python -m pytest tests -q
+.venv/bin/python -m ruff check .
+.venv/bin/python -m ruff format --check .
+npm run lint:md
+.venv/bin/mkdocs build --strict -f mkdocs.yml
 ```
 
 Development entry points:
@@ -108,20 +108,20 @@ Development entry points:
 - [WINDOWS_DEV.md](WINDOWS_DEV.md): Windows/WSL development and local install
   notes.
 - [RELEASING.md](RELEASING.md): release tag and GitHub Actions flow.
-- [localtrace/docs/](localtrace/docs): LocalTrace specification, architecture,
+- [docs/](docs): LocalTrace specification, architecture,
   packaging, and workflow docs.
 
 ## Repository Layout
 
 Active LocalTrace files:
 
-- `localtrace/apps/localtrace/`: core local HTTP app.
-- `localtrace/apps/winprobe/`: Windows probe.
-- `localtrace/extension/`: browser extension.
-- `localtrace/web/`: built-in web UI.
-- `localtrace/packaging/`: Windows packaging and install scripts.
-- `localtrace/skill/`: local trace helper scripts.
-- `localtrace/docs/`: product and engineering docs.
+- `apps/localtrace/`: core local HTTP app.
+- `apps/winprobe/`: Windows probe.
+- `extension/`: browser extension.
+- `web/`: built-in web UI.
+- `packaging/`: Windows packaging and install scripts.
+- `skill/`: local trace helper scripts.
+- `docs/`: product and engineering docs.
 
 Earlier prototype client/runtime code has been removed from the active main
 branch. Use Git history if old implementation details are needed for reference.

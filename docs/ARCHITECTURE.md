@@ -258,7 +258,7 @@ architecture.
 May reuse ideas or small code sections from:
 
 - old Windows collector history, where it supports the LocalTrace probe role
-- old browser extension history, as already migrated into `localtrace/extension/`
+- old browser extension history, as already migrated into `extension/`
 - old UI information architecture, only where it supports LocalTrace's local
   capture scope
 
@@ -272,20 +272,19 @@ Must not preserve:
 ## First Directory Draft
 
 ```text
-localtrace/
-  docs/
-    LOCALTRACE_SPEC.md
-    ARCHITECTURE.md
-    EVENT_SCHEMA.md
-    WORKFLOW.md
-    INFRASTRUCTURE.md
-    ISSUES.md
-  apps/
-    localtrace/
-    winprobe/
-  extension/
-  web/
-  skill/
+docs/
+  LOCALTRACE_SPEC.md
+  ARCHITECTURE.md
+  EVENT_SCHEMA.md
+  WORKFLOW.md
+  INFRASTRUCTURE.md
+  ISSUES.md
+apps/
+  localtrace/
+  winprobe/
+extension/
+web/
+skill/
 ```
 
 Only `docs/` exists during P0 spec review. Other directories are created only after approval.
