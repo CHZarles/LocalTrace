@@ -4,22 +4,31 @@ LocalTrace 是给 Windows agent 使用的本地活动上下文工具。它记录
 
 ## 先让 Agent 安装 Skill
 
-如果你是在给 agent 配 LocalTrace，先让 agent 安装 LocalTrace Skill。用户不需要手动运行安装命令。
+如果要让 agent 使用 LocalTrace，先让它安装 LocalTrace Skill。整个安装过程由 agent 完成，你不需要手动运行安装命令。
 
-你可以直接对 agent 说：
+可以直接对 agent 说：
 
-> 请在当前仓库安装 LocalTrace Skill。只使用仓库 skill 目录里的安装器完成安装，不要让我手动运行命令；安装后检查 skill 已经可用，并打开 LocalTrace Web UI。
+> 请从 GitHub 仓库 [CHZarles/LocalTrace](https://github.com/CHZarles/LocalTrace) 安装 LocalTrace Skill。只使用仓库 skill 目录里的安装器完成安装，不要让我手动运行命令。安装完成后，检查 skill 是否可用，并打开 LocalTrace Web UI。
 
-安装入口只有一个：仓库 skill 目录里的安装器。agent 应该自己执行安装器，把 skill 放到本地 skill 目录，并创建它自己的调用入口。
+安装入口只有一个：仓库 skill 目录里的安装器。agent 会自行执行安装器，把 skill 放到本地 skill 目录，并创建后续调用入口。
 
-安装完成后，agent 可以通过这个 skill 打开 Web UI、检查 LocalTrace 状态、
-读取最近活动、汇总一天活动、查看过去 3 天的焦点切换事实，或解释一段
-时间里的活动空白。用户不需要读取数据库，也不需要导出事件文件。
+安装完成后，agent 可以通过这个 skill 打开 Web UI、检查 LocalTrace 状态、读取最近活动、汇总一天活动，或解释一段时间里的活动空白。用户不需要读取数据库，也不需要导出事件文件。
 
-常用子能力包括 dashboard、focus-switches、health、recent-events、
-day-summary 和 explain-gap。`focus-switches` 只提供切换次数、目标时长、
-未知/空闲时长、切换列表和 `prompt_context`；它不自带评分，agent 可以
-结合你提供的 prompt 再做评价。
+## 子命令和触发方式
+
+你不需要记住子命令。直接用自然语言告诉 agent 想查什么，agent 会自己选择合适的子命令。
+
+| 你可以对 agent 说 | agent 会使用 | 用途 |
+| --- | --- | --- |
+| 打开 LocalTrace 面板 | `dashboard` | 打开本地 Web UI。 |
+| 检查 LocalTrace 是否正常 | `health` | 查看服务、采集状态、数据库和最近来源时间。 |
+| 看看我刚才在做什么 | `recent-events` | 读取最近活动，并按时间、应用、网站和事件类型整理。 |
+| 总结今天的活动 | `day-summary` | 汇总某一天的事件数量、主要应用/网站、来源和时间范围。 |
+| 看看我这几天切换注意力的情况 | `focus-switches` | 返回切换次数、目标时长、未知/空闲时长、切换列表和 `prompt_context`。 |
+| 查某一段时间发生了什么 | `events-between` | 读取指定时间窗口内的原始活动事件。 |
+| 解释这段时间为什么没有记录 | `explain-gap` | 查找空白区间内、前后最近的活动上下文。 |
+
+`focus-switches` 只返回事实数据，不自带评分。agent 可以结合你提供的 prompt 再做评价。
 
 ## Web UI
 
@@ -64,22 +73,3 @@ LocalTrace Skill 负责让 agent 查询活动记录；Windows 运行时负责真
 - [web/README.md](web/README.md)
 - [extension/README.md](extension/README.md)
 - [skill/README.md](skill/README.md)
-
-## English
-
-LocalTrace is a local activity context tool for a Windows agent. It records
-foreground app focus, browser tab activity, and non-browser audio as raw events
-on the local machine, then shows the current day in a local Web UI.
-
-If you are setting it up for an agent, ask the agent to install the LocalTrace
-Skill from this repository. The agent should use the bundled installer itself,
-verify the skill, and open the Web UI without asking you to run shell commands.
-
-The skill can open the dashboard, check health, read recent activity, summarize
-a day, report focus-switch facts for the past 3 days, and explain activity
-gaps. `focus-switches` returns factual data and `prompt_context`; it does not
-produce a built-in rating.
-
-LocalTrace does not capture page bodies, screenshots, keyboard input, cloud
-sync, or LAN access. You can tighten capture settings and privacy rules in the
-Settings page.

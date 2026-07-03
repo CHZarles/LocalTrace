@@ -526,7 +526,8 @@ def test_skill_docs_show_windows_agent_install_and_invocation() -> None:
     assert "opens the Web UI" in skill_file
     assert "focus-switches" in skill_file
     assert "prompt_context" in skill_file
-    assert "请在当前仓库安装 LocalTrace Skill" in project_readme
+    assert "https://github.com/CHZarles/LocalTrace" in project_readme
+    assert "请从 GitHub 仓库" in project_readme
     assert "不要让我手动运行命令" in project_readme
     assert "安装入口只有一个" in project_readme
     assert "PowerShell" not in project_readme
