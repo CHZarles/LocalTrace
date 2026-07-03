@@ -36,6 +36,15 @@ def test_pyproject_keeps_packaging_helpers_out_of_runtime_scripts() -> None:
     )
 
 
+def test_pyproject_declares_windows_uiautomation_dependency() -> None:
+    pyproject = tomllib.loads((LOCALTRACE_ROOT / "pyproject.toml").read_text())
+
+    assert (
+        'uiautomation>=2.0,<3.0; platform_system == "Windows"'
+        in pyproject["project"]["dependencies"]
+    )
+
+
 def test_packager_creates_release_zip_with_expected_layout(tmp_path: Path) -> None:
     dist_dir = tmp_path / "dist"
     result = run_packager("--dist-dir", str(dist_dir), "--skip-exe-check")
@@ -169,6 +178,22 @@ def test_windows_build_script_invokes_pyinstaller_for_both_exes() -> None:
     assert "localtrace_launcher.py" in script
     assert "localtrace_winprobe_launcher.py" in script
     assert "Start-Process -Verb RunAs" not in script
+
+
+def test_windows_build_script_bundles_uiautomation_for_winprobe() -> None:
+    script = (LOCALTRACE_ROOT / "packaging" / "build-windows.ps1").read_text(
+        encoding="utf-8"
+    )
+
+    assert '"--hidden-import", "uiautomation"' in script
+
+
+def test_windows_release_workflow_installs_uiautomation_dependency() -> None:
+    workflow = (
+        LOCALTRACE_ROOT / ".github" / "workflows" / "localtrace-release-windows.yml"
+    ).read_text(encoding="utf-8")
+
+    assert "uiautomation>=2.0,<3.0" in workflow
 
 
 def test_core_launcher_propagates_main_exit_status() -> None:

@@ -564,12 +564,34 @@ class WindowsActivityReader:
             buffer = ctypes.create_unicode_buffer(title_length + 1)
             if user32.GetWindowTextW(hwnd, buffer, title_length + 1) > 0:
                 title = buffer.value
+        if not title.strip():
+            title = self._uia_window_title(int(hwnd))
 
         return ForegroundApp(
             pid=int(pid.value),
             title=title,
             exe_path=self._process_exe_path(int(pid.value)),
         )
+
+    def _uia_window_title(self, hwnd: int) -> str:
+        try:
+            import uiautomation as uia
+        except ImportError:
+            LOGGER.debug("uiautomation is unavailable; skipping UIA title lookup")
+            return ""
+
+        try:
+            control = uia.ControlFromHandle(hwnd)
+            title = getattr(control, "Name", "")
+        except Exception as exc:
+            LOGGER.debug(
+                "UI Automation title lookup failed hwnd=%s error=%s",
+                hwnd,
+                exc,
+            )
+            return ""
+
+        return title.strip() if isinstance(title, str) else ""
 
     def active_audio_app(self, preferred_pid: int | None) -> AudioApp | None:
         import ctypes

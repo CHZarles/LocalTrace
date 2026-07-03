@@ -51,6 +51,7 @@ $winprobeArgs = @(
   "--clean",
   "--onefile",
   "--name", "localtrace-winprobe",
+  "--hidden-import", "uiautomation",
   "--paths", (Join-Path $RepoRoot "apps\winprobe"),
   "--distpath", $DistDir,
   "--workpath", (Join-Path $buildDir "localtrace-winprobe"),

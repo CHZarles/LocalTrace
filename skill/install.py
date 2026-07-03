@@ -57,7 +57,10 @@ def main() -> int:
                 "prepared": False,
                 "source_kind": "not_attempted",
                 "source": None,
-                "reason": "LOCALAPPDATA is not set and no browser extension directory was provided.",
+                "reason": (
+                    "LOCALAPPDATA is not set and no browser extension directory "
+                    "was provided."
+                ),
             }
         )
     except (OSError, subprocess.CalledProcessError) as exc:
@@ -123,7 +126,10 @@ def browser_extension_guidance(extension_result: dict[str, Any]) -> dict[str, An
     status = (
         "浏览器插件加载目录已经准备好。"
         if prepared
-        else f"浏览器插件加载目录尚未自动准备：{extension_result.get('reason', '未找到扩展包')}。"
+        else (
+            "浏览器插件加载目录尚未自动准备："
+            f"{extension_result.get('reason', '未找到扩展包')}。"
+        )
     )
     return {
         "unpacked_dir": unpacked_dir,
@@ -182,7 +188,10 @@ def prepare_browser_extension(source: Path, unpacked_dir: Path) -> dict[str, Any
         "unpacked_dir": str(unpacked_dir),
         "source_kind": "missing",
         "source": None,
-        "reason": "could not find localtrace-extension.zip or repository extension runtime files",
+        "reason": (
+            "could not find localtrace-extension.zip or repository extension "
+            "runtime files"
+        ),
     }
 
 
@@ -206,7 +215,8 @@ def extract_extension_zip(extension_zip: Path, unpacked_dir: Path) -> None:
             target = (root / member.filename).resolve()
             if target != root and root not in target.parents:
                 raise OSError(
-                    f"Refusing to extract outside extension directory: {member.filename}"
+                    "Refusing to extract outside extension directory: "
+                    f"{member.filename}"
                 )
             archive.extract(member, root)
 

@@ -28,6 +28,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install pyinstaller==6.14.1
+          python -m pip install "uiautomation>=2.0,<3.0"
 
       - name: Build LocalTrace Windows zip
         id: package

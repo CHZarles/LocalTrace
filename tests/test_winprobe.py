@@ -338,6 +338,54 @@ def test_browser_executables_are_excluded_from_app_audio() -> None:
     assert is_browser_exe("spotify.exe") is False
 
 
+def test_foreground_app_falls_back_to_uia_when_win32_title_is_empty(
+    monkeypatch,
+) -> None:
+    import ctypes
+    from types import SimpleNamespace
+
+    reader = object.__new__(WindowsActivityReader)
+    monkeypatch.setattr(
+        reader,
+        "_process_exe_path",
+        lambda pid: r"C:\Users\charles\AppData\Local\Programs\Cursor\Cursor.exe",
+    )
+    monkeypatch.setattr(
+        reader,
+        "_uia_window_title",
+        lambda hwnd: "Agent chat - Cursor",
+        raising=False,
+    )
+
+    class User32:
+        def GetForegroundWindow(self) -> int:
+            return 101
+
+        def GetWindowThreadProcessId(self, hwnd: int, pid_ref: object) -> int:
+            assert hwnd == 101
+            pid_ref._obj.value = 4242
+            return 1
+
+        def GetWindowTextLengthW(self, hwnd: int) -> int:
+            assert hwnd == 101
+            return 0
+
+    monkeypatch.setattr(
+        ctypes,
+        "windll",
+        SimpleNamespace(user32=User32()),
+        raising=False,
+    )
+
+    foreground = reader.foreground_app()
+
+    assert foreground == ForegroundApp(
+        pid=4242,
+        title="Agent chat - Cursor",
+        exe_path=r"C:\Users\charles\AppData\Local\Programs\Cursor\Cursor.exe",
+    )
+
+
 def test_audio_candidates_fall_back_to_pid_when_paths_are_unknown(
     monkeypatch,
     caplog,
