@@ -59,7 +59,7 @@ export function buildTabActiveEvent({
   };
 
   const title =
-    settings.sendTitle === true && typeof tab.title === "string" && tab.title.trim()
+    settings.sendTitle !== false && typeof tab.title === "string" && tab.title.trim()
       ? tab.title
       : null;
 

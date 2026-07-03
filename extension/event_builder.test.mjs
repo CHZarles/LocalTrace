@@ -57,14 +57,32 @@ test("buildTabActiveEvent records tab title by default", () => {
   });
 });
 
-test("buildTabActiveEvent can omit tab title when explicitly disabled", () => {
+test("buildTabActiveEvent records tab title when sendTitle is omitted", () => {
   const event = buildTabActiveEvent({
-    observedAt: "2026-07-01T10:34:00.000Z",
+    observedAt: "2026-07-01T10:33:30.000Z",
     seq: 21,
-    activity: "audio",
+    activity: "focus",
     browser: "chrome",
     tab: {
       id: 101,
+      windowId: 1,
+      title: "Default title",
+      url: "https://example.com/article"
+    },
+    settings: {}
+  });
+
+  assert.equal(event.title, "Default title");
+});
+
+test("buildTabActiveEvent can omit tab title when explicitly disabled", () => {
+  const event = buildTabActiveEvent({
+    observedAt: "2026-07-01T10:34:00.000Z",
+    seq: 22,
+    activity: "audio",
+    browser: "chrome",
+    tab: {
+      id: 102,
       windowId: 2,
       title: "Music title",
       url: "https://youtube.com/watch?v=secret"
