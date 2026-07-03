@@ -530,6 +530,9 @@ def test_skill_docs_show_windows_agent_install_and_invocation() -> None:
     assert "请从 GitHub 仓库" in project_readme
     assert "不要让我手动运行命令" in project_readme
     assert "安装入口只有一个" in project_readme
+    assert "安装器会自动解压浏览器插件" in project_readme
+    assert "把插件目录复制到剪贴板" in project_readme
+    assert "extension/localtrace-extension.zip" not in project_readme
     assert "PowerShell" not in project_readme
     assert ".\\skill\\install.ps1" not in project_readme
     assert "localtrace.exe" not in project_readme

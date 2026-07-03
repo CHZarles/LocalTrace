@@ -20,6 +20,66 @@ function Get-NormalizedPath {
   return [System.IO.Path]::GetFullPath($Path).TrimEnd("\", "/")
 }
 
+function Open-BrowserExtensionPage {
+  param(
+    [Parameter(Mandatory = $true)][string]$Name,
+    [Parameter(Mandatory = $true)][string]$Url,
+    [Parameter(Mandatory = $true)][string[]]$ExecutableNames
+  )
+
+  foreach ($browser in $ExecutableNames) {
+    try {
+      Start-Process -FilePath $browser -ArgumentList $Url -ErrorAction Stop
+      Write-Host "Opened $Name extension page: $Url"
+      return $true
+    } catch {
+      Write-Verbose "Could not open $Name using $browser."
+    }
+  }
+
+  return $false
+}
+
+function Prepare-BrowserExtension {
+  param([Parameter(Mandatory = $true)][string]$InstallDir)
+
+  $extensionZip = Get-NormalizedPath -Path (Join-Path $InstallDir "extension\localtrace-extension.zip")
+  $extensionLoadDir = Get-NormalizedPath -Path (Join-Path $InstallDir "extension\localtrace-extension")
+
+  if (-not (Test-Path $extensionZip)) {
+    Write-Warning "Browser extension zip not found: $extensionZip"
+    return
+  }
+
+  if (Test-Path $extensionLoadDir) {
+    Remove-Item -Recurse -Force $extensionLoadDir
+  }
+  New-Item -ItemType Directory -Force $extensionLoadDir | Out-Null
+  Expand-Archive -Path $extensionZip -DestinationPath $extensionLoadDir -Force
+
+  try {
+    Set-Clipboard -Value $extensionLoadDir
+    Write-Host "Copied browser extension directory to clipboard."
+  } catch {
+    Write-Warning "Could not copy browser extension directory to clipboard."
+  }
+
+  $opened = @()
+  if (Open-BrowserExtensionPage -Name "Edge" -Url "edge://extensions/" -ExecutableNames @("msedge.exe", "msedge")) {
+    $opened += "Edge"
+  }
+  if (Open-BrowserExtensionPage -Name "Chrome" -Url "chrome://extensions/" -ExecutableNames @("chrome.exe", "chrome")) {
+    $opened += "Chrome"
+  }
+
+  Write-Host "Load unpacked extension directory: $extensionLoadDir"
+  Write-Host "Browser security requires the final confirmation step."
+  Write-Host "In Chrome or Edge, enable Developer mode, click Load unpacked, and select the copied directory."
+  if ($opened.Count -eq 0) {
+    Write-Host "Chrome or Edge was not found automatically. Open chrome://extensions/ or edge://extensions/ manually."
+  }
+}
+
 $normalizedReleaseRoot = Get-NormalizedPath -Path $ReleaseRoot
 $normalizedInstallDir = Get-NormalizedPath -Path $InstallDir
 if ($normalizedReleaseRoot -ieq $normalizedInstallDir) {
@@ -29,6 +89,9 @@ $releaseRootPrefix = "$normalizedReleaseRoot$([System.IO.Path]::DirectorySeparat
 if ($normalizedInstallDir.StartsWith($releaseRootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
   throw "InstallDir must not be inside ReleaseRoot. Choose an install directory outside the extracted release directory."
 }
+
+$ReleaseRoot = $normalizedReleaseRoot
+$InstallDir = $normalizedInstallDir
 
 $coreExe = Join-Path $InstallDir "localtrace.exe"
 
@@ -60,6 +123,8 @@ foreach ($item in $requiredItems) {
 
 New-Item -Path $runKey -Force | Out-Null
 Set-ItemProperty -Path $runKey -Name $runName -Value "`"$coreExe`""
+
+Prepare-BrowserExtension -InstallDir $InstallDir
 
 Write-Host "LocalTrace installed to: $InstallDir"
 Write-Host "Autostart registered at: $runKey\$runName"

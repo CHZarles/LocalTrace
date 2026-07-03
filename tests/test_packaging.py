@@ -190,6 +190,20 @@ def test_install_script_fails_fast_for_missing_required_artifacts() -> None:
     assert "Set-ItemProperty" in script
 
 
+def test_install_script_prepares_browser_extension_for_manual_load() -> None:
+    script = (
+        LOCALTRACE_ROOT / "packaging" / "scripts" / "install-localtrace.ps1"
+    ).read_text(encoding="utf-8")
+
+    assert "localtrace-extension.zip" in script
+    assert "Expand-Archive" in script
+    assert "Set-Clipboard" in script
+    assert "chrome://extensions/" in script
+    assert "edge://extensions/" in script
+    assert "Load unpacked" in script
+    assert "Load unpacked extension directory" in script
+
+
 def test_install_script_rejects_running_from_installed_copy() -> None:
     script = (
         LOCALTRACE_ROOT / "packaging" / "scripts" / "install-localtrace.ps1"
@@ -258,5 +272,6 @@ def test_packaging_docs_are_in_mkdocs_nav() -> None:
     assert "localtrace.exe" in docs
     assert "localtrace-winprobe.exe" in docs
     assert "LocalTrace-windows.zip" in docs
-    assert "Extract `extension/localtrace-extension.zip`" in docs
+    assert "The installer extracts the browser extension" in docs
+    assert "Extract `extension/localtrace-extension.zip`" not in docs
     assert "Load unpacked" in docs
