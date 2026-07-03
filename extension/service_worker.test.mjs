@@ -95,6 +95,10 @@ test("service worker reports audible web tabs even when the browser is focused",
     posted.map((event) => event.payload?.activity),
     ["focus", "audio"]
   );
+  assert.deepEqual(
+    posted.map((event) => event.title),
+    ["Playing", "Playing"]
+  );
   assert.equal(
     posted.some((event) => event.kind === "tab_audio_stop"),
     false
