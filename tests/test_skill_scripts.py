@@ -5,6 +5,7 @@ import os
 import subprocess
 import sys
 import threading
+import zipfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from types import ModuleType
@@ -474,6 +475,62 @@ def test_skill_installer_copies_skill_and_creates_invocation_command(
     assert "recent-events" in help_result.stdout
     assert "dashboard" in help_result.stdout
     assert "focus-switches" in help_result.stdout
+
+
+def test_skill_installer_prepares_browser_extension_load_directory(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "skills" / "localtrace"
+    bin_dir = tmp_path / "bin"
+    extension_dir = tmp_path / "browser-extension"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SKILL_DIR / "install.py"),
+            "--target",
+            str(target),
+            "--bin-dir",
+            str(bin_dir),
+            "--browser-extension-dir",
+            str(extension_dir),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    body = json.loads(result.stdout)
+    assert body["browser_extension_unpacked_dir"] == str(extension_dir)
+    assert body["browser_extension"]["prepared"] is True
+    assert body["browser_extension"]["source_kind"] == "repo_extension_dir"
+    assert "已经准备好" in body["must_tell_user_zh"]
+    assert (extension_dir / "manifest.json").exists()
+    assert (extension_dir / "service_worker.js").exists()
+    assert not (extension_dir / "service_worker.test.mjs").exists()
+
+
+def test_skill_installer_extracts_browser_extension_zip(tmp_path: Path) -> None:
+    installer = load_install_module()
+    source = tmp_path / "repo" / "skill"
+    source.mkdir(parents=True)
+    extension_dir = tmp_path / "extension" / "localtrace-extension"
+    extension_zip = extension_dir.parent / "localtrace-extension.zip"
+    extension_zip.parent.mkdir(parents=True)
+    with zipfile.ZipFile(extension_zip, "w") as archive:
+        archive.writestr("manifest.json", '{"manifest_version":3}')
+        archive.writestr("service_worker.js", "self.localtrace = true;")
+
+    result = installer.prepare_browser_extension(source, extension_dir)
+
+    assert result["prepared"] is True
+    assert result["source_kind"] == "extension_zip"
+    assert result["source"] == str(extension_zip)
+    assert (extension_dir / "manifest.json").read_text(encoding="utf-8") == (
+        '{"manifest_version":3}'
+    )
+    assert (extension_dir / "service_worker.js").exists()
 
 
 def test_powershell_installer_is_available_for_windows_users() -> None:

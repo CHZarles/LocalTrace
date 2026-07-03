@@ -7,6 +7,7 @@ import shutil
 import stat
 import subprocess
 import sys
+import zipfile
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -15,6 +16,15 @@ SKILL_NAME = "localtrace"
 COMMAND_NAME = "localtrace-skill"
 CHROME_EXTENSIONS_URL = "chrome://extensions/"
 EDGE_EXTENSIONS_URL = "edge://extensions/"
+EXTENSION_RUNTIME_FILES = (
+    "manifest.json",
+    "event_builder.mjs",
+    "offscreen.html",
+    "offscreen.js",
+    "popup.html",
+    "popup.js",
+    "service_worker.js",
+)
 
 
 def main() -> int:
@@ -24,6 +34,7 @@ def main() -> int:
     parser.add_argument("--target", type=Path, default=default_skill_target())
     parser.add_argument("--bin-dir", type=Path, default=default_bin_dir())
     parser.add_argument("--python", type=Path, default=Path(sys.executable))
+    parser.add_argument("--browser-extension-dir", type=Path, default=None)
     parser.add_argument("--no-bin", action="store_true")
     parser.add_argument("--skip-deps", action="store_true")
     args = parser.parse_args()
@@ -38,11 +49,22 @@ def main() -> int:
         command_path = None
         if not args.no_bin:
             command_path = install_command(args.bin_dir, args.target)
+        extension_dir = args.browser_extension_dir or default_browser_extension_path()
+        extension_result = (
+            prepare_browser_extension(source, extension_dir)
+            if extension_dir is not None
+            else {
+                "prepared": False,
+                "source_kind": "not_attempted",
+                "source": None,
+                "reason": "LOCALAPPDATA is not set and no browser extension directory was provided.",
+            }
+        )
     except (OSError, subprocess.CalledProcessError) as exc:
         print_json({"ok": False, "error": str(exc)})
         return 1
 
-    browser_extension = browser_extension_guidance()
+    browser_extension = browser_extension_guidance(extension_result)
     print_json(
         {
             "ok": True,
@@ -80,19 +102,132 @@ def default_browser_extension_dir() -> str:
     return base + r"\LocalTrace\App\extension\localtrace-extension"
 
 
-def browser_extension_guidance() -> dict[str, str]:
-    unpacked_dir = default_browser_extension_dir()
+def default_browser_extension_path() -> Path | None:
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if not local_app_data:
+        return None
+    return (
+        Path(local_app_data)
+        / "LocalTrace"
+        / "App"
+        / "extension"
+        / "localtrace-extension"
+    )
+
+
+def browser_extension_guidance(extension_result: dict[str, Any]) -> dict[str, Any]:
+    unpacked_dir = str(
+        extension_result.get("unpacked_dir") or default_browser_extension_dir()
+    )
+    prepared = bool(extension_result.get("prepared"))
+    status = (
+        "浏览器插件加载目录已经准备好。"
+        if prepared
+        else f"浏览器插件加载目录尚未自动准备：{extension_result.get('reason', '未找到扩展包')}。"
+    )
     return {
         "unpacked_dir": unpacked_dir,
         "chrome_url": CHROME_EXTENSIONS_URL,
         "edge_url": EDGE_EXTENSIONS_URL,
+        "prepared": prepared,
+        "source_kind": str(extension_result.get("source_kind") or "unknown"),
+        "source": extension_result.get("source"),
+        "reason": extension_result.get("reason"),
         "agent_message_zh": (
-            "必须告诉用户：浏览器插件需要手动加载。"
+            f"必须告诉用户：{status}"
             f"插件解压路径：{unpacked_dir}；"
             f"Chrome 扩展页地址：{CHROME_EXTENSIONS_URL}；"
             f"Edge 扩展页地址：{EDGE_EXTENSIONS_URL}。"
             "打开对应浏览器的扩展管理页，开启开发者模式，选择加载已解压的扩展，然后选择上面的目录。"
         ),
+    }
+
+
+def prepare_browser_extension(source: Path, unpacked_dir: Path) -> dict[str, Any]:
+    source = source.resolve()
+    unpacked_dir = unpacked_dir.resolve()
+    extension_zip = first_existing_path(
+        [
+            unpacked_dir.parent / "localtrace-extension.zip",
+            source.parent / "extension" / "localtrace-extension.zip",
+        ]
+    )
+    if extension_zip is not None:
+        replace_directory(unpacked_dir)
+        extract_extension_zip(extension_zip, unpacked_dir)
+        return prepared_extension_result(
+            unpacked_dir,
+            source_kind="extension_zip",
+            source=extension_zip,
+        )
+
+    repo_extension_dir = source.parent / "extension"
+    if (repo_extension_dir / "manifest.json").is_file():
+        replace_directory(unpacked_dir)
+        for name in EXTENSION_RUNTIME_FILES:
+            runtime_file = repo_extension_dir / name
+            if not runtime_file.is_file():
+                raise FileNotFoundError(
+                    f"Missing browser extension runtime file: {runtime_file}"
+                )
+            shutil.copy2(runtime_file, unpacked_dir / name)
+        return prepared_extension_result(
+            unpacked_dir,
+            source_kind="repo_extension_dir",
+            source=repo_extension_dir,
+        )
+
+    return {
+        "prepared": False,
+        "unpacked_dir": str(unpacked_dir),
+        "source_kind": "missing",
+        "source": None,
+        "reason": "could not find localtrace-extension.zip or repository extension runtime files",
+    }
+
+
+def first_existing_path(candidates: list[Path]) -> Path | None:
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def replace_directory(directory: Path) -> None:
+    if directory.exists():
+        shutil.rmtree(directory)
+    directory.mkdir(parents=True, exist_ok=True)
+
+
+def extract_extension_zip(extension_zip: Path, unpacked_dir: Path) -> None:
+    root = unpacked_dir.resolve()
+    with zipfile.ZipFile(extension_zip) as archive:
+        for member in archive.infolist():
+            target = (root / member.filename).resolve()
+            if target != root and root not in target.parents:
+                raise OSError(
+                    f"Refusing to extract outside extension directory: {member.filename}"
+                )
+            archive.extract(member, root)
+
+
+def prepared_extension_result(
+    unpacked_dir: Path,
+    *,
+    source_kind: str,
+    source: Path,
+) -> dict[str, Any]:
+    manifest = unpacked_dir / "manifest.json"
+    if not manifest.is_file():
+        raise FileNotFoundError(
+            f"Prepared browser extension is missing manifest.json: {unpacked_dir}"
+        )
+    return {
+        "prepared": True,
+        "unpacked_dir": str(unpacked_dir),
+        "source_kind": source_kind,
+        "source": str(source),
+        "reason": None,
     }
 
 
