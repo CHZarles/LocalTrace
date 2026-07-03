@@ -11,7 +11,7 @@ function json(response, body) {
   response.end(JSON.stringify(body));
 }
 
-async function startWebUiServer() {
+async function startWebUiServer({ events = [], settings = null } = {}) {
   const server = http.createServer((request, response) => {
     const url = new URL(request.url, "http://127.0.0.1");
     if (url.pathname === "/") {
@@ -45,13 +45,13 @@ async function startWebUiServer() {
       return;
     }
     if (url.pathname === "/events") {
-      json(response, { ok: true, events: [] });
+      json(response, { ok: true, events });
       return;
     }
     if (url.pathname === "/settings") {
       json(response, {
         ok: true,
-        settings: {
+        settings: settings || {
           api: { host: "127.0.0.1", port: 8765 },
           capture: {
             poll_ms: 1000,
@@ -104,6 +104,51 @@ test("metrics and settings are separate pages", async ({ page }) => {
     await expect(page.locator("#settingsPanel")).toBeVisible();
     await expect(page.locator("#metricsView")).toBeHidden();
     await expect(page.locator("#settingsPanel #healthMetrics")).toHaveCount(0);
+  } finally {
+    await server.close();
+  }
+});
+
+test("stale browser audio is not shown as current background audio", async ({
+  page
+}) => {
+  const staleTitle = "实用干货|今天手把手教你在..";
+  const server = await startWebUiServer({
+    events: [
+      {
+        id: 1,
+        observed_at: "2026-07-03T09:50:00.000Z",
+        received_at: "2026-07-03T09:50:00.000Z",
+        source: "browser_extension",
+        kind: "tab_active",
+        entity_type: "domain",
+        entity: "youtube.com",
+        title: staleTitle,
+        payload: { activity: "audio", browser: "chrome" }
+      }
+    ]
+  });
+  try {
+    await page.addInitScript(() => {
+      const fixedNow = new Date("2026-07-03T10:00:00.000Z").valueOf();
+      const RealDate = Date;
+      class FixedDate extends RealDate {
+        constructor(...args) {
+          super(...(args.length ? args : [fixedNow]));
+        }
+
+        static now() {
+          return fixedNow;
+        }
+      }
+      FixedDate.UTC = RealDate.UTC;
+      FixedDate.parse = RealDate.parse;
+      globalThis.Date = FixedDate;
+    });
+    await page.goto(server.url);
+
+    await expect(page.locator("#nowAudio")).toContainText("No audio activity");
+    await expect(page.locator("#nowAudio")).not.toContainText(staleTitle);
   } finally {
     await server.close();
   }

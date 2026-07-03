@@ -102,7 +102,7 @@ function buildTodayModel(events, settings) {
   const latestTab = todayEvents.find(
     (event) => event.source === "browser_extension" && isFocusEvent(event)
   );
-  const latestAudio = latestActiveAudioEvent(todayEvents);
+  const latestAudio = latestActiveAudioEvent(todayEvents, idleSeconds, now);
 
   return {
     now,
@@ -623,16 +623,20 @@ function nextAudioBoundary(audioEvents, index, event, now) {
   return now;
 }
 
-function latestActiveAudioEvent(eventsDesc) {
+function latestActiveAudioEvent(eventsDesc, idleSeconds, now) {
   const latestStopByKey = new Map();
+  const maxAgeMs = Math.max(1, Number(idleSeconds) || 300) * 1000;
   for (const event of eventsDesc) {
+    const observedAt = parseDate(event.observed_at);
+    if (!observedAt) continue;
+    if (now.getTime() - observedAt.getTime() > maxAgeMs) break;
+
     const key = `${event.source}:${event.entity_type}:${event.entity}`;
     if (isAudioStopEvent(event) && !latestStopByKey.has(key)) {
-      latestStopByKey.set(key, parseDate(event.observed_at));
+      latestStopByKey.set(key, observedAt);
       continue;
     }
     if (!isAudioStartEvent(event)) continue;
-    const observedAt = parseDate(event.observed_at);
     const stopAt = latestStopByKey.get(key);
     if (!stopAt || observedAt > stopAt) return event;
   }
