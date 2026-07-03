@@ -36,8 +36,8 @@ class ProbeSettings:
     poll_ms: int = 1000
     heartbeat_seconds: int = 60
     idle_cutoff_seconds: int = 300
-    store_titles: bool = False
-    store_exe_path: bool = False
+    store_titles: bool = True
+    store_exe_path: bool = True
 
     @property
     def endpoint(self) -> str:
@@ -438,8 +438,12 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--poll-ms", type=int, default=1000)
     parser.add_argument("--heartbeat-seconds", type=int, default=60)
     parser.add_argument("--idle-cutoff-seconds", type=int, default=300)
-    parser.add_argument("--store-titles", action="store_true")
-    parser.add_argument("--store-exe-path", action="store_true")
+    parser.add_argument(
+        "--store-titles", action=argparse.BooleanOptionalAction, default=True
+    )
+    parser.add_argument(
+        "--store-exe-path", action=argparse.BooleanOptionalAction, default=True
+    )
     return parser.parse_args(argv)
 
 

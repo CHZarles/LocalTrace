@@ -324,5 +324,5 @@ Recent events may support descending order later, but v1 spec starts with predic
 - [ ] Existing LocalTrace capture signals are preserved.
 - [ ] Idle is not stored as raw events.
 - [ ] No derived duration field is required.
-- [ ] Titles and exe paths are disabled by default.
+- [ ] Titles and exe paths are stored by default and can be disabled in settings.
 - [ ] Events are sufficient for skill-side timeline/top/day summary computation.

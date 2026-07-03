@@ -1,5 +1,5 @@
 const state = {
-  activeSection: "todayView",
+  activeSection: "metricsView",
   topFilter: "all",
   events: [],
   settings: null,
@@ -9,6 +9,11 @@ const state = {
 };
 
 const $ = (id) => document.getElementById(id);
+
+const SECTION_TITLES = {
+  metricsView: "Metrics",
+  settingsPanel: "Settings"
+};
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -59,8 +64,12 @@ function renderShell() {
   for (const button of document.querySelectorAll(".nav-item")) {
     const active = button.dataset.section === state.activeSection;
     button.classList.toggle("active", active);
+    button.setAttribute("aria-current", active ? "page" : "false");
   }
-  $("pageTitle").textContent = "Today";
+  for (const section of document.querySelectorAll(".view")) {
+    section.classList.toggle("active", section.id === state.activeSection);
+  }
+  $("pageTitle").textContent = SECTION_TITLES[state.activeSection] || "Metrics";
 }
 
 function renderToday() {
@@ -700,10 +709,7 @@ function formatTime(value) {
 function setSection(sectionId) {
   state.activeSection = sectionId;
   renderShell();
-  document.getElementById(sectionId)?.scrollIntoView({
-    behavior: "smooth",
-    block: "start"
-  });
+  $(sectionId)?.scrollIntoView({ block: "start" });
 }
 
 function setStatus(text) {

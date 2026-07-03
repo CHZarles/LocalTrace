@@ -23,8 +23,8 @@ class CaptureConfig:
     poll_ms: int = 1000
     heartbeat_seconds: int = 60
     idle_cutoff_seconds: int = 300
-    store_titles: bool = False
-    store_exe_path: bool = False
+    store_titles: bool = True
+    store_exe_path: bool = True
     track_browser: bool = True
     track_audio: bool = True
 

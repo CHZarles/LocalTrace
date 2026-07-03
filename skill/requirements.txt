@@ -1,0 +1,2 @@
+# LocalTrace skill runtime dependencies.
+# This file is intentionally empty: current skill scripts use only Python stdlib.

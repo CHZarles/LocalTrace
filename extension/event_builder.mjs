@@ -4,7 +4,7 @@ export const DEFAULT_PORT = 8765;
 export const DEFAULT_SETTINGS = {
   enabled: true,
   port: DEFAULT_PORT,
-  sendTitle: false,
+  sendTitle: true,
   trackBackgroundAudio: true,
   keepAlive: true,
   heartbeatSeconds: 60

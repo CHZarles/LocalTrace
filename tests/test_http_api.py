@@ -324,9 +324,10 @@ def test_http_routes_expose_web_settings_and_local_json_apis(tmp_path: Path) -> 
         assert "flowList" not in html
         assert "Recent events" not in html
         assert "eventsTable" not in html
+        assert "metricsView" in html
         assert "settingsPanel" in html
         assert 'id="settingsPanel" class="view" hidden' not in html
-        assert 'data-section="todayView"' in html
+        assert 'data-section="metricsView"' in html
         assert 'data-section="settingsPanel"' in html
         assert "data-view=" not in html
         assert "/web/app.js" in html
@@ -434,15 +435,22 @@ def test_post_events_validates_and_stores_raw_events(tmp_path: Path) -> None:
     assert event["kind"] == "app_active"
     assert event["entity_type"] == "app"
     assert event["entity"] == "Code.exe"
-    assert event["title"] is None
-    assert event["payload"] == {"pid": 1234, "activity": "focus"}
+    assert event["title"] == "Sensitive project title"
+    assert event["payload"] == {
+        "pid": 1234,
+        "activity": "focus",
+        "title": "Nested sensitive title",
+        "exe_path": "C:/Users/charles/AppData/Local/Programs/Code.exe",
+    }
     assert event["received_at"].endswith("Z")
 
 
-def test_post_events_keeps_titles_and_exe_path_when_configured(tmp_path: Path) -> None:
+def test_post_events_filters_titles_and_exe_path_when_disabled(
+    tmp_path: Path,
+) -> None:
     config = default_config(data_dir=tmp_path)
-    config.capture.store_titles = True
-    config.capture.store_exe_path = True
+    config.capture.store_titles = False
+    config.capture.store_exe_path = False
     initialize_database(config.db_path)
     service = LocalTraceService(config)
 
@@ -464,9 +472,8 @@ def test_post_events_keeps_titles_and_exe_path_when_configured(tmp_path: Path) -
     )
 
     event = service.get_events({})[1]["events"][0]
-    assert event["title"] == "Project notes"
-    assert event["payload"]["title"] == "Nested project title"
-    assert event["payload"]["exe_path"] == "C:/Program Files/Code/Code.exe"
+    assert event["title"] is None
+    assert event["payload"] == {"pid": 1234, "activity": "focus"}
 
 
 def test_post_events_rejects_disallowed_event_kind(tmp_path: Path) -> None:

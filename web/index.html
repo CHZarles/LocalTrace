@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>LocalTrace</title>
-    <link rel="stylesheet" href="/web/styles.css?v=20260702-single-page" />
+    <link rel="stylesheet" href="/web/styles.css?v=20260703-pages" />
   </head>
   <body>
     <svg class="icon-sprite" aria-hidden="true">
@@ -39,9 +39,9 @@
           </div>
         </div>
         <nav class="nav-list" aria-label="Primary">
-          <button class="nav-item active" type="button" data-section="todayView">
+          <button class="nav-item active" type="button" data-section="metricsView">
             <svg class="icon" aria-hidden="true"><use href="#icon-activity"></use></svg>
-            <span>Today</span>
+            <span>Metrics</span>
           </button>
           <button class="nav-item" type="button" data-section="settingsPanel">
             <svg class="icon" aria-hidden="true"><use href="#icon-settings"></use></svg>
@@ -74,7 +74,7 @@
         </header>
 
         <main>
-          <section id="todayView" class="view">
+          <section id="metricsView" class="view active">
             <div class="hero-grid">
               <article class="card now-card">
                 <div class="section-heading">
@@ -158,17 +158,17 @@
                 </article>
               </aside>
             </div>
+
+            <article class="card">
+              <div class="section-heading">
+                <h3>Health</h3>
+              </div>
+              <dl class="metrics" id="healthMetrics"></dl>
+            </article>
           </section>
 
           <section id="settingsPanel" class="view">
             <div class="settings-layout">
-              <article class="card">
-                <div class="section-heading">
-                  <h3>Health</h3>
-                </div>
-                <dl class="metrics" id="healthMetrics"></dl>
-              </article>
-
               <article class="card">
                 <div class="section-heading">
                   <h3>Core settings</h3>
@@ -256,6 +256,6 @@
       </div>
     </div>
 
-    <script type="module" src="/web/app.js?v=20260702-single-page"></script>
+    <script type="module" src="/web/app.js?v=20260703-pages"></script>
   </body>
 </html>

@@ -1,36 +1,87 @@
 ---
 name: localtrace
-description: Use when you need to inspect LocalTrace health, query captured raw events, summarize a day, or explain observed activity gaps from the local LocalTrace HTTP API.
+description: Query a Windows LocalTrace runtime over loopback HTTP and summarize captured activity for agents. Use when the user asks what happened locally, what they did today, recent apps/tabs/audio, LocalTrace health, missing events, or activity gaps.
 ---
 
 # LocalTrace Skill
 
-Use this skill when the user asks about locally captured LocalTrace activity.
-The scripts call the LocalTrace core over loopback HTTP JSON only. They do not
-read SQLite, import LocalTrace runtime internals, use auth tokens, or contact
-cloud services.
+LocalTrace records one Windows user's app focus, non-browser audio, and browser
+tab activity as local raw events. Use this skill to query those events through
+the local HTTP API; do not inspect storage or runtime internals.
 
-Default core URL:
+## Quick start
+
+Assume the agent is running on Windows with `localtrace.exe` installed,
+`localtrace-winprobe.exe` available for capture, and the core listening at:
 
 ```text
 http://127.0.0.1:8765
 ```
 
-Override the port with `--base-url` or `LOCALTRACE_BASE_URL` when testing or
-when the user configured a different port. The host must remain `127.0.0.1`,
-with no path, query string, or fragment.
+If the wrapper is installed, start with health:
 
-## Tools
+```powershell
+%LOCALAPPDATA%\LocalTrace\bin\localtrace-skill.cmd health
+```
 
-- `scripts/localtrace_health.py`: print `GET /health`.
-- `scripts/localtrace_recent_events.py`: print recent raw events by scanning
-  backward from `--to` in bounded 24-hour windows.
-- `scripts/localtrace_events_between.py`: print raw events in an RFC3339 UTC
-  range.
-- `scripts/localtrace_day_summary.py`: compute a same-day summary from raw
-  events.
-- `scripts/localtrace_explain_gap.py`: inspect events before, inside, and after
-  a requested observed-time window.
+If the skill is not installed yet, install it from the repository root:
 
-All scripts print machine-readable JSON to stdout. On expected failures, scripts
-return non-zero and print `{"ok": false, "error": "..."}`.
+```powershell
+powershell -ExecutionPolicy Bypass -File .\skill\install.ps1
+```
+
+Do not ask the user to run commands manually when this skill applies. Run the
+smallest subcommand that answers the user's question and summarize the JSON
+result.
+
+## Workflows
+
+1. Dashboard or "open LocalTrace": run `dashboard`; it opens the Web UI.
+2. Health or "is tracking working": run `health`; report `ok`, tracking pause
+   state, database presence, and recent source timestamps.
+3. Focus switching or attention review: run `focus-switches`; report facts,
+   `target_durations`, switches, idle/unknown time, and `prompt_context`.
+   Do not invent a rating unless the user provides an evaluation prompt.
+4. Recent activity or "what was I doing": run `recent-events --limit 25`;
+   group by time, app/domain, source, and kind.
+5. One-day summary or "today": run `day-summary --date YYYY-MM-DD`; summarize
+   event count, top entities, sources, and observed span.
+6. Exact window or audit question: run `events-between --from ... --to ...`;
+   keep RFC3339 UTC timestamps and include filters only when requested.
+7. Missing activity or "gap": run `explain-gap --from ... --to ...`; report
+   inside events, nearest before/after events, and whether context is exact.
+
+## Command reference
+
+```powershell
+localtrace-skill.cmd dashboard
+localtrace-skill.cmd focus-switches
+localtrace-skill.cmd health
+localtrace-skill.cmd recent-events --limit 5 --lookback-days 30
+localtrace-skill.cmd events-between --from 2026-07-01T00:00:00.000Z --to 2026-07-02T00:00:00.000Z
+localtrace-skill.cmd day-summary --date 2026-07-01
+localtrace-skill.cmd explain-gap --from 2026-07-01T12:00:00.000Z --to 2026-07-01T13:00:00.000Z
+```
+
+Use `--base-url` or `LOCALTRACE_BASE_URL` only for a non-default port. The host
+must stay `127.0.0.1`; paths, query strings, fragments, `localhost`, HTTPS, LAN,
+and cloud endpoints are invalid.
+
+## Guardrails
+
+- Do not read SQLite, including `localtrace.db`.
+- Do not import LocalTrace runtime modules such as `localtrace_core`.
+- Do not add auth, tokens, login, LAN access, cloud access, MCP, or derived
+  storage.
+- Do not ask for screenshots, keyboard logs, page bodies, full URLs, or manual
+  exports.
+- Treat `observed_at` as analysis time; `received_at` is diagnostic context.
+- All tools print JSON. On non-zero exits, report the JSON `error` field and
+  the command you tried.
+
+## Bundled files
+
+- `install.ps1`: Windows one-command installer.
+- `install.py`: copies the skill, installs `requirements.txt`, creates wrapper.
+- `scripts/localtrace.py`: dispatcher used by `localtrace-skill.cmd`.
+- `scripts/localtrace_*.py`: deterministic HTTP JSON query tools.

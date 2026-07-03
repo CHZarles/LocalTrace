@@ -25,7 +25,7 @@ test("safeHostname keeps only http and https hostnames", () => {
   assert.equal(safeHostname("not a url"), null);
 });
 
-test("buildTabActiveEvent creates LocalTrace focus events without titles by default", () => {
+test("buildTabActiveEvent records tab title by default", () => {
   const event = buildTabActiveEvent({
     observedAt: "2026-07-01T10:33:00.000Z",
     seq: 20,
@@ -47,7 +47,7 @@ test("buildTabActiveEvent creates LocalTrace focus events without titles by defa
     kind: "tab_active",
     entity_type: "domain",
     entity: "github.com",
-    title: null,
+    title: "Secret title",
     payload: {
       activity: "focus",
       browser: "edge",
@@ -57,7 +57,7 @@ test("buildTabActiveEvent creates LocalTrace focus events without titles by defa
   });
 });
 
-test("buildTabActiveEvent can include tab title only when explicitly enabled", () => {
+test("buildTabActiveEvent can omit tab title when explicitly disabled", () => {
   const event = buildTabActiveEvent({
     observedAt: "2026-07-01T10:34:00.000Z",
     seq: 21,
@@ -69,12 +69,12 @@ test("buildTabActiveEvent can include tab title only when explicitly enabled", (
       title: "Music title",
       url: "https://youtube.com/watch?v=secret"
     },
-    settings: { ...DEFAULT_SETTINGS, sendTitle: true }
+    settings: { ...DEFAULT_SETTINGS, sendTitle: false }
   });
 
   assert.equal(event.kind, "tab_active");
   assert.equal(event.entity, "youtube.com");
-  assert.equal(event.title, "Music title");
+  assert.equal(event.title, null);
   assert.equal(event.payload.activity, "audio");
   assert.equal(event.payload.title, undefined);
   assert.equal(event.payload.url, undefined);

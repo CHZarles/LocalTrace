@@ -1,4 +1,5 @@
 import ast
+import importlib.util
 import json
 import os
 import subprocess
@@ -6,10 +7,12 @@ import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from types import ModuleType
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 SCRIPTS_DIR = Path(__file__).resolve().parents[1] / "skill" / "scripts"
+SKILL_DIR = Path(__file__).resolve().parents[1] / "skill"
 
 
 class FakeLocalTraceServer:
@@ -193,6 +196,418 @@ def test_health_script_returns_core_health_json() -> None:
     assert result.returncode == 0
     assert output_json(result) == {"ok": True, "service": "localtrace"}
     assert server.requests == ["/health"]
+
+
+def test_unified_entrypoint_invokes_health_subcommand() -> None:
+    with FakeLocalTraceServer(
+        {"/health": {"body": {"ok": True, "service": "localtrace"}}}
+    ) as server:
+        result = run_script("localtrace.py", ["health"], server.base_url)
+
+    assert result.returncode == 0
+    assert output_json(result) == {"ok": True, "service": "localtrace"}
+    assert server.requests == ["/health"]
+
+
+def test_dashboard_script_opens_web_dashboard(monkeypatch, capsys) -> None:
+    opened: list[tuple[str, int]] = []
+    module = load_script_module("localtrace_dashboard.py")
+    monkeypatch.setattr(
+        module.webbrowser,
+        "open",
+        lambda url, new=0: opened.append((url, new)) or True,
+    )
+
+    with FakeLocalTraceServer(
+        {
+            "/health": {
+                "body": {
+                    "ok": True,
+                    "service": "localtrace",
+                    "tracking": {"paused": False},
+                }
+            }
+        }
+    ) as server:
+        result = module.main(["--base-url", server.base_url])
+
+    assert result == 0
+    body = json.loads(capsys.readouterr().out)
+    assert body["ok"] is True
+    assert body["opened"] is True
+    assert body["dashboard_url"] == f"{server.base_url}/"
+    assert body["health"]["service"] == "localtrace"
+    assert opened == [(f"{server.base_url}/", 2)]
+    assert server.requests == ["/health"]
+
+
+def test_unified_entrypoint_invokes_dashboard_subcommand_without_opening() -> None:
+    with FakeLocalTraceServer(
+        {"/health": {"body": {"ok": True, "service": "localtrace"}}}
+    ) as server:
+        result = run_script(
+            "localtrace.py", ["dashboard", "--no-open"], server.base_url
+        )
+
+    assert result.returncode == 0
+    body = output_json(result)
+    assert body["ok"] is True
+    assert body["opened"] is False
+    assert body["dashboard_url"] == f"{server.base_url}/"
+    assert server.requests == ["/health"]
+
+
+def test_focus_switches_reports_facts_without_scoring() -> None:
+    events = [
+        {
+            **event_at(1, "2026-07-01T09:00:00.000Z", "Code.exe"),
+            "title": "LocalTrace",
+        },
+        {
+            "id": 2,
+            "observed_at": "2026-07-01T09:02:00.000Z",
+            "received_at": "2026-07-01T09:02:00.000Z",
+            "source": "browser_extension",
+            "kind": "tab_active",
+            "entity_type": "domain",
+            "entity": "github.com",
+            "title": "Review PR",
+            "payload": {"activity": "focus"},
+        },
+        {
+            "id": 3,
+            "observed_at": "2026-07-01T09:04:00.000Z",
+            "received_at": "2026-07-01T09:04:00.000Z",
+            "source": "browser_extension",
+            "kind": "tab_active",
+            "entity_type": "domain",
+            "entity": "github.com",
+            "title": "Review PR",
+            "payload": {"activity": "focus"},
+        },
+        {
+            "id": 4,
+            "observed_at": "2026-07-01T09:05:00.000Z",
+            "received_at": "2026-07-01T09:05:00.000Z",
+            "source": "windows_probe",
+            "kind": "app_audio",
+            "entity_type": "app",
+            "entity": "Spotify.exe",
+            "title": None,
+            "payload": {"activity": "audio"},
+        },
+        {
+            **event_at(5, "2026-07-01T09:20:00.000Z", "Code.exe"),
+            "title": "Terminal",
+        },
+    ]
+    with FakeLocalTraceServer(
+        {
+            "/settings": {
+                "body": {
+                    "ok": True,
+                    "settings": {"capture": {"idle_cutoff_seconds": 300}},
+                }
+            },
+            "/events": {"body": events_route(events)},
+        }
+    ) as server:
+        result = run_script(
+            "localtrace_focus_switches.py",
+            ["--to", "2026-07-04T00:00:00.000Z"],
+            server.base_url,
+        )
+
+    assert result.returncode == 0
+    body = output_json(result)
+    assert body["ok"] is True
+    assert body["from"] == "2026-07-01T00:00:00.000Z"
+    assert body["to"] == "2026-07-04T00:00:00.000Z"
+    assert body["idle_cutoff_seconds"] == 300
+    assert body["focus_event_count"] == 4
+    assert body["focus_target_count"] == 3
+    assert body["switch_count"] == 2
+    assert body["unknown_or_idle_seconds"] == 660
+    assert body["long_gap_count"] == 1
+    assert body["target_durations"] == [
+        {
+            "entity_type": "domain",
+            "entity": "github.com",
+            "title": "Review PR",
+            "event_count": 2,
+            "duration_seconds": 420,
+        },
+        {
+            "entity_type": "app",
+            "entity": "Code.exe",
+            "title": "LocalTrace",
+            "event_count": 1,
+            "duration_seconds": 120,
+        },
+        {
+            "entity_type": "app",
+            "entity": "Code.exe",
+            "title": "Terminal",
+            "event_count": 1,
+            "duration_seconds": 0,
+        },
+    ]
+    assert body["switches"] == [
+        {
+            "at": "2026-07-01T09:02:00.000Z",
+            "from": {
+                "entity_type": "app",
+                "entity": "Code.exe",
+                "title": "LocalTrace",
+            },
+            "to": {
+                "entity_type": "domain",
+                "entity": "github.com",
+                "title": "Review PR",
+            },
+            "gap_seconds": 120,
+        },
+        {
+            "at": "2026-07-01T09:20:00.000Z",
+            "from": {
+                "entity_type": "domain",
+                "entity": "github.com",
+                "title": "Review PR",
+            },
+            "to": {
+                "entity_type": "app",
+                "entity": "Code.exe",
+                "title": "Terminal",
+            },
+            "gap_seconds": 960,
+        },
+    ]
+    assert "prompt_context" in body
+    assert "attention_score" not in body
+    assert [parse_request(request)[0] for request in server.requests] == [
+        "/settings",
+        "/events",
+    ]
+
+
+def test_unified_entrypoint_invokes_focus_switches_subcommand() -> None:
+    with FakeLocalTraceServer(
+        {
+            "/settings": {"body": {"ok": True, "settings": {"capture": {}}}},
+            "/events": {"body": events_route([])},
+        }
+    ) as server:
+        result = run_script(
+            "localtrace.py",
+            ["focus-switches", "--to", "2026-07-04T00:00:00.000Z"],
+            server.base_url,
+        )
+
+    assert result.returncode == 0
+    body = output_json(result)
+    assert body["ok"] is True
+    assert body["focus_event_count"] == 0
+    assert body["switch_count"] == 0
+
+
+def test_skill_installer_copies_skill_and_creates_invocation_command(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "skills" / "localtrace"
+    bin_dir = tmp_path / "bin"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SKILL_DIR / "install.py"),
+            "--target",
+            str(target),
+            "--bin-dir",
+            str(bin_dir),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    body = json.loads(result.stdout)
+    assert body["ok"] is True
+    assert body["skill_dir"] == str(target)
+    assert (target / "SKILL.md").exists()
+    assert (target / "README.md").exists()
+    assert (target / "scripts" / "localtrace.py").exists()
+    assert not (target / "scripts" / "__pycache__").exists()
+
+    command_name = "localtrace-skill.cmd" if os.name == "nt" else "localtrace-skill"
+    command = bin_dir / command_name
+    assert command.exists()
+    if os.name != "nt":
+        assert os.access(command, os.X_OK)
+
+    help_result = subprocess.run(
+        [str(command), "--help"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert help_result.returncode == 0
+    assert "health" in help_result.stdout
+    assert "recent-events" in help_result.stdout
+    assert "dashboard" in help_result.stdout
+    assert "focus-switches" in help_result.stdout
+
+
+def test_powershell_installer_is_available_for_windows_users() -> None:
+    installer = SKILL_DIR / "install.ps1"
+
+    assert installer.exists()
+    text = installer.read_text(encoding="utf-8")
+    assert "install.py" in text
+    assert "LOCALTRACE_SKILL_ARCHIVE" in text
+    assert "Windows_NT" in text
+    assert "$args" in text
+
+
+def test_installer_parses_runtime_requirements(tmp_path: Path) -> None:
+    requirements = tmp_path / "requirements.txt"
+    requirements.write_text(
+        "\n# comment\nrequests==2.32.0\n\ncharset-normalizer>=3\n",
+        encoding="utf-8",
+    )
+
+    installer = load_install_module()
+
+    assert installer.requirements_from(requirements) == [
+        "requests==2.32.0",
+        "charset-normalizer>=3",
+    ]
+
+
+def test_installer_runs_pip_for_declared_runtime_requirements(tmp_path: Path) -> None:
+    requirements = tmp_path / "requirements.txt"
+    requirements.write_text("requests==2.32.0\n", encoding="utf-8")
+    calls: list[list[str]] = []
+
+    installer = load_install_module()
+    installer.install_dependencies(
+        requirements,
+        Path("/usr/bin/python3"),
+        runner=lambda command: calls.append(command),
+    )
+
+    assert calls == [
+        [
+            "/usr/bin/python3",
+            "-m",
+            "pip",
+            "install",
+            "-r",
+            str(requirements),
+        ]
+    ]
+
+
+def test_skill_docs_show_windows_agent_install_and_invocation() -> None:
+    skill_readme = (SKILL_DIR / "README.md").read_text(encoding="utf-8")
+    skill_file = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+    project_readme = (SKILL_DIR.parent / "README.md").read_text(encoding="utf-8")
+
+    assert "PowerShell" in skill_readme
+    assert ".\\skill\\install.ps1" in skill_readme
+    assert "%USERPROFILE%\\.agents\\skills\\localtrace" in skill_readme
+    assert "%LOCALAPPDATA%\\LocalTrace\\bin\\localtrace-skill.cmd" in skill_readme
+    assert "localtrace.exe" in skill_readme
+    assert "localtrace-winprobe.exe" in skill_readme
+    assert "dashboard" in skill_readme
+    assert "focus-switches" in skill_readme
+    assert "prompt_context" in skill_readme
+    assert "Do not ask the user to run commands manually" in skill_file
+    assert "opens the Web UI" in skill_file
+    assert "focus-switches" in skill_file
+    assert "prompt_context" in skill_file
+    assert "请在当前仓库安装 LocalTrace Skill" in project_readme
+    assert "不要让我手动运行命令" in project_readme
+    assert "安装入口只有一个" in project_readme
+    assert "PowerShell" not in project_readme
+    assert ".\\skill\\install.ps1" not in project_readme
+    assert "localtrace.exe" not in project_readme
+    assert "localtrace-winprobe.exe" not in project_readme
+    assert "```" not in project_readme
+    assert "sh skill/install.sh" not in skill_readme
+    assert "sh skill/install.sh" not in project_readme
+    assert "WSL, Linux, and macOS" not in skill_readme
+    assert "WSL, Linux, and macOS" not in project_readme
+
+
+def test_skill_markdown_is_concise_and_agent_oriented() -> None:
+    text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+    lines = text.splitlines()
+    description = frontmatter_field(text, "description")
+
+    assert len(lines) <= 100
+    assert description is not None
+    assert not description.startswith("Use when")
+    assert ". Use when " in description
+    assert "loopback HTTP" in description
+    assert "captured activity" in description
+
+    for heading in [
+        "## Quick start",
+        "## Workflows",
+        "## Command reference",
+        "## Guardrails",
+    ]:
+        assert heading in text
+
+    assert "localtrace.exe" in text
+    assert "localtrace-winprobe.exe" in text
+    assert "Do not ask the user to run commands manually" in text
+    assert "Do not read SQLite" in text
+    assert "Do not import LocalTrace runtime modules" in text
+    assert "dashboard" in text
+    assert "focus-switches" in text
+    assert "prompt_context" in text
+
+
+def frontmatter_field(text: str, key: str) -> str | None:
+    lines = text.splitlines()
+    if not lines or lines[0] != "---":
+        return None
+    for line in lines[1:]:
+        if line == "---":
+            return None
+        prefix = f"{key}: "
+        if line.startswith(prefix):
+            return line[len(prefix) :]
+    return None
+
+
+def load_install_module() -> Any:
+    spec = importlib.util.spec_from_file_location(
+        "localtrace_skill_install", SKILL_DIR / "install.py"
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_script_module(script_name: str) -> ModuleType:
+    spec = importlib.util.spec_from_file_location(
+        f"localtrace_skill_{script_name.removesuffix('.py')}",
+        SCRIPTS_DIR / script_name,
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.path.insert(0, str(SCRIPTS_DIR))
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        sys.path.pop(0)
+    return module
 
 
 def test_recent_events_script_scans_backward_from_requested_end() -> None:

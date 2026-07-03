@@ -271,9 +271,13 @@ main {
 }
 
 .view {
-  display: grid;
+  display: none;
   gap: var(--space4);
   scroll-margin-top: 96px;
+}
+
+.view.active {
+  display: grid;
 }
 
 .hero-grid {
@@ -669,6 +673,11 @@ td {
   text-align: right;
 }
 
+.rules-table .danger {
+  min-width: 72px;
+  white-space: nowrap;
+}
+
 .settings-layout {
   display: grid;
   gap: var(--space4);
@@ -772,7 +781,7 @@ label span {
   }
 
   .hero-grid,
-  .top-list {
+  .workbench-grid {
     grid-template-columns: 1fr;
   }
 
@@ -780,6 +789,15 @@ label span {
   .settings-grid,
   .rule-form {
     grid-template-columns: 1fr;
+  }
+
+  .rules-table {
+    min-width: 560px;
+  }
+
+  .rules-table .danger {
+    min-width: 72px;
+    white-space: nowrap;
   }
 }
 
@@ -796,6 +814,18 @@ label span {
 
   .now-row {
     grid-template-columns: 1fr;
+  }
+
+  .now-list {
+    grid-template-columns: 1fr;
+  }
+
+  .timeline-card {
+    overflow-x: auto;
+  }
+
+  .timeline-grid {
+    min-width: 680px;
   }
 
   .metric-grid {

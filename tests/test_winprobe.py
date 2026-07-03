@@ -22,7 +22,7 @@ from localtrace_winprobe.probe import (
 )
 
 
-def test_build_app_active_event_uses_core_schema_and_privacy_defaults() -> None:
+def test_build_app_active_event_records_current_fields_by_default() -> None:
     observed_at = datetime(2026, 7, 1, 10, 30, tzinfo=UTC)
     foreground = ForegroundApp(
         pid=1234,
@@ -44,12 +44,17 @@ def test_build_app_active_event_uses_core_schema_and_privacy_defaults() -> None:
         "kind": "app_active",
         "entity_type": "app",
         "entity": "Code.exe",
-        "title": None,
-        "payload": {"activity": "focus", "pid": 1234},
+        "title": "Sensitive project title",
+        "payload": {
+            "activity": "focus",
+            "pid": 1234,
+            "title": "Sensitive project title",
+            "exe_path": r"C:\Users\charles\AppData\Local\Programs\Code.exe",
+        },
     }
 
 
-def test_build_app_active_event_can_include_title_and_exe_path_when_enabled() -> None:
+def test_build_app_active_event_can_omit_title_and_exe_path_when_disabled() -> None:
     observed_at = datetime(2026, 7, 1, 10, 30, tzinfo=UTC)
     foreground = ForegroundApp(
         pid=1234,
@@ -60,16 +65,16 @@ def test_build_app_active_event_can_include_title_and_exe_path_when_enabled() ->
     event = build_app_active_event(
         foreground,
         observed_at=observed_at,
-        settings=ProbeSettings(store_titles=True, store_exe_path=True),
+        settings=ProbeSettings(store_titles=False, store_exe_path=False),
         seq=1,
     )
 
-    assert event["title"] == "Project notes"
-    assert event["payload"]["title"] == "Project notes"
-    assert event["payload"]["exe_path"] == r"C:\Program Files\Code\Code.exe"
+    assert event["title"] is None
+    assert "title" not in event["payload"]
+    assert "exe_path" not in event["payload"]
 
 
-def test_build_app_audio_event_uses_core_schema_and_privacy_defaults() -> None:
+def test_build_app_audio_event_records_current_fields_by_default() -> None:
     observed_at = datetime(2026, 7, 1, 10, 31, tzinfo=UTC)
     audio = AudioApp(
         pid=5678,
@@ -91,11 +96,15 @@ def test_build_app_audio_event_uses_core_schema_and_privacy_defaults() -> None:
         "entity_type": "app",
         "entity": "Spotify.exe",
         "title": None,
-        "payload": {"activity": "audio", "pid": 5678},
+        "payload": {
+            "activity": "audio",
+            "pid": 5678,
+            "exe_path": r"C:\Program Files\Spotify\Spotify.exe",
+        },
     }
 
 
-def test_build_app_audio_event_can_include_exe_path_when_enabled() -> None:
+def test_build_app_audio_event_can_omit_exe_path_when_disabled() -> None:
     observed_at = datetime(2026, 7, 1, 10, 31, tzinfo=UTC)
     audio = AudioApp(
         pid=5678,
@@ -105,11 +114,11 @@ def test_build_app_audio_event_can_include_exe_path_when_enabled() -> None:
     event = build_app_audio_event(
         audio,
         observed_at=observed_at,
-        settings=ProbeSettings(store_exe_path=True),
+        settings=ProbeSettings(store_exe_path=False),
         seq=8,
     )
 
-    assert event["payload"]["exe_path"] == r"C:\Program Files\Spotify\Spotify.exe"
+    assert "exe_path" not in event["payload"]
 
 
 def test_build_app_audio_stop_event_includes_stop_reason() -> None:
@@ -137,6 +146,7 @@ def test_build_app_audio_stop_event_includes_stop_reason() -> None:
         "payload": {
             "activity": "audio",
             "pid": 5678,
+            "exe_path": r"C:\Program Files\Spotify\Spotify.exe",
             "reason": "no_active_audio_sessions",
         },
     }

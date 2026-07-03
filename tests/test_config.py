@@ -22,8 +22,8 @@ def test_missing_config_uses_local_only_defaults(tmp_path: Path) -> None:
     assert config.capture.poll_ms == 1000
     assert config.capture.heartbeat_seconds == 60
     assert config.capture.idle_cutoff_seconds == 300
-    assert config.capture.store_titles is False
-    assert config.capture.store_exe_path is False
+    assert config.capture.store_titles is True
+    assert config.capture.store_exe_path is True
     assert config.capture.track_browser is True
     assert config.capture.track_audio is True
     assert config.data_dir == tmp_path
@@ -34,14 +34,16 @@ def test_config_can_be_saved_and_loaded(tmp_path: Path) -> None:
     config_path = tmp_path / "config.json"
     config = default_config(data_dir=tmp_path)
     config.api.port = 9999
-    config.capture.store_titles = True
+    config.capture.store_titles = False
+    config.capture.store_exe_path = False
 
     save_config(config, config_path)
     loaded = load_config(config_path, data_dir=tmp_path)
 
     assert loaded.api.host == "127.0.0.1"
     assert loaded.api.port == 9999
-    assert loaded.capture.store_titles is True
+    assert loaded.capture.store_titles is False
+    assert loaded.capture.store_exe_path is False
     assert "host" not in config_path.read_text(encoding="utf-8")
 
 
@@ -66,7 +68,8 @@ def test_missing_config_is_saved_with_defaults(tmp_path: Path) -> None:
     assert config.data_dir == tmp_path
     saved = json.loads(config_path.read_text(encoding="utf-8"))
     assert saved["api"]["port"] == 8765
-    assert saved["capture"]["store_titles"] is False
+    assert saved["capture"]["store_titles"] is True
+    assert saved["capture"]["store_exe_path"] is True
     assert saved["privacy"] == {}
     assert "host" not in saved["api"]
 

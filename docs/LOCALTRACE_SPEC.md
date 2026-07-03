@@ -109,9 +109,9 @@ Idle behavior:
 
 Privacy defaults:
 
-- Window titles are off by default.
-- Tab titles are off by default.
-- Full executable paths are off by default.
+- Window titles are stored by default.
+- Tab titles are stored by default.
+- Full executable paths are stored by default.
 - Full URLs are not captured by default.
 - Web page content is never captured.
 - Screenshots are never captured.
@@ -221,8 +221,8 @@ Draft `config.json`:
     "poll_ms": 1000,
     "heartbeat_seconds": 60,
     "idle_cutoff_seconds": 300,
-    "store_titles": false,
-    "store_exe_path": false,
+    "store_titles": true,
+    "store_exe_path": true,
     "track_browser": true,
     "track_audio": true
   },

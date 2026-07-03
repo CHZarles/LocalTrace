@@ -10,7 +10,7 @@ Manifest V3 extension for LocalTrace browser activity capture.
 - Emits `tab_active` with `payload.activity = focus` for the focused browser tab.
 - Emits `tab_active` with `payload.activity = audio` for audible background tabs.
 - Emits `tab_audio_stop` when a previously tracked audible tab stops.
-- Sends tab titles only when `Send tab title` is enabled. It is disabled by default.
+- Sends tab titles by default; clear `Send tab title` to omit them.
 - Does not send full URLs, page content, screenshots, or keyboard input.
 
 ## Install For Local Smoke Testing
@@ -34,7 +34,7 @@ Manifest V3 extension for LocalTrace browser activity capture.
    - `entity_type = domain`
    - `payload.activity = focus`
    - no full URL in the event or payload
-   - `title = null` by default
+   - `title` contains the tab title by default
 4. Play audio from a browser tab while the browser is not focused.
 5. Query `GET /events?source=browser_extension&kind=tab_active`.
 6. Confirm an audio event has `payload.activity = audio`.
