@@ -42,13 +42,18 @@ def main() -> int:
         print_json({"ok": False, "error": str(exc)})
         return 1
 
+    browser_extension = browser_extension_guidance()
     print_json(
         {
             "ok": True,
             "skill_dir": str(args.target),
             "command": str(command_path) if command_path else None,
             "dependencies": dependencies,
-            "browser_extension": browser_extension_guidance(),
+            "browser_extension_unpacked_dir": browser_extension["unpacked_dir"],
+            "chrome_extensions_url": browser_extension["chrome_url"],
+            "edge_extensions_url": browser_extension["edge_url"],
+            "must_tell_user_zh": browser_extension["agent_message_zh"],
+            "browser_extension": browser_extension,
         }
     )
     return 0
@@ -82,7 +87,7 @@ def browser_extension_guidance() -> dict[str, str]:
         "chrome_url": CHROME_EXTENSIONS_URL,
         "edge_url": EDGE_EXTENSIONS_URL,
         "agent_message_zh": (
-            "浏览器插件需要你手动加载。"
+            "必须告诉用户：浏览器插件需要手动加载。"
             f"插件解压路径：{unpacked_dir}；"
             f"Chrome 扩展页地址：{CHROME_EXTENSIONS_URL}；"
             f"Edge 扩展页地址：{EDGE_EXTENSIONS_URL}。"
@@ -168,7 +173,7 @@ def write_windows_command(command_path: Path, skill_dir: Path) -> None:
 
 
 def print_json(body: dict[str, Any]) -> None:
-    print(json.dumps(body, sort_keys=True))
+    print(json.dumps(body, ensure_ascii=False, sort_keys=True))
 
 
 if __name__ == "__main__":

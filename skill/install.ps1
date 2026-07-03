@@ -61,5 +61,27 @@ function Get-LocalInstallPy {
 $python = Find-Python
 $installPy = Get-LocalInstallPy
 $passthroughArgs = $args
-& $python $installPy --python $python @passthroughArgs
-exit $LASTEXITCODE
+$installOutput = & $python $installPy --python $python @passthroughArgs
+$installExitCode = $LASTEXITCODE
+$installOutputText = ($installOutput | Out-String).Trim()
+if ($installOutputText) {
+  Write-Output $installOutputText
+}
+
+if ($installExitCode -ne 0) {
+  exit $installExitCode
+}
+
+try {
+  $installResult = $installOutputText | ConvertFrom-Json
+  if ($installResult.ok -and $installResult.must_tell_user_zh) {
+    Write-Host ""
+    Write-Host "=== LocalTrace browser extension details: 请转告用户 ==="
+    Write-Host $installResult.must_tell_user_zh
+    Write-Host "======================================================"
+  }
+} catch {
+  Write-Warning "LocalTrace skill installed, but browser extension guidance could not be parsed."
+}
+
+exit $installExitCode

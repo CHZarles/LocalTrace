@@ -431,9 +431,19 @@ def test_skill_installer_copies_skill_and_creates_invocation_command(
     )
 
     assert result.returncode == 0
+    assert "必须告诉用户" in result.stdout
     body = json.loads(result.stdout)
     assert body["ok"] is True
     assert body["skill_dir"] == str(target)
+    assert body["browser_extension_unpacked_dir"].endswith(
+        r"LocalTrace\App\extension\localtrace-extension"
+    )
+    assert body["chrome_extensions_url"] == "chrome://extensions/"
+    assert body["edge_extensions_url"] == "edge://extensions/"
+    assert "必须告诉用户" in body["must_tell_user_zh"]
+    assert "插件解压路径" in body["must_tell_user_zh"]
+    assert "Chrome 扩展页地址" in body["must_tell_user_zh"]
+    assert "Edge 扩展页地址" in body["must_tell_user_zh"]
     assert body["browser_extension"]["unpacked_dir"].endswith(
         r"LocalTrace\App\extension\localtrace-extension"
     )
@@ -475,6 +485,10 @@ def test_powershell_installer_is_available_for_windows_users() -> None:
     assert "LOCALTRACE_SKILL_ARCHIVE" in text
     assert "Windows_NT" in text
     assert "$args" in text
+    assert "ConvertFrom-Json" in text
+    assert "must_tell_user_zh" in text
+    assert "请转告用户" in text
+    assert "Write-Host" in text
 
 
 def test_installer_parses_runtime_requirements(tmp_path: Path) -> None:
@@ -581,6 +595,7 @@ def test_skill_markdown_is_concise_and_agent_oriented() -> None:
     assert "localtrace-winprobe.exe" in text
     assert "Do not ask the user to run commands manually" in text
     assert "After installation, immediately relay" in text
+    assert "must_tell_user_zh" in text
     assert "browser_extension.unpacked_dir" in text
     assert "browser_extension.chrome_url" in text
     assert "browser_extension.edge_url" in text
