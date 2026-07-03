@@ -14,6 +14,31 @@ LocalTrace 是给 Windows agent 使用的本地活动上下文工具。它记录
 
 安装完成后，agent 可以通过这个 skill 打开 Web UI、检查 LocalTrace 状态、读取最近活动、汇总一天活动，或解释一段时间里的活动空白。用户不需要读取数据库，也不需要导出事件文件。
 
+## 手动加载浏览器插件
+
+浏览器插件目前需要用户手动加载。LocalTrace 会准备插件包，但 Chrome / Edge 不允许普通本地程序静默安装未上架插件。
+
+你需要做的只有这一步：把发布包里的 `extension/localtrace-extension.zip` 解压出来，然后在浏览器里加载这个已解压的插件目录。
+
+Chrome：
+
+1. 打开 Chrome 扩展管理页：`chrome://extensions/`。
+2. 打开右上角的「开发者模式」。
+3. 点击「加载已解压的扩展程序」。
+4. 选择刚才解压出来的插件目录，也就是包含 `manifest.json` 的目录。
+5. 打开 LocalTrace 插件弹窗，确认 health 显示 OK。
+
+Edge：
+
+1. 打开 Edge 扩展管理页：`edge://extensions/`。
+2. 打开「开发人员模式」。
+3. 点击「加载解压缩的扩展」。
+4. 选择刚才解压出来的插件目录，也就是包含 `manifest.json` 的目录。
+5. 打开 LocalTrace 插件弹窗，确认 health 显示 OK。
+
+如果 health 不是 OK，先确认 LocalTrace Web UI 可以正常打开。插件只会连接本机的 LocalTrace，不会把浏览器活动发送到云端。
+
+
 ## 子命令和触发方式
 
 你不需要记住子命令。直接用自然语言告诉 agent 想查什么，agent 会自己选择合适的子命令。
@@ -62,29 +87,6 @@ LocalTrace Skill 负责让 agent 查询活动记录；Windows 运行时负责真
 
 发布包是 `LocalTrace-windows.zip`。解压后，使用包内安装器安装 Windows 运行时。
 
-## 手动加载浏览器插件
-
-浏览器插件目前需要用户手动加载。LocalTrace 会准备插件包，但 Chrome / Edge 不允许普通本地程序静默安装未上架插件。
-
-你需要做的只有这一步：把发布包里的 `extension/localtrace-extension.zip` 解压出来，然后在浏览器里加载这个已解压的插件目录。
-
-Chrome：
-
-1. 打开 Chrome 扩展管理页：`chrome://extensions/`。
-2. 打开右上角的「开发者模式」。
-3. 点击「加载已解压的扩展程序」。
-4. 选择刚才解压出来的插件目录，也就是包含 `manifest.json` 的目录。
-5. 打开 LocalTrace 插件弹窗，确认 health 显示 OK。
-
-Edge：
-
-1. 打开 Edge 扩展管理页：`edge://extensions/`。
-2. 打开「开发人员模式」。
-3. 点击「加载解压缩的扩展」。
-4. 选择刚才解压出来的插件目录，也就是包含 `manifest.json` 的目录。
-5. 打开 LocalTrace 插件弹窗，确认 health 显示 OK。
-
-如果 health 不是 OK，先确认 LocalTrace Web UI 可以正常打开。插件只会连接本机的 LocalTrace，不会把浏览器活动发送到云端。
 
 ## 开发者文档
 
