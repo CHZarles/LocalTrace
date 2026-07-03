@@ -13,6 +13,8 @@ from typing import Any
 
 SKILL_NAME = "localtrace"
 COMMAND_NAME = "localtrace-skill"
+CHROME_EXTENSIONS_URL = "chrome://extensions/"
+EDGE_EXTENSIONS_URL = "edge://extensions/"
 
 
 def main() -> int:
@@ -46,6 +48,7 @@ def main() -> int:
             "skill_dir": str(args.target),
             "command": str(command_path) if command_path else None,
             "dependencies": dependencies,
+            "browser_extension": browser_extension_guidance(),
         }
     )
     return 0
@@ -64,6 +67,28 @@ def default_bin_dir() -> Path:
         base = Path(local_app_data) if local_app_data else Path.home()
         return base / "LocalTrace" / "bin"
     return Path.home() / ".local" / "bin"
+
+
+def default_browser_extension_dir() -> str:
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    base = local_app_data.rstrip("\\/") if local_app_data else "%LOCALAPPDATA%"
+    return base + r"\LocalTrace\App\extension\localtrace-extension"
+
+
+def browser_extension_guidance() -> dict[str, str]:
+    unpacked_dir = default_browser_extension_dir()
+    return {
+        "unpacked_dir": unpacked_dir,
+        "chrome_url": CHROME_EXTENSIONS_URL,
+        "edge_url": EDGE_EXTENSIONS_URL,
+        "agent_message_zh": (
+            "浏览器插件需要你手动加载。"
+            f"插件解压路径：{unpacked_dir}；"
+            f"Chrome 扩展页地址：{CHROME_EXTENSIONS_URL}；"
+            f"Edge 扩展页地址：{EDGE_EXTENSIONS_URL}。"
+            "打开对应浏览器的扩展管理页，开启开发者模式，选择加载已解压的扩展，然后选择上面的目录。"
+        ),
+    }
 
 
 def install_skill(source: Path, target: Path) -> None:

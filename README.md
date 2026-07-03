@@ -8,9 +8,11 @@ LocalTrace 是给 Windows agent 使用的本地活动上下文工具。它记录
 
 可以直接对 agent 说：
 
-> 请从 GitHub 仓库 [CHZarles/LocalTrace](https://github.com/CHZarles/LocalTrace) 安装 LocalTrace Skill。只使用仓库 skill 目录里的安装器完成安装，不要让我手动运行命令。安装完成后，检查 skill 是否可用，并打开 LocalTrace Web UI。
+> 请从 GitHub 仓库 [CHZarles/LocalTrace](https://github.com/CHZarles/LocalTrace) 安装 LocalTrace Skill。只使用仓库 skill 目录里的安装器完成安装，不要让我手动运行命令。安装完成后，马上输出浏览器插件解压路径、Chrome 扩展页地址、Edge 扩展页地址；然后检查 skill 是否可用，并打开 LocalTrace Web UI。
 
 安装入口只有一个：仓库 skill 目录里的安装器。agent 会自行执行安装器，把 skill 放到本地 skill 目录，并创建后续调用入口。
+
+安装完成后，agent 必须马上输出浏览器插件加载信息：插件解压路径、Chrome 扩展页地址、Edge 扩展页地址。用户不需要手动解压插件，只需要在浏览器里加载这个目录。
 
 安装完成后，agent 可以通过这个 skill 打开 Web UI、检查 LocalTrace 状态、读取最近活动、汇总一天活动，或解释一段时间里的活动空白。用户不需要读取数据库，也不需要导出事件文件。
 

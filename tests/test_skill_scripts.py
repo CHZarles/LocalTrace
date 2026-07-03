@@ -434,6 +434,14 @@ def test_skill_installer_copies_skill_and_creates_invocation_command(
     body = json.loads(result.stdout)
     assert body["ok"] is True
     assert body["skill_dir"] == str(target)
+    assert body["browser_extension"]["unpacked_dir"].endswith(
+        r"LocalTrace\App\extension\localtrace-extension"
+    )
+    assert body["browser_extension"]["chrome_url"] == "chrome://extensions/"
+    assert body["browser_extension"]["edge_url"] == "edge://extensions/"
+    assert "插件解压路径" in body["browser_extension"]["agent_message_zh"]
+    assert "Chrome" in body["browser_extension"]["agent_message_zh"]
+    assert "Edge" in body["browser_extension"]["agent_message_zh"]
     assert (target / "SKILL.md").exists()
     assert (target / "README.md").exists()
     assert (target / "scripts" / "localtrace.py").exists()
@@ -530,6 +538,11 @@ def test_skill_docs_show_windows_agent_install_and_invocation() -> None:
     assert "请从 GitHub 仓库" in project_readme
     assert "不要让我手动运行命令" in project_readme
     assert "安装入口只有一个" in project_readme
+    assert "安装完成后，agent 必须马上输出浏览器插件加载信息" in project_readme
+    assert "马上输出浏览器插件解压路径" in project_readme
+    assert "插件解压路径" in project_readme
+    assert "Chrome 扩展页地址" in project_readme
+    assert "Edge 扩展页地址" in project_readme
     assert "安装器会自动解压浏览器插件" in project_readme
     assert "把插件目录复制到剪贴板" in project_readme
     assert "extension/localtrace-extension.zip" not in project_readme
@@ -567,6 +580,11 @@ def test_skill_markdown_is_concise_and_agent_oriented() -> None:
     assert "localtrace.exe" in text
     assert "localtrace-winprobe.exe" in text
     assert "Do not ask the user to run commands manually" in text
+    assert "After installation, immediately relay" in text
+    assert "browser_extension.unpacked_dir" in text
+    assert "browser_extension.chrome_url" in text
+    assert "browser_extension.edge_url" in text
+    assert "browser_extension.agent_message_zh" in text
     assert "Do not read SQLite" in text
     assert "Do not import LocalTrace runtime modules" in text
     assert "dashboard" in text

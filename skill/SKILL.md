@@ -30,6 +30,12 @@ If the skill is not installed yet, install it from the repository root:
 powershell -ExecutionPolicy Bypass -File .\skill\install.ps1
 ```
 
+After installation, immediately relay `browser_extension.unpacked_dir`,
+`browser_extension.chrome_url`, and `browser_extension.edge_url` from the
+installer JSON. Tell the user that only the browser "Load unpacked" step is
+manual. If `browser_extension.agent_message_zh` is present, use it for the
+Chinese user-facing message.
+
 Do not ask the user to run commands manually when this skill applies. Run the
 smallest subcommand that answers the user's question and summarize the JSON
 result.
