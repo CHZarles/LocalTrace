@@ -154,6 +154,63 @@ test("stale browser audio is not shown as current background audio", async ({
   }
 });
 
+test("stale browser audio is hidden even when idle cutoff is long", async ({
+  page
+}) => {
+  const staleTitle = "实用干货|今天手把手教你在....";
+  const server = await startWebUiServer({
+    settings: {
+      api: { host: "127.0.0.1", port: 8765 },
+      capture: {
+        poll_ms: 1000,
+        heartbeat_seconds: 60,
+        idle_cutoff_seconds: 7200,
+        store_titles: false,
+        store_exe_path: false,
+        track_browser: true,
+        track_audio: true
+      }
+    },
+    events: [
+      {
+        id: 1,
+        observed_at: "2026-07-03T09:05:00.000Z",
+        received_at: "2026-07-03T09:05:00.000Z",
+        source: "browser_extension",
+        kind: "tab_active",
+        entity_type: "domain",
+        entity: "youtube.com",
+        title: staleTitle,
+        payload: { activity: "audio", browser: "chrome" }
+      }
+    ]
+  });
+  try {
+    await page.addInitScript(() => {
+      const fixedNow = new Date("2026-07-03T10:37:00.000Z").valueOf();
+      const RealDate = Date;
+      class FixedDate extends RealDate {
+        constructor(...args) {
+          super(...(args.length ? args : [fixedNow]));
+        }
+
+        static now() {
+          return fixedNow;
+        }
+      }
+      FixedDate.UTC = RealDate.UTC;
+      FixedDate.parse = RealDate.parse;
+      globalThis.Date = FixedDate;
+    });
+    await page.goto(server.url);
+
+    await expect(page.locator("#nowAudio")).toContainText("No audio activity");
+    await expect(page.locator("#nowAudio")).not.toContainText(staleTitle);
+  } finally {
+    await server.close();
+  }
+});
+
 test("mobile metrics use a single-column layout", async ({ page }) => {
   const server = await startWebUiServer();
   try {

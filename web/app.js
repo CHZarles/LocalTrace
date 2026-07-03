@@ -91,6 +91,7 @@ function buildTodayModel(events, settings) {
     Number.isFinite(settings.capture.idle_cutoff_seconds)
       ? settings.capture.idle_cutoff_seconds
       : 300;
+  const audioFreshnessSeconds = currentAudioFreshnessSeconds(settings);
 
   const focusSegments = buildFocusSegments(ascending, idleSeconds, now);
   const audioSegments = buildAudioSegments(ascending, idleSeconds, now);
@@ -102,7 +103,11 @@ function buildTodayModel(events, settings) {
   const latestTab = todayEvents.find(
     (event) => event.source === "browser_extension" && isFocusEvent(event)
   );
-  const latestAudio = latestActiveAudioEvent(todayEvents, idleSeconds, now);
+  const latestAudio = latestActiveAudioEvent(
+    todayEvents,
+    audioFreshnessSeconds,
+    now
+  );
 
   return {
     now,
@@ -145,6 +150,14 @@ function buildAudioSegments(events, idleSeconds, now) {
     segments.push(...segmentFromEvent(event, start, next, idleSeconds, true));
   }
   return segments;
+}
+
+function currentAudioFreshnessSeconds(settings) {
+  const heartbeatSeconds = Number(settings?.capture?.heartbeat_seconds);
+  const heartbeat = Number.isFinite(heartbeatSeconds) && heartbeatSeconds > 0
+    ? heartbeatSeconds
+    : 60;
+  return Math.max(90, heartbeat * 3);
 }
 
 function segmentFromEvent(event, start, next, idleSeconds, audio) {
