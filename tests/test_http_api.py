@@ -320,8 +320,9 @@ def test_http_routes_expose_web_settings_and_local_json_apis(tmp_path: Path) -> 
         assert "Now" in html
         assert "Today Top" in html
         assert "Timeline" in html
-        assert "Recent flow" in html
-        assert "flowList" in html
+        assert 'id="hero"' in html
+        assert 'id="rightNow"' in html
+        assert "flow-list" in html
         assert "Recent events" not in html
         assert "eventsTable" not in html
         assert "metricsView" in html
@@ -347,6 +348,8 @@ def test_http_routes_expose_web_settings_and_local_json_apis(tmp_path: Path) -> 
         assert "/tracking/status" in script
         assert "/events?limit=500&order=desc" in script
         assert "renderToday" in script
+        assert "renderHero" in script
+        assert "renderRightNow" in script
         assert "renderFlow" in script
         assert "buildTimelineModel" in script
         assert ".scrollIntoView(" in script
@@ -360,7 +363,8 @@ def test_http_routes_expose_web_settings_and_local_json_apis(tmp_path: Path) -> 
         assert ":root" in styles
         assert ".nav-rail" in styles
         assert ".timeline-grid" in styles
-        assert ".flow-list" in styles
+        assert ".hero-block" in styles
+        assert ".hero-headline" in styles
         assert ".entity-avatar" in styles
         assert ".row-value > div" in styles
         assert ".timeline-lane-label > div" in styles
