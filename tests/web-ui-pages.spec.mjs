@@ -129,7 +129,7 @@ test("icon rail collapses nav to icons", async ({ page }) => {
   }
 });
 
-test("KPI tiles render with mono numbers", async ({ page }) => {
+test("KPI tiles render with serif numbers", async ({ page }) => {
   const server = await startWebUiServer({
     events: [
       {
@@ -162,7 +162,9 @@ test("KPI tiles render with mono numbers", async ({ page }) => {
     const focusFamily = await focusNum.evaluate(
       (el) => getComputedStyle(el).fontFamily
     );
-    expect(focusFamily.toLowerCase()).toContain("mono");
+    // A2 design: KPI numerals use the serif family (Charter / Source Serif / Georgia)
+    expect(focusFamily.toLowerCase()).not.toContain("mono");
+    expect(focusFamily.toLowerCase()).toContain("serif");
   } finally {
     await server.close();
   }
