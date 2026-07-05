@@ -213,25 +213,48 @@ function segmentFromEvent(event, start, next, idleSeconds, audio) {
 }
 
 function renderKpis(model) {
-  $("kpiFocusNum").innerHTML = `${formatHm(model.focusSeconds)}<span class="unit">h:m</span>`;
+  const focusText = formatHm(model.focusSeconds);
+  maybeAnimate("kpiFocusNum", focusText);
+  $("kpiFocusNum").innerHTML = `${focusText}<span class="unit">h:m</span>`;
   $("kpiFocusFoot").textContent = model.focusSeconds > 0
     ? `Goal 5:00 · ${minutesToGo(5 * 3600 - model.focusSeconds)} to go`
     : "No focus yet";
 
-  $("kpiAudioNum").innerHTML = `${Math.max(0, Math.round(model.audioSeconds / 60))}<span class="unit">m</span>`;
+  const audioText = String(Math.max(0, Math.round(model.audioSeconds / 60)));
+  maybeAnimate("kpiAudioNum", audioText);
+  $("kpiAudioNum").innerHTML = `${audioText}<span class="unit">m</span>`;
   $("kpiAudioFoot").textContent = model.audioSegments.length
     ? `${model.audioSegments.length} session${model.audioSegments.length === 1 ? "" : "s"}`
     : "No audio captured";
 
-  $("kpiSwitchesNum").textContent = String(model.focusSwitches);
+  const switchesText = String(model.focusSwitches);
+  maybeAnimate("kpiSwitchesNum", switchesText);
+  $("kpiSwitchesNum").textContent = switchesText;
   $("kpiSwitchesFoot").textContent = model.todayEventsCount
     ? `${model.todayEventsCount} events today`
     : "No activity yet";
 
-  $("kpiEventsNum").textContent = String(model.todayEventsCount);
+  const eventsText = String(model.todayEventsCount);
+  maybeAnimate("kpiEventsNum", eventsText);
+  $("kpiEventsNum").textContent = eventsText;
   $("kpiEventsFoot").textContent = model.todayEventsCount
     ? `${Math.round(model.todayEventsCount / Math.max(1, hoursElapsed(model.now)))} / hr · db synced`
     : "— / hr · db synced";
+}
+
+function maybeAnimate(kpiId, newValue) {
+  const el = $(kpiId);
+  if (!el) return;
+  // Compare against the first text node (the numeric portion), not the trailing unit span
+  const currentNode = el.firstChild;
+  const current = currentNode && currentNode.nodeType === Node.TEXT_NODE
+    ? currentNode.nodeValue
+    : el.textContent;
+  if (current !== newValue && current !== "0" && current !== "0:00" && current !== "") {
+    el.classList.remove("kpi-num-pulse");
+    void el.offsetWidth; // force reflow
+    el.classList.add("kpi-num-pulse");
+  }
 }
 
 function renderTimeline(model) {
