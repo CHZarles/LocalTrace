@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>LocalTrace — Command Center</title>
-    <link rel="stylesheet" href="/web/styles.css?v=20260705-light" />
+    <link rel="stylesheet" href="/web/styles.css?v=20260705-rich" />
   </head>
   <body>
     <div class="app">
@@ -75,28 +75,28 @@
       <main id="dashboardView" class="dashboard view active">
 
         <section class="kpi-row">
-          <article class="kpi-card accent">
+          <article class="kpi-card accent" data-accent="focus">
             <span class="label kpi-label">Focused</span>
             <div>
               <div class="kpi-num" id="kpiFocusNum">0:00</div>
               <div class="kpi-foot" id="kpiFocusFoot">No focus yet</div>
             </div>
           </article>
-          <article class="kpi-card">
+          <article class="kpi-card" data-accent="audio">
             <span class="label kpi-label">Audio playback</span>
             <div>
               <div class="kpi-num" id="kpiAudioNum">0<span class="unit">m</span></div>
               <div class="kpi-foot" id="kpiAudioFoot">No audio captured</div>
             </div>
           </article>
-          <article class="kpi-card">
+          <article class="kpi-card" data-accent="switches">
             <span class="label kpi-label">App switches</span>
             <div>
               <div class="kpi-num" id="kpiSwitchesNum">0</div>
               <div class="kpi-foot" id="kpiSwitchesFoot">No activity yet</div>
             </div>
           </article>
-          <article class="kpi-card">
+          <article class="kpi-card" data-accent="events">
             <span class="label kpi-label">Events logged</span>
             <div>
               <div class="kpi-num" id="kpiEventsNum">0</div>
@@ -254,6 +254,6 @@
       </footer>
     </div>
 
-    <script type="module" src="/web/app.js?v=20260705-light"></script>
+    <script type="module" src="/web/app.js?v=20260705-rich"></script>
   </body>
 </html>

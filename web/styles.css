@@ -13,6 +13,7 @@
   --accent-2: #8a5e2e;
   --audio: #4d7a72;
   --success: #4f7a4a;
+  --info: #4a6a8a;
   --warning: #a8743a;
   --danger: #b85a48;
   --radius: 6px;
@@ -23,6 +24,13 @@
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 1px 2px rgb(31 28 22 / 0.04), 0 1px 0 rgb(31 28 22 / 0.03) inset;
+}
 html, body {
   background: var(--bg);
   color: var(--text);
@@ -96,7 +104,7 @@ html, body {
   padding: 0;
 }
 .icon-rail-btn:hover { color: var(--text); background: var(--surface); }
-.icon-rail-btn.active { color: var(--accent); }
+.icon-rail-btn.active { color: var(--accent); background: rgb(168 116 58 / 0.10); }
 .icon-rail-btn.active::after {
   content: "";
   position: absolute;
@@ -204,20 +212,38 @@ html, body {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 20px 22px;
+  padding: 24px 22px 20px;
   display: flex;
   flex-direction: column;
   gap: 6px;
   min-width: 0;
   min-height: 132px;
+  position: relative;
+  box-shadow: 0 1px 2px rgb(31 28 22 / 0.04), 0 1px 0 rgb(31 28 22 / 0.03) inset;
+  transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
 }
-.kpi-card.accent::before {
+.kpi-card::before {
   content: "";
   position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  border-top-left-radius: var(--radius);
+  border-top-right-radius: var(--radius);
+  background: var(--kpi-accent, var(--accent));
+  opacity: 0.7;
+}
+.kpi-card[data-accent="focus"]    { --kpi-accent: var(--accent); }
+.kpi-card[data-accent="audio"]    { --kpi-accent: var(--audio); }
+.kpi-card[data-accent="switches"] { --kpi-accent: var(--success); }
+.kpi-card[data-accent="events"]   { --kpi-accent: var(--info); }
+.kpi-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 2px 8px rgb(168 116 58 / 0.10), 0 1px 0 rgb(31 28 22 / 0.03) inset;
+  transform: translateY(-1px);
 }
 .kpi-label {
   font: 600 10px/1 var(--font-sans);
-  letter-spacing: 0.14em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--text-3);
 }
@@ -255,22 +281,27 @@ html, body {
   grid-template-columns: 168px 1fr;
   gap: 24px;
   align-items: start;
+  box-shadow: 0 1px 2px rgb(31 28 22 / 0.04), 0 1px 0 rgb(31 28 22 / 0.03) inset;
 }
 .timeline-title {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  background: linear-gradient(180deg, rgb(168 116 58 / 0.04), transparent);
+  border-radius: 4px;
   padding-right: 18px;
+  padding-left: 6px;
+  margin-left: -6px;
   border-right: 1px solid var(--border);
 }
 .timeline-title-label {
   font: 600 10px/1 var(--font-sans);
-  letter-spacing: 0.14em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--text-3);
 }
 .timeline-title-num {
-  font: 400 28px/1.05 var(--font-serif);
+  font: 400 32px/1.05 var(--font-serif);
   font-feature-settings: 'lnum', 'tnum';
   color: var(--text);
   letter-spacing: -0.01em;
@@ -295,7 +326,7 @@ html, body {
   font: 400 10px/1 var(--font-mono);
   font-feature-settings: 'tnum';
   color: var(--text-3);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.16em;
   margin-left: 220px;  /* offset to align under the track, not the label */
 }
 .timeline-axis span.now-label { color: var(--accent); }
@@ -362,7 +393,7 @@ html, body {
 .timeline-track {
   position: relative;
   height: 24px;
-  background: var(--bg);
+  background: linear-gradient(90deg, var(--surface-2), var(--surface) 100%);
   border: 1px solid var(--border-2);
   border-radius: 3px;
   overflow: hidden;
@@ -372,6 +403,7 @@ html, body {
   top: 4px;
   height: 16px;
   border-radius: 2px;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18);
 }
 .timeline-bar.focus {
   background: var(--accent);
@@ -413,6 +445,7 @@ html, body {
   flex-direction: column;
   gap: 12px;
   min-width: 0;
+  box-shadow: 0 1px 2px rgb(31 28 22 / 0.04), 0 1px 0 rgb(31 28 22 / 0.03) inset;
 }
 .panel-h {
   display: flex;
@@ -427,7 +460,7 @@ html, body {
 .panel-h .count {
   font: 400 11px/1 var(--font-sans);
   color: var(--text-3);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.16em;
 }
 
 /* Right now */
@@ -535,7 +568,7 @@ html, body {
 }
 .flow-hd > span {
   font: 600 10px/1 var(--font-sans);
-  letter-spacing: 0.14em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--text-3);
   padding: 8px 10px;
@@ -547,7 +580,7 @@ html, body {
 }
 .flow-row > * {
   padding: 10px 10px;
-  border-bottom: 1px solid var(--border-2);
+  border-bottom: 1px solid var(--border);
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -587,7 +620,7 @@ html, body {
 }
 .flow-src {
   font: 600 10px/1 var(--font-sans);
-  letter-spacing: 0.10em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--text-3);
   display: flex;
@@ -617,6 +650,7 @@ html, body {
   height: 24px;
   background: var(--bg);
   border-top: 1px solid var(--border);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.4);
   display: flex;
   align-items: center;
   justify-content: flex-end;
