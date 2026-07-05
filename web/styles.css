@@ -1,21 +1,27 @@
 :root {
   color-scheme: light;
-  --bg0: #ffffff;
-  --bg1: #f6f7f9;
-  --surface0: #ffffff;
-  --surface1: #f2f3f5;
-  --surface2: #eef2f7;
-  --border0: #e6e8ec;
-  --text0: #0b0f1a;
-  --text1: #3b4252;
-  --text2: #6b7280;
-  --accent0: #2f80ed;
-  --accent1: #1b5fd6;
-  --accentContainer: #e6f0fd;
+  --bg0: #fbfaf7;
+  --bg1: #f6f3ec;
+  --surface0: #fbfaf7;
+  --surface1: #f2eee5;
+  --surface2: #ebe4d4;
+  --border0: #ebe4d4;
+  --text0: #1a1a1a;
+  --text1: #3b3530;
+  --text2: #7a7066;
+  --accent0: #1b5fd6;
+  --accent1: #15469a;
+  --accentContainer: #dfe8f6;
   --success: #22c55e;
   --warning: #f59e0b;
   --danger: #ef4444;
   --info: #38bdf8;
+  --serif: ui-serif, Georgia, "Source Serif Pro", serif;
+  --hero1: 14px;
+  --hero2: 28px;
+  --hero3: 40px;
+  --hero4: 56px;
+  --hero5: 80px;
   --radiusS: 8px;
   --radiusM: 12px;
   --space1: 4px;
@@ -24,7 +30,7 @@
   --space4: 16px;
   --space5: 20px;
   --space6: 24px;
-  --shadow: 0 1px 2px rgb(15 23 42 / 0.04), 0 10px 30px rgb(15 23 42 / 0.025);
+  --shadow: none;
 }
 
 * {
@@ -301,11 +307,10 @@ main {
 
 .card {
   min-width: 0;
-  padding: 18px;
+  padding: 14px;
   border: 1px solid var(--border0);
   border-radius: var(--radiusM);
   background: var(--surface0);
-  box-shadow: var(--shadow);
 }
 
 .status-pill {
@@ -422,8 +427,8 @@ main {
 .metric-grid strong {
   display: block;
   margin-top: var(--space1);
-  font-size: 24px;
-  line-height: 28px;
+  font-size: 16px;
+  line-height: 22px;
 }
 
 .segmented {
@@ -455,7 +460,7 @@ main {
 .top-item {
   position: relative;
   overflow: hidden;
-  min-height: 58px;
+  min-height: 48px;
   padding: var(--space3);
   border: 1px solid var(--border0);
   border-radius: var(--radiusM);
@@ -604,7 +609,7 @@ main {
   display: grid;
   grid-column: 1 / -1;
   grid-template-columns: 220px minmax(0, 1fr);
-  min-height: 54px;
+  min-height: 44px;
 }
 
 .timeline-lane-label {
@@ -616,7 +621,7 @@ main {
 
 .timeline-track {
   position: relative;
-  min-height: 54px;
+  min-height: 44px;
   border-bottom: 1px solid var(--border0);
   background:
     linear-gradient(to right, rgb(11 15 26 / 0.10) 1px, transparent 1px) 0 0 / 25% 100%,
@@ -625,9 +630,9 @@ main {
 
 .timeline-bar {
   position: absolute;
-  top: 18px;
+  top: 22px;
   min-width: 3px;
-  height: 18px;
+  height: 12px;
   border-radius: 999px;
 }
 
@@ -651,7 +656,7 @@ main {
   align-items: center;
   gap: var(--space3);
   min-width: 0;
-  min-height: 58px;
+  min-height: 48px;
   padding: var(--space3);
   border: 1px solid var(--border0);
   border-radius: var(--radiusM);
@@ -914,4 +919,12 @@ label span {
     grid-column: 3;
     justify-content: flex-start;
   }
+}
+
+.caps-tag {
+  display: block;
+  color: var(--text2);
+  font: 600 11px/1 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
