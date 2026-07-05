@@ -301,9 +301,6 @@ main {
 
 .hero-block {
   padding: var(--hero4) var(--hero4) var(--hero3);
-  border-radius: 0;
-  border-left: 0;
-  border-right: 0;
   background: var(--bg0);
 }
 

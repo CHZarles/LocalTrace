@@ -88,20 +88,11 @@ function buildHeadline(model) {
   const switches = model.focusSwitches || 0;
   const events = (model.todayEvents || []).length;
 
-  const fmt = (sec) => {
-    if (sec < 60) return `${sec}s`;
-    const total = Math.round(sec / 60);
-    if (total < 60) return `${total}m`;
-    const h = Math.floor(total / 60);
-    const m = total % 60;
-    return m ? `${h}h ${m}m` : `${h}h`;
-  };
-
   const sentence =
     focus >= 3600
-      ? `Today, you focused ${fmt(focus)}.`
+      ? `Today, you focused ${formatDuration(focus)}.`
       : focus >= 60
-        ? `Today so far — ${fmt(focus)} focused.`
+        ? `Today so far — ${formatDuration(focus)} focused.`
         : "Nothing tracked yet today.";
 
   const tallyApps = new Set(
@@ -115,23 +106,31 @@ function buildHeadline(model) {
       .map((e) => e.entity)
   );
 
-  const sub = focus <= 0
-    ? "Once activity starts, it will appear here."
-    : `across ${tallyApps.size} apps and ${tallySites.size} sites. ${switches} focus switches. ${fmt(audio)} of background audio. — a quieter day.`;
+  const subData = focus <= 0
+    ? { lead: "Once activity starts, it will appear here.", emphasis: "" }
+    : {
+        lead: `across ${tallyApps.size} apps and ${tallySites.size} sites. ${switches} focus switches. ${formatDuration(audio)} of background audio.`,
+        emphasis: "a quieter day."
+      };
 
   const date = new Intl.DateTimeFormat(undefined, {
     year: "numeric", month: "2-digit", day: "2-digit"
   }).format(model.now);
 
   const numerals = [
-    { tag: "Focus", value: fmt(focus) || "—" },
-    ...(audio > 0 ? [{ tag: "Audio", value: fmt(audio) }] : []),
+    { tag: "Focus", value: focus >= 60 ? formatDuration(focus) : "—" },
+    { tag: "Audio", value: audio > 0 ? formatDuration(audio) : "—" },
     { tag: "Switches", value: String(switches) },
     { tag: "Events", value: String(events) }
   ];
-  while (numerals.length < 4) numerals.push({ tag: "Events", value: "0" });
 
-  return { eyebrow: `LOCALTRACE · ${date}`, sentence, sub, numerals };
+  return {
+    eyebrow: `LOCALTRACE · ${date}`,
+    sentence,
+    subLead: subData.lead,
+    subEmphasis: subData.emphasis,
+    numerals
+  };
 }
 
 function renderHero(model) {
@@ -150,11 +149,11 @@ function renderHero(model) {
 
   const sub = document.createElement("p");
   sub.className = "hero-sub";
-  sub.append(document.createTextNode(h.sub.replace(/\s*—\s*.*$/, "").trim() + " "));
-  const emMatch = h.sub.match(/—\s*(.+)$/);
-  if (emMatch) {
+  sub.append(document.createTextNode(h.subLead));
+  if (h.subEmphasis) {
+    sub.append(document.createTextNode(" — "));
     const em = document.createElement("em");
-    em.textContent = "— " + emMatch[1].trim();
+    em.textContent = h.subEmphasis;
     sub.append(em);
   }
 
