@@ -1,0 +1,41 @@
+{
+  "planPath": "docs/superpowers/plans/2026-07-05-ui-optimization.md",
+  "tasks": [
+    {
+      "id": 10,
+      "subject": "Task 1: Tokens + secondary card demotion",
+      "status": "pending",
+      "description": "Swap palette, add serif + hero-rhythm tokens, drop shadows, soften borders. Demote Timeline / Recent flow / Today Top / Health card density (padding, type, row height, no shadow).\n\nFiles: web/styles.css\n\nAcceptance:\n- --bg0 #fbfaf7, --text2 #7a7066, --border0 #ebe4d4, --shadow none\n- --serif and --hero1..5 tokens present\n- .card has no shadow\n- timeline/flow/top numeric sizes and row heights demoted per spec table\n\nVerify: node_modules/.bin/playwright test tests/web-ui-pages.spec.mjs (6 tests pass)\n\n```json:metadata\n{\"files\": [\"web/styles.css\"], \"verifyCommand\": \"node_modules/.bin/playwright test tests/web-ui-pages.spec.mjs\", \"acceptanceCriteria\": [\"palette swapped\", \"serif/hero tokens present\", \"no card shadow\", \"secondary card sizes per spec\"], \"requiresUserVerification\": false}\n```",
+      "blockedBy": []
+    },
+    {
+      "id": 11,
+      "subject": "Task 2: Right-now card",
+      "status": "pending",
+      "description": "Replace .now-card (which currently sits in .hero-grid) with a #rightNow block at the top of .side-stack.\n\nFiles: web/index.html, web/app.js, tests/web-ui-pages.spec.mjs\n\nAcceptance:\n- index.html no longer contains now-card; contains #rightNow <aside>\n- app.js has renderRightNow(model)\n- Playwright: stale-audio tests rewritten to assert #rightNow\n\nVerify: playwright test (8 pass after Task 3 changes)\n\n```json:metadata\n{\"files\": [\"web/index.html\", \"web/app.js\", \"web/styles.css\", \"tests/web-ui-pages.spec.mjs\"], \"verifyCommand\": \"node_modules/.bin/playwright test tests/web-ui-pages.spec.mjs\", \"acceptanceCriteria\": [\"now-card removed\", \"rightNow wired\", \"audio-stale tests pass\"], \"requiresUserVerification\": false}\n```",
+      "blockedBy": [10]
+    },
+    {
+      "id": 12,
+      "subject": "Task 3: Editorial hero block",
+      "status": "pending",
+      "description": "Replace .hero-grid body with #hero populated by renderHero(model). Eyebrow / serif headline / sub / 4-cell numerals. Mobile downsizing 980px / 700px. Widen side rail to 1.4fr/1fr.\n\nFiles: web/app.js, web/styles.css, tests/web-ui-pages.spec.mjs\n\nAcceptance:\n- #hero in index.html and populated on load\n- headline uses serif (computed font-family contains 'serif')\n- 4 numerals visible: FOCUS / AUDIO / SWITCHES / EVENTS\n- mobile <=700px -> h1 font-size <= 32px\n- .workbench-grid 1.4fr / 1fr\n\nVerify: playwright test (8 pass)\n\n```json:metadata\n{\"files\": [\"web/app.js\", \"web/styles.css\", \"tests/web-ui-pages.spec.mjs\"], \"verifyCommand\": \"node_modules/.bin/playwright test tests/web-ui-pages.spec.mjs\", \"acceptanceCriteria\": [\"hero renders serif headline\", \"4-cell numerals row present\", \"mobile downsizes <=32px\", \"workbench columns 1.4/1\"], \"requiresUserVerification\": false}\n```",
+      "blockedBy": [11]
+    },
+    {
+      "id": 13,
+      "subject": "Task 4: Settings visual treatment",
+      "status": "pending",
+      "description": "Inherit new tokens. Caps-tag label style. Retune .toggle. No markup changes.\n\nFiles: web/styles.css\n\nAcceptance:\n- label span caps-tag style (uppercase, letter-spacing)\n- .toggle uses surface1 + accent0 checkbox colour\n- settings tests still pass\n\nVerify: playwright test (8 still pass)\n\n```json:metadata\n{\"files\": [\"web/styles.css\"], \"verifyCommand\": \"node_modules/.bin/playwright test tests/web-ui-pages.spec.mjs\", \"acceptanceCriteria\": [\"label caps style applied\", \"toggle palette retuned\", \"no markup change\"], \"requiresUserVerification\": false}\n```",
+      "blockedBy": [10]
+    },
+    {
+      "id": 14,
+      "subject": "Task 5: Update tests + verify with user",
+      "status": "pending",
+      "description": "Update tests/test_http_api.py to match new DOM. Run full test suite. Verify with user.\n\nFiles: tests/test_http_api.py\n\nAcceptance:\n- test_http_api asserts id=hero, id=rightNow, renderHero, renderRightNow in script, .hero-block/.hero-headline in styles\n- full pytest (config + http_api + skill_scripts) passes\n- Playwright + node:test pass\n- user confirms visual result\n\nVerify: .venv/bin/python -m pytest tests/ && playwright test && node --test extension/service_worker.test.mjs && AskUserQuestion\n\n```json:metadata\n{\"files\": [\"tests/test_http_api.py\"], \"verifyCommand\": \".venv/bin/python -m pytest tests/ --ignore=tests/web-ui-pages.spec.mjs -x --tb=short\", \"acceptanceCriteria\": [\"http_api tests pass\", \"full pytest passes\", \"Playwright + node tests pass\", \"user confirms visual result\"], \"requiresUserVerification\": true, \"userVerificationPrompt\": \"Open the LocalTrace Web UI and confirm the editorial direction reads correctly (one serif hero + demoted secondary cards)?\"}\n```",
+      "blockedBy": [12, 13]
+    }
+  ],
+  "lastUpdated": "2026-07-05T18:00:00Z"
+}
