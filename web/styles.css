@@ -284,68 +284,106 @@ html, body {
 .timeline-body {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 6px;
   min-width: 0;
 }
-.timeline-rows {
-  display: grid;
-  grid-template-columns: 56px 1fr;
-  gap: 4px 10px;
-  align-items: center;
-}
-.timeline-row {
-  display: contents;
-}
-.timeline-row-label {
-  font: 600 9px/1 var(--font-sans);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--text-3);
-  text-align: right;
-}
-.timeline-track {
-  position: relative;
-  background: var(--bg);
-  border: 1px solid var(--border-2);
-  border-radius: 2px;
-  height: 36px;
-  overflow: hidden;
-}
-#timelineFocusRow { height: 36px; }
-#timelineAudioRow { height: 18px; }
-.tl-block {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  border-radius: 1px;
-}
-.tl-block.focus {
-  background: var(--accent);
-  opacity: 0.85;
-}
-.tl-block.audio {
-  background: var(--audio);
-  opacity: 0.85;
-}
-.tl-now {
-  position: absolute;
-  top: -2px;
-  bottom: -2px;
-  right: -1px;
-  width: 1.5px;
-  background: var(--accent);
-  pointer-events: none;
-}
 .timeline-axis {
+  position: relative;
+  height: 18px;
   display: flex;
+  align-items: center;
   justify-content: space-between;
   font: 400 10px/1 var(--font-mono);
   font-feature-settings: 'tnum';
   color: var(--text-3);
   letter-spacing: 0.04em;
-  padding: 0 60px 0 66px; /* offset to align under the tracks not the labels */
+  margin-left: 220px;  /* offset to align under the track, not the label */
 }
 .timeline-axis span.now-label { color: var(--accent); }
+.timeline-lanes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.timeline-lane {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  min-height: 36px;
+}
+.timeline-lane-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.timeline-lane-label .entity-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  display: grid;
+  place-items: center;
+  color: var(--text-2);
+  flex: 0 0 22px;
+}
+.timeline-lane-label .entity-avatar[data-kind="domain"] {
+  border-radius: 50%;
+}
+.timeline-lane-label .entity-icon {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.timeline-lane-label > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.timeline-lane-label strong {
+  font: 500 13px var(--font-sans);
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.timeline-lane-label span {
+  font: 400 10px var(--font-mono);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.timeline-track {
+  position: relative;
+  height: 24px;
+  background: var(--bg);
+  border: 1px solid var(--border-2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.timeline-bar {
+  position: absolute;
+  top: 4px;
+  height: 16px;
+  border-radius: 2px;
+}
+.timeline-bar.focus {
+  background: var(--accent);
+  opacity: 0.88;
+}
+.timeline-bar.audio {
+  background: var(--audio);
+  top: 7px;
+  height: 10px;
+  opacity: 0.88;
+}
 .timeline-meta {
   display: flex;
   justify-content: flex-end;
@@ -355,6 +393,8 @@ html, body {
   font-feature-settings: 'tnum';
   color: var(--text-2);
   letter-spacing: 0.04em;
+  margin-top: 4px;
+  margin-left: 232px;
 }
 
 /* Bottom split */

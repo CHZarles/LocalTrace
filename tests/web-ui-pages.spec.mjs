@@ -381,21 +381,21 @@ test("mobile dashboard has single-column bottom split", async ({ page }) => {
   }
 });
 
-test("timeline shows focus and audio rows with Gantt blocks", async ({ page }) => {
+test("timeline shows swimlanes per app with focus + audio bars", async ({ page }) => {
   const server = await startWebUiServer({
     events: [
       {
-        id: 1, observed_at: "2026-07-05T16:30:00.000Z", received_at: "2026-07-05T16:30:00.000Z",
+        id: 1, observed_at: "2026-07-05T09:00:00.000Z", received_at: "2026-07-05T09:00:00.000Z",
         source: "windows_probe", kind: "app_active", entity_type: "app", entity: "Code.exe",
         title: "VS Code", payload: { activity: "focus" }
       },
       {
-        id: 2, observed_at: "2026-07-05T17:00:00.000Z", received_at: "2026-07-05T17:00:00.000Z",
+        id: 2, observed_at: "2026-07-05T10:00:00.000Z", received_at: "2026-07-05T10:00:00.000Z",
         source: "windows_probe", kind: "app_active", entity_type: "app", entity: "Code.exe",
         payload: { activity: "focus" }
       },
       {
-        id: 3, observed_at: "2026-07-05T17:30:00.000Z", received_at: "2026-07-05T17:30:00.000Z",
+        id: 3, observed_at: "2026-07-05T11:00:00.000Z", received_at: "2026-07-05T11:00:00.000Z",
         source: "browser_extension", kind: "tab_audio", entity_type: "domain", entity: "youtube.com",
         title: "Live set", payload: { activity: "audio", browser: "chrome" }
       }
@@ -403,7 +403,7 @@ test("timeline shows focus and audio rows with Gantt blocks", async ({ page }) =
   });
   try {
     await page.addInitScript(() => {
-      const fixedNow = new Date("2026-07-05T17:45:00.000Z").valueOf();
+      const fixedNow = new Date("2026-07-05T12:00:00.000Z").valueOf();
       const RealDate = Date;
       class FixedDate extends RealDate {
         constructor(...args) { super(...(args.length ? args : [fixedNow])); }
@@ -415,12 +415,11 @@ test("timeline shows focus and audio rows with Gantt blocks", async ({ page }) =
     });
     await page.goto(server.url);
 
-    const focusRow = page.locator("#timelineFocusRow");
-    const audioRow = page.locator("#timelineAudioRow");
-    await expect(focusRow).toBeVisible();
-    await expect(audioRow).toBeVisible();
-    await expect(focusRow.locator(".tl-block.focus")).toHaveCount(2);
-    await expect(audioRow.locator(".tl-block.audio")).toHaveCount(1);
+    const lanes = page.locator("#timelineLanes .timeline-lane");
+    await expect(lanes).toHaveCount(2);
+    await expect(lanes.first().locator(".timeline-lane-label strong")).toContainText("Code.exe");
+    await expect(lanes.first().locator(".timeline-bar.focus")).toHaveCount(2);
+    await expect(lanes.nth(1).locator(".timeline-bar.audio")).toHaveCount(1);
   } finally {
     await server.close();
   }

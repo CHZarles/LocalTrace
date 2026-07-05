@@ -79,7 +79,7 @@ function buildDashboardModel(events, settings) {
   );
   const latestAudio = latestActiveAudioEvent(todayEvents, audioFreshnessSeconds, now);
 
-  const timelineWindow = buildTimelineWindow(todayEvents, idleSeconds, now);
+  const timelineLanes = buildTimelineLanes(todayEvents, focusSegments, audioSegments, now);
 
   const latestObservedAt =
     state.events.length > 0
@@ -95,7 +95,7 @@ function buildDashboardModel(events, settings) {
     audioSeconds,
     focusSwitches: focusSegments.length,
     todayEventsCount: todayEvents.length,
-    timelineWindow,
+    timelineLanes,
     latestFocus,
     latestTab,
     latestAudio,
@@ -103,30 +103,56 @@ function buildDashboardModel(events, settings) {
   };
 }
 
-function buildTimelineWindow(todayEvents, idleSeconds, now) {
-  // Window: last 12 hours. Start = now - 12h.
-  const windowMs = 12 * 60 * 60 * 1000;
-  const start = new Date(now.getTime() - windowMs);
-  const end = now;
+function buildTimelineLanes(todayEvents, focusSegments, audioSegments, now) {
+  const byEntity = new Map();
+  for (const seg of focusSegments) {
+    const key = `${seg.kind}:${seg.entity}`;
+    if (!byEntity.has(key)) {
+      byEntity.set(key, {
+        kind: seg.kind,
+        entity: seg.entity,
+        label: seg.label,
+        totalSeconds: 0,
+        bars: []
+      });
+    }
+    const lane = byEntity.get(key);
+    lane.totalSeconds += seg.seconds;
+    lane.bars.push({
+      startMinute: minuteOfDay(seg.start),
+      endMinute: minuteOfDay(seg.end),
+      audio: false
+    });
+  }
+  for (const seg of audioSegments) {
+    const key = `${seg.kind}:${seg.entity}`;
+    if (byEntity.has(key)) {
+      byEntity.get(key).bars.push({
+        startMinute: minuteOfDay(seg.start),
+        endMinute: minuteOfDay(seg.end),
+        audio: true
+      });
+    } else {
+      byEntity.set(key, {
+        kind: seg.kind,
+        entity: seg.entity,
+        label: seg.label,
+        totalSeconds: 0,
+        bars: [{
+          startMinute: minuteOfDay(seg.start),
+          endMinute: minuteOfDay(seg.end),
+          audio: true
+        }]
+      });
+    }
+  }
+  return [...byEntity.values()]
+    .sort((a, b) => b.totalSeconds - a.totalSeconds || a.label.localeCompare(b.label))
+    .slice(0, 12);
+}
 
-  // Slice today events to those that fall in the window
-  const ascending = [...todayEvents].sort(compareEventsAsc);
-  const focusSegments = buildFocusSegments(ascending, idleSeconds, end);
-  const audioSegments = buildAudioSegments(ascending, idleSeconds, end);
-
-  // Filter segments to those overlapping the window
-  const inWindow = (seg) => seg.end > start && seg.start < end;
-
-  // Clamp to the window: a segment starting before `start` should be clipped to `start`
-  const clamp = (seg) => ({
-    startPct: Math.max(0, (seg.start.getTime() - start.getTime()) / windowMs) * 100,
-    endPct: Math.min(1, (seg.end.getTime() - start.getTime()) / windowMs) * 100,
-  });
-
-  const focusBars = focusSegments.filter(inWindow).map(clamp);
-  const audioBars = audioSegments.filter(inWindow).map(clamp);
-
-  return { focusBars, audioBars, windowMs, start, end };
+function minuteOfDay(date) {
+  return date.getHours() * 60 + date.getMinutes();
 }
 
 function currentAudioFreshnessSeconds(settings) {
@@ -212,45 +238,75 @@ function renderTimeline(model) {
   const focusMinutes = Math.round(model.focusSeconds / 60);
   const totalMinutes = focusMinutes + Math.round(model.audioSeconds / 60);
   $("timelineTitle").textContent = `${formatHm(model.focusSeconds)} / ${totalMinutes}m`;
-  $("timelineSub").textContent = `12h window · ${model.todayEventsCount} events`;
-
-  const focus = $("timelineFocusRow");
-  focus.replaceChildren();
-  for (const bar of model.timelineWindow.focusBars) {
-    const block = document.createElement("span");
-    block.className = "tl-block focus";
-    block.style.left = `${bar.startPct}%`;
-    block.style.width = `${Math.max(0.4, bar.endPct - bar.startPct)}%`;
-    focus.append(block);
-  }
-  const nowMarker = document.createElement("span");
-  nowMarker.className = "tl-now";
-  focus.append(nowMarker);
-
-  const audio = $("timelineAudioRow");
-  audio.replaceChildren();
-  for (const bar of model.timelineWindow.audioBars) {
-    const block = document.createElement("span");
-    block.className = "tl-block audio";
-    block.style.left = `${bar.startPct}%`;
-    block.style.width = `${Math.max(0.4, bar.endPct - bar.startPct)}%`;
-    audio.append(block);
-  }
+  $("timelineSub").textContent = `${model.timelineLanes.length} lanes · today`;
 
   const axis = $("timelineAxis");
   axis.replaceChildren();
-  const ticks = [
-    "12h ago", "10h ago", "8h ago", "6h ago", "4h ago", "2h ago", "now"
-  ];
-  for (const label of ticks) {
+  for (const t of [2, 6, 10, 14, 18, 22]) {
     const span = document.createElement("span");
-    if (label === "now") span.className = "now-label";
-    span.textContent = label;
+    span.textContent = String(t).padStart(2, "0");
     axis.append(span);
+  }
+  const nowLabel = document.createElement("span");
+  nowLabel.className = "now-label";
+  nowLabel.textContent = "NOW";
+  axis.append(nowLabel);
+
+  const lanes = $("timelineLanes");
+  lanes.replaceChildren();
+  for (const lane of model.timelineLanes) {
+    lanes.append(renderTimelineLane(lane));
   }
 
   $("timelineMeta").textContent =
-    `12h window · focus ${formatHm(model.focusSeconds)} · audio ${Math.round(model.audioSeconds / 60)}m`;
+    `24h window · focus ${formatHm(model.focusSeconds)} · audio ${Math.round(model.audioSeconds / 60)}m`;
+}
+
+function renderTimelineLane(lane) {
+  const row = document.createElement("div");
+  row.className = "timeline-lane";
+
+  const label = document.createElement("div");
+  label.className = "timeline-lane-label";
+  const text = document.createElement("div");
+  const title = document.createElement("strong");
+  const sub = document.createElement("span");
+  title.textContent = lane.label;
+  sub.textContent = formatDuration(lane.totalSeconds);
+  text.append(title, sub);
+  const avatar = document.createElement("span");
+  avatar.className = "entity-avatar";
+  avatar.dataset.kind = lane.kind;
+  avatar.append(entityIconSvg(lane.kind));
+  label.append(avatar, text);
+
+  const track = document.createElement("div");
+  track.className = "timeline-track";
+  for (const bar of lane.bars) {
+    const block = document.createElement("span");
+    block.className = bar.audio ? "timeline-bar audio" : "timeline-bar focus";
+    block.style.left = `${(bar.startMinute / 1440) * 100}%`;
+    block.style.width = `${Math.max(0.4, ((bar.endMinute - bar.startMinute) / 1440) * 100)}%`;
+    track.append(block);
+  }
+
+  row.append(label, track);
+  return row;
+}
+
+function entityIconSvg(kind) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-hidden", "true");
+  svg.classList.add("entity-icon");
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  if (kind === "domain") {
+    path.setAttribute("d", "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z M3.6 9h16.8 M3.6 15h16.8 M12 3a13 13 0 0 1 0 18 M12 3a13 13 0 0 0 0 18");
+  } else {
+    path.setAttribute("d", "M4 5h16v11H4Z M8 20h8 M10 16v4 M14 16v4");
+  }
+  svg.append(path);
+  return svg;
 }
 
 function renderRightNow(model) {

@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>LocalTrace — Command Center</title>
-    <link rel="stylesheet" href="/web/styles.css?v=20260705-a2p-gantt" />
+    <link rel="stylesheet" href="/web/styles.css?v=20260705-a2p-swim" />
   </head>
   <body>
     <div class="app">
@@ -109,21 +109,12 @@
           <div class="timeline-title">
             <span class="timeline-title-label">Activity</span>
             <span class="timeline-title-num mono" id="timelineTitle">0:00 / 0m</span>
-            <span class="timeline-title-sub" id="timelineSub">12h window</span>
+            <span class="timeline-title-sub" id="timelineSub">0 lanes · today</span>
           </div>
           <div class="timeline-body">
-            <div class="timeline-rows">
-              <div class="timeline-row">
-                <span class="timeline-row-label">Focus</span>
-                <div class="timeline-track" id="timelineFocusRow"></div>
-              </div>
-              <div class="timeline-row">
-                <span class="timeline-row-label">Audio</span>
-                <div class="timeline-track" id="timelineAudioRow"></div>
-              </div>
-            </div>
             <div class="timeline-axis" id="timelineAxis"></div>
-            <div class="timeline-meta" id="timelineMeta">12h window</div>
+            <div class="timeline-lanes" id="timelineLanes"></div>
+            <div class="timeline-meta" id="timelineMeta">24h window · focus 0m · audio 0m</div>
           </div>
         </section>
 
@@ -263,6 +254,6 @@
       </footer>
     </div>
 
-    <script type="module" src="/web/app.js?v=20260705-a2p-gantt"></script>
+    <script type="module" src="/web/app.js?v=20260705-a2p-swim"></script>
   </body>
 </html>
