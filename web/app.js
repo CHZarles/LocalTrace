@@ -331,13 +331,14 @@ function rightNowRow({ label, event, fallback }) {
 
 function renderRecentFlow(events) {
   const body = $("flowBody");
+  if (!body) return;
   body.replaceChildren();
+  body.className = "flow-list";
   const items = [...events].sort(compareEventsDesc).slice(0, 10);
   if (items.length === 0) {
-    const empty = document.createElement("div");
-    empty.style.padding = "14px 18px";
-    empty.style.color = "var(--text-2)";
-    empty.textContent = "No recent activity";
+    const empty = document.createElement("p");
+    empty.className = "flow-empty";
+    empty.textContent = "No events captured yet.";
     body.append(empty);
     return;
   }
@@ -349,33 +350,33 @@ function appendFlowRow(event) {
   row.className = "flow-row";
 
   const t = document.createElement("span");
-  t.className = "t";
+  t.className = "flow-time mono";
   t.textContent = formatTime(event.observed_at);
   row.append(t);
 
-  const app = document.createElement("span");
-  app.className = "app";
-  const title = document.createElement("strong");
-  title.textContent = displayEntity(event);
-  const ctx = document.createElement("span");
-  ctx.className = "ctx";
-  ctx.textContent = event.title || eventKindLabel(event);
-  app.append(title, ctx);
-  row.append(app);
+  const nameWrap = document.createElement("div");
+  nameWrap.className = "flow-name";
+  const name = document.createElement("strong");
+  name.textContent = displayEntity(event);
+  const title = document.createElement("span");
+  title.className = "flow-title";
+  title.textContent = event.title || eventKindLabel(event);
+  nameWrap.append(name, title);
+  row.append(nameWrap);
 
   const dur = document.createElement("span");
-  dur.className = "num";
-  // approximate duration by suffix we cannot reliably compute, but for flow show the related recent period
+  dur.className = "flow-dur mono";
   dur.textContent = computeEventDurationLabel(event);
   row.append(dur);
 
   const src = document.createElement("span");
-  src.className = "src";
-  const chip = document.createElement("span");
-  chip.className = "flow-chip";
-  chip.dataset.source = event.source || "system";
-  chip.textContent = sourceLabel(event.source);
-  src.append(chip);
+  src.className = "flow-src";
+  const dot = document.createElement("span");
+  dot.className = "flow-src-dot";
+  dot.dataset.source = event.source || "system";
+  const srcText = document.createElement("span");
+  srcText.textContent = sourceLabel(event.source);
+  src.append(dot, srcText);
   row.append(src);
 
   return row;
