@@ -317,25 +317,34 @@ def test_http_routes_expose_web_settings_and_local_json_apis(tmp_path: Path) -> 
         assert "text/html" in content_type
         assert "LocalTrace" in html
         assert "Today" in html
-        assert "Now" in html
-        assert "Today Top" in html
-        assert "Timeline" in html
-        assert 'id="hero"' in html
-        assert 'id="rightNow"' in html
-        assert "flow-list" in html
-        assert "Recent events" not in html
+        assert "Right now" in html
+        assert "Recent flow" in html
+        assert "Activity" in html
+        assert 'id="dashboard"' not in html
+        assert 'class="icon-rail"' in html
+        assert 'class="kpi-row"' in html
+        assert 'class="bottom-split"' in html
+        assert 'id="nowList"' in html
+        assert 'id="nowFoot"' in html
+        assert 'id="flowBody"' in html
+        assert 'id="statusBar"' in html
+        assert 'id="hero"' not in html
+        assert 'id="rightNow"' not in html
+        assert 'id="metricsView"' not in html
+        assert 'id="settingsPanel"' not in html
+        assert 'id="healthMetrics"' not in html
+        assert 'class="hero-block"' not in html
+        assert "Today Top" not in html
+        assert "flow-list" not in html
         assert "eventsTable" not in html
-        assert "metricsView" in html
-        assert "settingsPanel" in html
-        assert 'id="settingsPanel" class="view" hidden' not in html
-        assert 'data-section="metricsView"' in html
-        assert 'data-section="settingsPanel"' in html
+        assert 'data-section=' not in html
         assert "data-view=" not in html
+        assert "icon-rail-btn" in html
+        assert 'data-rail="dashboard"' in html
+        assert 'data-rail="settings"' in html
         assert "/web/app.js" in html
         assert 'src="/web/app.js?v=' in html
         assert 'href="/web/styles.css?v=' in html
-        assert "Dashboard" not in html
-        assert "Reports" not in html
         assert "Planner" not in html
         assert "Review" not in html
 
@@ -347,31 +356,35 @@ def test_http_routes_expose_web_settings_and_local_json_apis(tmp_path: Path) -> 
         assert "/privacy/rules" in script
         assert "/tracking/status" in script
         assert "/events?limit=500&order=desc" in script
-        assert "renderToday" in script
-        assert "renderHero" in script
+        assert "renderKpis" in script
+        assert "renderTimeline" in script
         assert "renderRightNow" in script
-        assert "renderFlow" in script
-        assert "buildTimelineModel" in script
-        assert ".scrollIntoView(" in script
+        assert "renderRecentFlow" in script
+        assert "renderStatusBar" in script
+        assert "renderDashboard" in script
+        assert "renderHero" not in script
+        assert "buildHeadline" not in script
+        assert "buildTimelineModel" not in script
+        assert ".scrollIntoView(" not in script
         assert "view.hidden" not in script
         assert "avatar.append(badge)" not in script
-        assert "restart required" in script
 
         status, content_type, styles = request_text(base_url, "/web/styles.css")
         assert status == 200
         assert "text/css" in content_type
         assert ":root" in styles
-        assert ".nav-rail" in styles
-        assert ".timeline-grid" in styles
-        assert ".hero-block" in styles
-        assert ".hero-headline" in styles
+        assert ".icon-rail" in styles
+        assert ".kpi-row" in styles
+        assert ".timeline-strip" in styles
+        assert ".bottom-split" in styles
+        assert ".flow-row" in styles
+        assert ".status-bar" in styles
+        assert ".hero-block" not in styles
+        assert ".hero-headline" not in styles
+        assert ".timeline-grid" not in styles
+        assert ".row-value" not in styles
         assert ".entity-avatar" in styles
-        assert ".row-value > div" in styles
-        assert ".timeline-lane-label > div" in styles
-        assert ".row-value .entity-avatar" in styles
-        assert ".timeline-lane-label .entity-avatar" in styles
         assert ".entity-icon" in styles
-        assert "display: block;" in styles
         assert ".entity-avatar b" not in styles
 
         status, body = request_json(base_url, "/settings")

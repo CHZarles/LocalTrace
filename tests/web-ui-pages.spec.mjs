@@ -90,20 +90,108 @@ async function startWebUiServer({ events = [], settings = null } = {}) {
   };
 }
 
-test("metrics and settings are separate pages", async ({ page }) => {
+test("dashboard and settings are separated by the rail", async ({ page }) => {
   const server = await startWebUiServer();
   try {
     await page.goto(server.url);
 
-    await expect(page.locator("#metricsView")).toBeVisible();
-    await expect(page.locator("#settingsPanel")).toBeHidden();
-    await expect(page.locator("#metricsView #healthMetrics")).toHaveCount(1);
+    await expect(page.locator("#dashboardView")).toBeVisible();
+    await expect(page.locator("#settingsView")).toBeHidden();
+    await expect(page.locator(".icon-rail")).toBeVisible();
+    await expect(page.locator(".icon-rail-btn[data-rail='settings']")).toBeVisible();
 
-    await page.getByRole("button", { name: "Settings" }).click();
+    await page.locator(".icon-rail-btn[data-rail='settings']").click();
 
-    await expect(page.locator("#settingsPanel")).toBeVisible();
-    await expect(page.locator("#metricsView")).toBeHidden();
-    await expect(page.locator("#settingsPanel #healthMetrics")).toHaveCount(0);
+    await expect(page.locator("#settingsView")).toBeVisible();
+    await expect(page.locator("#dashboardView")).toBeHidden();
+
+    await page.locator("#backToDashboard").click();
+    await expect(page.locator("#dashboardView")).toBeVisible();
+    await expect(page.locator("#settingsView")).toBeHidden();
+  } finally {
+    await server.close();
+  }
+});
+
+test("icon rail collapses nav to icons", async ({ page }) => {
+  const server = await startWebUiServer();
+  try {
+    await page.goto(server.url);
+    await expect(page.locator(".icon-rail")).toBeVisible();
+    const railWidth = await page.locator(".icon-rail").evaluate(
+      (el) => el.getBoundingClientRect().width
+    );
+    expect(railWidth).toBe(48);
+    const iconButtons = await page.locator(".icon-rail-btn").count();
+    expect(iconButtons).toBeGreaterThanOrEqual(4);
+  } finally {
+    await server.close();
+  }
+});
+
+test("KPI tiles render with mono numbers", async ({ page }) => {
+  const server = await startWebUiServer({
+    events: [
+      {
+        id: 1,
+        observed_at: new Date().toISOString(),
+        received_at: new Date().toISOString(),
+        source: "windows_probe",
+        kind: "app_active",
+        entity_type: "app",
+        entity: "Code.exe",
+        payload: { activity: "focus" }
+      }
+    ]
+  });
+  try {
+    await page.goto(server.url);
+    await expect(page.locator(".kpi-row")).toBeVisible();
+    const tiles = page.locator(".kpi-card");
+    await expect(tiles).toHaveCount(4);
+    const labels = await page.locator(".kpi-card .label.kpi-label").allTextContents();
+    expect(labels.map((l) => l.trim().toLowerCase())).toEqual([
+      "focused",
+      "audio playback",
+      "app switches",
+      "events logged"
+    ]);
+
+    const focusNum = page.locator("#kpiFocusNum");
+    await expect(focusNum).toBeVisible();
+    const focusFamily = await focusNum.evaluate(
+      (el) => getComputedStyle(el).fontFamily
+    );
+    expect(focusFamily.toLowerCase()).toContain("mono");
+  } finally {
+    await server.close();
+  }
+});
+
+test("status bar shows last sync", async ({ page }) => {
+  const server = await startWebUiServer({
+    events: [
+      {
+        id: 1,
+        observed_at: new Date().toISOString(),
+        received_at: new Date().toISOString(),
+        source: "windows_probe",
+        kind: "app_active",
+        entity_type: "app",
+        entity: "Code.exe",
+        payload: { activity: "focus" }
+      }
+    ]
+  });
+  try {
+    await page.goto(server.url);
+    const bar = page.locator(".status-bar");
+    await expect(bar).toBeVisible();
+    await expect(bar).toContainText(/Updated/);
+    await expect(bar).toContainText(/events?/);
+    await expect(bar).toContainText(/focused/);
+    const dots = await page.locator(".status-bar .dot").count();
+    expect(dots).toBe(3);
   } finally {
     await server.close();
   }
@@ -147,8 +235,8 @@ test("stale browser audio is not shown as current background audio", async ({
     });
     await page.goto(server.url);
 
-    await expect(page.locator("#rightNow")).toContainText("No audio activity");
-    await expect(page.locator("#rightNow")).not.toContainText(staleTitle);
+    await expect(page.locator("#nowList")).toContainText("No audio activity");
+    await expect(page.locator("#nowList")).not.toContainText(staleTitle);
   } finally {
     await server.close();
   }
@@ -204,8 +292,8 @@ test("stale browser audio is hidden even when idle cutoff is long", async ({
     });
     await page.goto(server.url);
 
-    await expect(page.locator("#rightNow")).toContainText("No audio activity");
-    await expect(page.locator("#rightNow")).not.toContainText(staleTitle);
+    await expect(page.locator("#nowList")).toContainText("No audio activity");
+    await expect(page.locator("#nowList")).not.toContainText(staleTitle);
   } finally {
     await server.close();
   }
@@ -263,32 +351,26 @@ test("recent flow renders latest events in descending order", async ({ page }) =
   try {
     await page.goto(server.url);
 
-    const rows = page.locator("#flowList .flow-item");
+    const rows = page.locator("#flowBody .flow-row");
     await expect(rows).toHaveCount(4);
-    await expect(rows.nth(0)).toContainText("youtube.com");
-    await expect(rows.nth(0)).toContainText("Tab audio");
-    await expect(rows.nth(1)).toContainText("Spotify.exe");
-    await expect(rows.nth(1)).toContainText("Audio stopped");
-    await expect(rows.nth(1)).toContainText("windows_probe");
-    await expect(rows.nth(2)).toContainText("docs.python.org");
-    await expect(rows.nth(3)).toContainText("Code.exe");
+    const cells = await rows.allTextContents();
+    expect(cells[0]).toContain("youtube.com");
+    expect(cells[1]).toContain("Spotify.exe");
+    expect(cells[2]).toContain("docs.python.org");
+    expect(cells[3]).toContain("Code.exe");
   } finally {
     await server.close();
   }
 });
 
-test("mobile metrics use a single-column layout", async ({ page }) => {
+test("mobile dashboard has single-column bottom split", async ({ page }) => {
   const server = await startWebUiServer();
   try {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(server.url);
 
-    await expect(page.locator("#metricsView")).toBeVisible();
-    await expect(page.locator(".right-now-list")).toHaveCSS(
-      "grid-template-columns",
-      /^(?!.*\s).+$/
-    );
-    await expect(page.locator(".workbench-grid")).toHaveCSS(
+    await expect(page.locator("#dashboardView")).toBeVisible();
+    await expect(page.locator(".bottom-split")).toHaveCSS(
       "grid-template-columns",
       /^(?!.*\s).+$/
     );
@@ -297,102 +379,13 @@ test("mobile metrics use a single-column layout", async ({ page }) => {
   }
 });
 
-test("mobile timeline keeps axis labels readable", async ({ page }) => {
+test("timeline shows 24 hourly buckets", async ({ page }) => {
   const server = await startWebUiServer();
   try {
-    await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(server.url);
-
-    await expect(page.locator("#metricsView")).toBeVisible();
-    const hasOverlap = await page.locator(".timeline-axis span").evaluateAll(
-      (ticks) => ticks.some((tick, index) => {
-        if (index === 0) return false;
-        const previous = ticks[index - 1].getBoundingClientRect();
-        const current = tick.getBoundingClientRect();
-        return current.left < previous.right + 2;
-      })
-    );
-    expect(hasOverlap).toBe(false);
-  } finally {
-    await server.close();
-  }
-});
-
-test("hero renders serif headline and inline numerals", async ({ page }) => {
-  const server = await startWebUiServer({
-    events: [
-      {
-        id: 1,
-        observed_at: "2026-07-03T09:00:00.000Z",
-        received_at: "2026-07-03T09:00:00.000Z",
-        source: "windows_probe",
-        kind: "app_active",
-        entity_type: "app",
-        entity: "Code.exe",
-        title: "LocalTrace",
-        payload: { activity: "focus" }
-      },
-      {
-        id: 2,
-        observed_at: "2026-07-03T10:00:00.000Z",
-        received_at: "2026-07-03T10:00:00.000Z",
-        source: "windows_probe",
-        kind: "app_active",
-        entity_type: "app",
-        entity: "Code.exe",
-        payload: { activity: "focus" }
-      }
-    ]
-  });
-  try {
-    await page.addInitScript(() => {
-      const fixedNow = new Date("2026-07-03T17:00:00.000Z").valueOf();
-      const RealDate = Date;
-      class FixedDate extends RealDate {
-        constructor(...args) { super(...(args.length ? args : [fixedNow])); }
-        static now() { return fixedNow; }
-      }
-      FixedDate.UTC = RealDate.UTC;
-      FixedDate.parse = RealDate.parse;
-      globalThis.Date = FixedDate;
-    });
-    await page.goto(server.url);
-
-    const hero = page.locator("#hero");
-    await expect(hero).toBeVisible();
-    const heroH1 = hero.locator("h1");
-    await expect(heroH1).toBeVisible();
-    const headline = (await heroH1.textContent()).trim();
-    expect(headline.length).toBeGreaterThan(0);
-    const family = await heroH1.evaluate((el) => getComputedStyle(el).fontFamily);
-    expect(family.toLowerCase()).toContain("serif");
-
-    await expect(hero.locator(".hero-numerals")).toHaveCount(1);
-    const numerals = hero.locator(".hero-numerals dt");
-    await expect(numerals.first()).toHaveText(/Focus/i);
-    const numeralTexts = await numerals.allTextContents();
-    expect(numeralTexts.length).toBe(4);
-    expect(numeralTexts.map((t) => t.trim().toLowerCase())).toEqual(
-      expect.arrayContaining(["focus", "events"])
-    );
-  } finally {
-    await server.close();
-  }
-});
-
-test("mobile hero downsizes below 700px", async ({ page }) => {
-  const server = await startWebUiServer();
-  try {
-    await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto(server.url);
-
-    const hero = page.locator("#hero");
-    await expect(hero).toBeVisible();
-    const heroH1 = hero.locator("h1");
-    const heroSize = await heroH1.evaluate((el) =>
-      parseFloat(getComputedStyle(el).fontSize)
-    );
-    expect(heroSize).toBeLessThanOrEqual(32);
+    await expect(page.locator("#timelineBars")).toBeVisible();
+    const bars = await page.locator(".timeline-bar").count();
+    expect(bars).toBe(24);
   } finally {
     await server.close();
   }

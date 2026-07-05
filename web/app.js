@@ -1,19 +1,13 @@
 const state = {
-  activeSection: "metricsView",
-  topFilter: "all",
   events: [],
   settings: null,
   rules: [],
   tracking: { paused: false },
-  health: null
+  health: null,
+  view: "dashboard"
 };
 
 const $ = (id) => document.getElementById(id);
-
-const SECTION_TITLES = {
-  metricsView: "Metrics",
-  settingsPanel: "Settings"
-};
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -42,184 +36,106 @@ async function loadAll() {
     state.settings = settings.settings;
     state.rules = privacy.rules;
     state.tracking = tracking;
-    renderAll();
-    setStatus("Ready");
+    renderDashboard(state);
   } catch (error) {
-    setStatus(error.message);
+    console.error(error);
   } finally {
     setBusy(false);
   }
 }
 
-function renderAll() {
-  renderShell();
-  renderToday();
-  renderFlow(state.events);
-  renderHealth(state.health);
+function renderDashboard(state) {
+  const model = buildDashboardModel(state.events, state.settings);
+  renderKpis(model);
+  renderTimeline(model);
+  renderRightNow(model);
+  renderRecentFlow(state.events);
+  renderStatusBar(model, state.health);
+  renderTracking(state.tracking);
   renderSettings(state.settings);
   renderRules(state.rules);
-  renderTracking(state.tracking);
 }
 
-function renderShell() {
-  for (const button of document.querySelectorAll(".nav-item")) {
-    const active = button.dataset.section === state.activeSection;
-    button.classList.toggle("active", active);
-    button.setAttribute("aria-current", active ? "page" : "false");
-  }
-  for (const section of document.querySelectorAll(".view")) {
-    section.classList.toggle("active", section.id === state.activeSection);
-  }
-  $("pageTitle").textContent = SECTION_TITLES[state.activeSection] || "Metrics";
-}
-
-function renderToday() {
-  const model = buildTodayModel(state.events, state.settings);
-  renderHero(model);
-  renderNow(model);
-  renderSummary(model);
-  renderTop(model);
-  renderTimeline(model);
-}
-
-function buildHeadline(model) {
-  const focus = model.focusSeconds || 0;
-  const audio = model.audioSeconds || 0;
-  const switches = model.focusSwitches || 0;
-  const events = (model.todayEvents || []).length;
-
-  const sentence =
-    focus >= 3600
-      ? `Today, you focused ${formatDuration(focus)}.`
-      : focus >= 60
-        ? `Today so far — ${formatDuration(focus)} focused.`
-        : "Nothing tracked yet today.";
-
-  const tallyApps = new Set(
-    (model.todayEvents || [])
-      .filter(isFocusEvent)
-      .map((e) => `${e.source}:${e.entity}`)
-  );
-  const tallySites = new Set(
-    (model.todayEvents || [])
-      .filter((e) => e.source === "browser_extension" && isFocusEvent(e))
-      .map((e) => e.entity)
-  );
-
-  const subData = focus <= 0
-    ? { lead: "Once activity starts, it will appear here.", emphasis: "" }
-    : {
-        lead: `across ${tallyApps.size} apps and ${tallySites.size} sites. ${switches} focus switches. ${formatDuration(audio)} of background audio.`,
-        emphasis: "a quieter day."
-      };
-
-  const date = new Intl.DateTimeFormat(undefined, {
-    year: "numeric", month: "2-digit", day: "2-digit"
-  }).format(model.now);
-
-  const numerals = [
-    { tag: "Focus", value: focus >= 60 ? formatDuration(focus) : "—" },
-    { tag: "Audio", value: audio > 0 ? formatDuration(audio) : "—" },
-    { tag: "Switches", value: String(switches) },
-    { tag: "Events", value: String(events) }
-  ];
-
-  return {
-    eyebrow: `LOCALTRACE · ${date}`,
-    sentence,
-    subLead: subData.lead,
-    subEmphasis: subData.emphasis,
-    numerals
-  };
-}
-
-function renderHero(model) {
-  const root = $("hero");
-  if (!root) return;
-  const h = model.headline;
-  if (!h) return;
-
-  const eyebrow = document.createElement("p");
-  eyebrow.className = "hero-eyebrow";
-  eyebrow.textContent = h.eyebrow;
-
-  const headline = document.createElement("h1");
-  headline.className = "hero-headline";
-  headline.textContent = h.sentence;
-
-  const sub = document.createElement("p");
-  sub.className = "hero-sub";
-  sub.append(document.createTextNode(h.subLead));
-  if (h.subEmphasis) {
-    sub.append(document.createTextNode(" — "));
-    const em = document.createElement("em");
-    em.textContent = h.subEmphasis;
-    sub.append(em);
-  }
-
-  const numerals = document.createElement("dl");
-  numerals.className = "hero-numerals";
-  for (const item of h.numerals) {
-    const cell = document.createElement("div");
-    const dt = document.createElement("dt");
-    const dd = document.createElement("dd");
-    dt.textContent = item.tag;
-    dd.textContent = item.value;
-    cell.append(dt, dd);
-    numerals.append(cell);
-  }
-
-  root.replaceChildren(eyebrow, headline, sub, numerals);
-}
-
-function buildTodayModel(events, settings) {
+function buildDashboardModel(events, settings) {
   const now = new Date();
   const todayEvents = events
     .filter((event) => isSameLocalDay(parseDate(event.observed_at), now))
     .sort(compareEventsDesc);
   const ascending = [...todayEvents].sort(compareEventsAsc);
   const idleSeconds =
-    settings?.capture?.idle_cutoff_seconds &&
-    Number.isFinite(settings.capture.idle_cutoff_seconds)
+    settings?.capture?.idle_cutoff_seconds && Number.isFinite(settings.capture.idle_cutoff_seconds)
       ? settings.capture.idle_cutoff_seconds
       : 300;
   const audioFreshnessSeconds = currentAudioFreshnessSeconds(settings);
 
   const focusSegments = buildFocusSegments(ascending, idleSeconds, now);
   const audioSegments = buildAudioSegments(ascending, idleSeconds, now);
-  const segments = [...focusSegments, ...audioSegments].sort(
-    (a, b) => a.start - b.start
-  );
-  const topItems = buildTopItems(segments);
+  const focusSeconds = sumSeconds(focusSegments);
+  const audioSeconds = sumSeconds(audioSegments);
+
   const latestFocus = todayEvents.find(isFocusEvent) || null;
   const latestTab = todayEvents.find(
     (event) => event.source === "browser_extension" && isFocusEvent(event)
   );
-  const latestAudio = latestActiveAudioEvent(
-    todayEvents,
-    audioFreshnessSeconds,
-    now
-  );
+  const latestAudio = latestActiveAudioEvent(todayEvents, audioFreshnessSeconds, now);
 
-  const focusSeconds = sumSeconds(focusSegments);
-  const audioSeconds = sumSeconds(audioSegments);
+  const timelineBuckets = buildTimelineBuckets(focusSegments, audioSegments, now);
 
-  const model = {
+  const latestObservedAt =
+    state.events.length > 0
+      ? parseDate(state.events.slice().sort(compareEventsAsc).slice(-1)[0]?.observed_at)
+      : null;
+
+  return {
     now,
     todayEvents,
     focusSegments,
     audioSegments,
-    segments,
-    topItems,
-    latestFocus,
-    latestTab: latestTab || null,
-    latestAudio,
     focusSeconds,
     audioSeconds,
-    focusSwitches: focusSegments.length
+    focusSwitches: focusSegments.length,
+    todayEventsCount: todayEvents.length,
+    timelineBuckets,
+    latestFocus,
+    latestTab,
+    latestAudio,
+    latestObservedAt
   };
-  model.headline = buildHeadline(model);
-  return model;
+}
+
+function buildTimelineBuckets(focusSegments, audioSegments, now) {
+  const HOURS = 24;
+  const bucketMs = (60 * 60 * 1000) / 2; // 30-min slots
+  const buckets = [];
+  for (let i = 0; i < HOURS; i += 1) {
+    buckets.push({ index: i, start: null, end: null, focus: false, audio: false, idle: true });
+  }
+  const mark = (segment) => {
+    if (!segment.start || !segment.end) return;
+    let s = segment.start.getTime();
+    const e = segment.end.getTime();
+    while (s < e) {
+      const hour = s.getUTCHours ? s : new Date(s).getUTCHours();
+      // hour-of-day in UTC for placement; clamped into 0..HOURS-1
+      const hourOfDay = new Date(s).getUTCHours();
+      const idx = Math.min(HOURS - 1, Math.max(0, hourOfDay));
+      const b = buckets[idx];
+      if (segment.audio) b.audio = true; else b.focus = true;
+      b.idle = !(b.focus || b.audio);
+      s += bucketMs;
+    }
+  };
+  for (const seg of focusSegments) mark(seg);
+  for (const seg of audioSegments) mark(seg);
+  return buckets;
+}
+
+function currentAudioFreshnessSeconds(settings) {
+  const heartbeatSeconds = Number(settings?.capture?.heartbeat_seconds);
+  const heartbeat = Number.isFinite(heartbeatSeconds) && heartbeatSeconds > 0
+    ? heartbeatSeconds
+    : 60;
+  return Math.max(90, heartbeat * 3);
 }
 
 function buildFocusSegments(events, idleSeconds, now) {
@@ -249,14 +165,6 @@ function buildAudioSegments(events, idleSeconds, now) {
   return segments;
 }
 
-function currentAudioFreshnessSeconds(settings) {
-  const heartbeatSeconds = Number(settings?.capture?.heartbeat_seconds);
-  const heartbeat = Number.isFinite(heartbeatSeconds) && heartbeatSeconds > 0
-    ? heartbeatSeconds
-    : 60;
-  return Math.max(90, heartbeat * 3);
-}
-
 function segmentFromEvent(event, start, next, idleSeconds, audio) {
   if (!start || !next) return [];
   const maxEnd = new Date(start.getTime() + idleSeconds * 1000);
@@ -279,289 +187,215 @@ function segmentFromEvent(event, start, next, idleSeconds, audio) {
   ];
 }
 
-function buildTopItems(segments) {
-  const map = new Map();
-  for (const segment of segments) {
-    const key = `${segment.kind}:${segment.entity}:${segment.activity}`;
-    const current =
-      map.get(key) ||
-      {
-        kind: segment.kind,
-        entity: segment.entity,
-        label: segment.label,
-        subtitle: segment.subtitle,
-        activity: segment.activity,
-        audio: segment.audio,
-        seconds: 0
-      };
-    current.seconds += segment.seconds;
-    if (!current.subtitle && segment.subtitle) current.subtitle = segment.subtitle;
-    map.set(key, current);
-  }
-  return [...map.values()].sort(
-    (a, b) => b.seconds - a.seconds || a.label.localeCompare(b.label)
-  );
+function renderKpis(model) {
+  $("kpiFocusNum").innerHTML = `${formatHm(model.focusSeconds)}<span class="unit">h:m</span>`;
+  $("kpiFocusFoot").textContent = model.focusSeconds > 0
+    ? `Goal 5:00 · ${minutesToGo(5 * 3600 - model.focusSeconds)} to go`
+    : "No focus yet";
+
+  $("kpiAudioNum").innerHTML = `${Math.max(0, Math.round(model.audioSeconds / 60))}<span class="unit">m</span>`;
+  $("kpiAudioFoot").textContent = model.audioSegments.length
+    ? `${model.audioSegments.length} session${model.audioSegments.length === 1 ? "" : "s"}`
+    : "No audio captured";
+
+  $("kpiSwitchesNum").textContent = String(model.focusSwitches);
+  $("kpiSwitchesFoot").textContent = model.todayEventsCount
+    ? `${model.todayEventsCount} events today`
+    : "No activity yet";
+
+  $("kpiEventsNum").textContent = String(model.todayEventsCount);
+  $("kpiEventsFoot").textContent = model.todayEventsCount
+    ? `${Math.round(model.todayEventsCount / Math.max(1, hoursElapsed(model.now)))} / hr · db synced`
+    : "— / hr · db synced";
 }
 
-function buildTimelineModel(model) {
-  const lanes = new Map();
-  for (const segment of model.segments) {
-    const key = `${segment.kind}:${segment.entity}`;
-    const lane =
-      lanes.get(key) ||
-      {
-        kind: segment.kind,
-        entity: segment.entity,
-        label: segment.label,
-        subtitle: segment.subtitle,
-        totalSeconds: 0,
-        bars: []
-      };
-    lane.totalSeconds += segment.seconds;
-    lane.bars.push({
-      audio: segment.audio,
-      startMinute: minuteOfDay(segment.start),
-      endMinute: minuteOfDay(segment.end),
-      title: `${segment.label} - ${formatDuration(segment.seconds)}`
-    });
-    lanes.set(key, lane);
+function renderTimeline(model) {
+  const focusMinutes = Math.round(model.focusSeconds / 60);
+  const totalMinutes = focusMinutes + Math.round(model.audioSeconds / 60);
+  $("timelineTitle").textContent = `${formatHm(model.focusSeconds)} / ${totalMinutes}m`;
+
+  const bars = $("timelineBars");
+  bars.replaceChildren();
+  const now = model.now;
+  const nowHourIdx = computeNowIndex(model.now);
+  for (let i = 0; i < 24; i += 1) {
+    const cell = document.createElement("span");
+    cell.className = "timeline-bar";
+    const bucket = model.timelineBuckets[i];
+    if (i === nowHourIdx) {
+      cell.classList.add("now");
+    } else if (bucket?.audio && !bucket?.focus) {
+      cell.classList.add("audio");
+    } else if (bucket?.focus) {
+      cell.classList.add("focus");
+    } else {
+      cell.classList.add("idle");
+    }
+    bars.append(cell);
   }
-  return [...lanes.values()]
-    .sort((a, b) => b.totalSeconds - a.totalSeconds || a.label.localeCompare(b.label))
-    .slice(0, 12);
+
+  $("timelineMeta").textContent =
+    `12h window · focus ${formatHm(model.focusSeconds)} · audio ${Math.round(model.audioSeconds / 60)}m`;
+
+  const axis = $("timelineAxis");
+  axis.replaceChildren();
+  const ticks = [
+    { label: "02", at: 2 },
+    { label: "06", at: 6 },
+    { label: "10", at: 10 },
+    { label: "14", at: 14 },
+    { label: "18", at: 18 },
+    { label: "22", at: 22 },
+    { label: "NOW", at: 24 }
+  ];
+  for (const t of ticks) {
+    const span = document.createElement("span");
+    span.textContent = t.label;
+    axis.append(span);
+  }
 }
 
-function renderNow(model) {
-  renderRightNow(model);
+function computeNowIndex(now) {
+  const h = now.getHours();
+  return Math.min(23, Math.max(0, h));
 }
 
 function renderRightNow(model) {
-  const root = $("rightNow");
-  if (!root) return;
   const rows = [
     { label: "Focus app", event: model.latestFocus, fallback: "No focus activity" },
     { label: "Using tab", event: model.latestTab, fallback: "No browser activity" },
     { label: "Background audio", event: model.latestAudio, fallback: "No audio activity" }
   ];
-
-  const heading = document.createElement("h3");
-  heading.className = "caps-tag";
-  heading.textContent = "Right now";
-
-  const list = document.createElement("div");
-  list.className = "right-now-list";
+  const list = $("nowList");
+  list.replaceChildren();
   for (const row of rows) list.append(rightNowRow(row));
 
-  const footer = document.createElement("p");
-  footer.className = "right-now-footer";
+  let active = 0;
+  for (const row of rows) if (row.event) active += 1;
+  $("nowCount").textContent = `${active} active`;
+
   const latestAt =
     model.latestAudio?.observed_at ||
     model.latestTab?.observed_at ||
     model.latestFocus?.observed_at;
-  footer.textContent = latestAt ? `Updated ${formatTime(latestAt)}` : "Waiting for activity";
-
-  root.replaceChildren(heading, list, footer);
+  $("nowFoot").textContent = latestAt
+    ? `Updated ${formatTime(latestAt)}`
+    : "Waiting for activity";
 }
 
 function rightNowRow({ label, event, fallback }) {
   const row = document.createElement("div");
-  row.className = "right-now-row";
-  const meta = document.createElement("span");
-  meta.className = "caps-tag";
-  meta.textContent = label;
-  const value = document.createElement("div");
-  value.className = "row-value";
+  row.className = "now-row";
+
+  const entity = document.createElement("div");
+  entity.className = "row-entity";
   if (event) {
-    value.append(
+    entity.append(
       entityAvatar(
         event.entity_type,
         event.entity,
         displayEntity(event),
-        event.payload?.activity || "focus"
+        isAudioStartEvent(event) ? "audio" : "focus"
       )
     );
     const text = document.createElement("div");
-    const title = document.createElement("strong");
-    const sub = document.createElement("span");
+    text.className = "text";
+    const title = document.createElement("div");
+    title.className = "now-name";
     title.textContent = displayEntity(event);
-    sub.textContent = event.title || formatTime(event.observed_at);
-    text.append(title, sub);
-    value.append(text);
+    const ctx = document.createElement("span");
+    ctx.className = "ctx";
+    ctx.textContent = event.title || formatTime(event.observed_at);
+    text.append(title, ctx);
+    entity.append(text);
   } else {
-    value.textContent = fallback;
+    entity.append(document.createTextNode(fallback));
   }
-  row.append(meta, value);
+  row.append(entity);
+
+  const time = document.createElement("div");
+  time.className = "now-time";
+  if (event) {
+    if (isAudioStartEvent(event)) {
+      time.innerHTML = `<span class="v">playing</span>`;
+    } else if (isAudioStopEvent(event)) {
+      time.innerHTML = `<span class="v">stopped</span>`;
+    } else {
+      const recentMinutes = sinceMinutes(event.observed_at, new Date());
+      time.innerHTML = `<span class="v">${recentMinutes}m</span> ago`;
+    }
+  }
+  row.append(time);
   return row;
 }
 
-function renderSummary(model) {
-  const focusTotal = $("focusTotal");
-  if (!focusTotal) return;
-  focusTotal.textContent = formatDuration(model.focusSeconds);
-  $("audioTotal").textContent = formatDuration(model.audioSeconds);
-  $("focusSwitches").textContent = String(model.focusSwitches);
-  $("todayEventsCount").textContent = String(model.todayEvents.length);
-  $("summaryMeta").textContent = model.todayEvents.length
-    ? `${model.focusSegments.length} focus segments, ${model.audioSegments.length} audio segments`
-    : "Waiting for activity";
-}
-
-function renderTop(model) {
-  for (const button of document.querySelectorAll(".segment")) {
-    button.classList.toggle("active", button.dataset.filter === state.topFilter);
+function renderRecentFlow(events) {
+  const body = $("flowBody");
+  body.replaceChildren();
+  const items = [...events].sort(compareEventsDesc).slice(0, 10);
+  if (items.length === 0) {
+    const empty = document.createElement("div");
+    empty.style.padding = "14px 18px";
+    empty.style.color = "var(--text-2)";
+    empty.textContent = "No recent activity";
+    body.append(empty);
+    return;
   }
-  const items = model.topItems
-    .filter((item) => state.topFilter === "all" || item.kind === state.topFilter)
-    .slice(0, 8);
-  const maxSeconds = Math.max(1, ...items.map((item) => item.seconds));
-  $("topMeta").textContent = items.length
-    ? `${items.length} lanes by observed duration`
-    : "No activity yet";
-  $("topList").replaceChildren(
-    ...items.map((item, index) => renderTopItem(item, index, maxSeconds))
-  );
+  for (const event of items) body.append(appendFlowRow(event));
 }
 
-function renderTopItem(item, index, maxSeconds) {
+function appendFlowRow(event) {
   const row = document.createElement("div");
-  row.className = "top-item";
-  const rank = document.createElement("span");
-  rank.className = "rank";
-  rank.textContent = String(index + 1).padStart(2, "0");
-  const body = document.createElement("div");
-  body.className = "top-body";
+  row.className = "flow-row";
+
+  const t = document.createElement("span");
+  t.className = "t";
+  t.textContent = formatTime(event.observed_at);
+  row.append(t);
+
+  const app = document.createElement("span");
+  app.className = "app";
   const title = document.createElement("strong");
-  const sub = document.createElement("span");
-  title.textContent = item.label;
-  sub.textContent = `${item.kind} - ${item.audio ? "audio" : "focus"}`;
-  const duration = document.createElement("b");
-  duration.textContent = formatDuration(item.seconds);
-  const meter = document.createElement("span");
-  meter.className = item.audio ? "top-meter audio" : "top-meter focus";
-  meter.style.width = `${Math.max(4, (item.seconds / maxSeconds) * 100)}%`;
-  body.append(title, sub);
-  row.append(
-    rank,
-    entityAvatar(item.kind, item.entity, item.label, item.activity),
-    body,
-    duration,
-    meter
-  );
-  return row;
-}
-
-function renderTimeline(model) {
-  const lanes = buildTimelineModel(model);
-  $("timelineEmpty").hidden = lanes.length !== 0;
-  $("timelineGrid").hidden = lanes.length === 0;
-  $("timelineMeta").textContent = lanes.length
-    ? `${lanes.length} top lanes from today`
-    : "No timeline activity yet";
-  $("timelineAxis").replaceChildren(...renderAxisTicks());
-  $("timelineLanes").replaceChildren(...lanes.map(renderTimelineLane));
-}
-
-function renderAxisTicks() {
-  return [0, 360, 720, 1080, 1440].map((minute) => {
-    const tick = document.createElement("span");
-    if (minute === 1440) tick.className = "end";
-    tick.style.left = `${(minute / 1440) * 100}%`;
-    tick.textContent = minute === 1440 ? "24:00" : `${String(minute / 60).padStart(2, "0")}:00`;
-    return tick;
-  });
-}
-
-function renderTimelineLane(lane) {
-  const row = document.createElement("div");
-  row.className = "timeline-row";
-  const label = document.createElement("div");
-  label.className = "timeline-lane-label";
-  const text = document.createElement("div");
-  const title = document.createElement("strong");
-  const sub = document.createElement("span");
-  title.textContent = lane.label;
-  sub.textContent = formatDuration(lane.totalSeconds);
-  text.append(title, sub);
-  label.append(entityAvatar(lane.kind, lane.entity, lane.label), text);
-
-  const track = document.createElement("div");
-  track.className = "timeline-track";
-  for (const bar of lane.bars) {
-    const item = document.createElement("span");
-    item.className = bar.audio ? "timeline-bar audio" : "timeline-bar focus";
-    item.title = bar.title;
-    item.style.left = `${(bar.startMinute / 1440) * 100}%`;
-    item.style.width = `${Math.max(0.3, ((bar.endMinute - bar.startMinute) / 1440) * 100)}%`;
-    track.append(item);
-  }
-  row.append(label, track);
-  return row;
-}
-
-function renderFlow(events) {
-  const items = [...events].sort(compareEventsDesc).slice(0, 14);
-  $("flowEmpty").hidden = items.length !== 0;
-  $("flowList").hidden = items.length === 0;
-  $("flowMeta").textContent = items.length
-    ? `${items.length} latest events`
-    : "Latest captured activity";
-  $("flowList").replaceChildren(...items.map(renderFlowItem));
-}
-
-function renderFlowItem(event) {
-  const row = document.createElement("div");
-  row.className = "flow-item";
-
-  const time = document.createElement("time");
-  time.className = "flow-time";
-  time.dateTime = event.observed_at || "";
-  time.textContent = formatFlowTime(event.observed_at);
-
-  const body = document.createElement("div");
-  body.className = "flow-body";
-  const title = document.createElement("strong");
-  const sub = document.createElement("span");
   title.textContent = displayEntity(event);
-  sub.textContent = flowSubtitle(event);
-  body.append(title, sub);
+  const ctx = document.createElement("span");
+  ctx.className = "ctx";
+  ctx.textContent = event.title || eventKindLabel(event);
+  app.append(title, ctx);
+  row.append(app);
 
-  const meta = document.createElement("div");
-  meta.className = "flow-meta";
-  meta.append(
-    flowChip(eventKindLabel(event), flowActivity(event)),
-    flowChip(event.source || "unknown")
-  );
+  const dur = document.createElement("span");
+  dur.className = "num";
+  // approximate duration by suffix we cannot reliably compute, but for flow show the related recent period
+  dur.textContent = computeEventDurationLabel(event);
+  row.append(dur);
 
-  row.append(
-    time,
-    entityAvatar(
-      event.entity_type,
-      event.entity,
-      displayEntity(event),
-      flowActivity(event)
-    ),
-    body,
-    meta
-  );
-  return row;
-}
-
-function flowChip(text, activity = "focus") {
+  const src = document.createElement("span");
+  src.className = "src";
   const chip = document.createElement("span");
   chip.className = "flow-chip";
-  chip.dataset.activity = activity;
-  chip.textContent = text;
-  return chip;
+  chip.dataset.source = event.source || "system";
+  chip.textContent = sourceLabel(event.source);
+  src.append(chip);
+  row.append(src);
+
+  return row;
 }
 
-function flowSubtitle(event) {
-  if (event.title) return event.title;
-  if (event.payload?.reason) return `Reason: ${event.payload.reason}`;
-  return event.kind || "";
+function computeEventDurationLabel(event) {
+  if (event.kind?.endsWith("_stop")) return "stop";
+  if (isAudioStartEvent(event) || isAudioStopEvent(event)) return "audio";
+  const at = parseDate(event.observed_at);
+  if (!at) return "—";
+  const minutes = Math.max(0, Math.round((Date.now() - at.getTime()) / 60000));
+  if (minutes >= 60) return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+  return `${minutes}m`;
 }
 
-function flowActivity(event) {
-  return isAudioStartEvent(event) || isAudioStopEvent(event) ? "audio" : "focus";
+function sourceLabel(source) {
+  if (source === "windows_probe") return "win";
+  if (source === "browser_extension") return "browser";
+  if (source === "system") return "system";
+  return source || "system";
 }
 
 function eventKindLabel(event) {
@@ -569,7 +403,7 @@ function eventKindLabel(event) {
     case "app_active":
       return "App focus";
     case "tab_active":
-      return flowActivity(event) === "audio" ? "Tab audio" : "Tab focus";
+      return isAudioStartEvent(event) ? "Tab audio" : "Tab focus";
     case "app_audio":
       return "App audio";
     case "app_audio_stop":
@@ -581,64 +415,76 @@ function eventKindLabel(event) {
   }
 }
 
-function renderHealth(health) {
-  if (!health) return;
-  const source = health.sources || {};
-  const metrics = [
-    ["Service", health.service || "unknown"],
-    ["Bind", `${health.bind?.host || "127.0.0.1"}:${health.bind?.port || ""}`],
-    ["Database", health.database?.exists ? "exists" : "missing"],
-    ["DB path", health.database?.path || ""],
-    ["Stored events", String(health.events?.recent_count ?? 0)],
-    ["Tracking", health.tracking?.paused ? "paused" : "active"],
-    ["Windows probe", source.windows_probe?.last_observed_at || "unknown"],
-    ["Browser extension", source.browser_extension?.last_observed_at || "unknown"]
-  ];
-  $("healthMetrics").replaceChildren(
-    ...metrics.map(([label, value]) => {
-      const item = document.createElement("div");
-      const dt = document.createElement("dt");
-      const dd = document.createElement("dd");
-      dt.textContent = label;
-      dd.textContent = value;
-      item.append(dt, dd);
-      return item;
-    })
-  );
+function renderStatusBar(model, health) {
+  const dots = document.querySelectorAll(".status-bar .dot");
+  const dbExists = health?.database?.exists;
+  const wLast = health?.sources?.windows_probe?.last_observed_at;
+  const bLast = health?.sources?.browser_extension?.last_observed_at;
+  for (const dot of dots) {
+    const kind = dot.dataset.health;
+    dot.classList.remove("red", "green");
+    if (kind === "db") {
+      dot.classList.add(dbExists ? "green" : "red");
+    } else if (kind === "browser") {
+      dot.classList.add(bLast ? "green" : "red");
+    } else if (kind === "winprobe") {
+      dot.classList.add(wLast ? "green" : "red");
+    }
+  }
+  const upd = $("statusUpdated");
+  if (upd) {
+    const latest = state.events
+      .slice()
+      .sort(compareEventsAsc)
+      .slice(-1)[0];
+    if (latest) {
+      upd.textContent = `${sinceSeconds(latest.observed_at, new Date())}s ago`;
+    } else {
+      upd.textContent = "—";
+    }
+  }
+  const counts = $("statusCounts");
+  if (counts) {
+    counts.textContent = `${model.todayEventsCount} events · ${formatHm(model.focusSeconds)} focused`;
+  }
+}
+
+function renderTracking(tracking) {
+  if (!tracking) return;
+  const pill = $("trackingPill");
+  if (pill) {
+    pill.textContent = tracking.paused ? "Paused" : "Tracking";
+  }
 }
 
 function renderSettings(settings) {
   if (!settings) return;
-  $("apiPort").value = settings.api.port;
-  $("pollMs").value = settings.capture.poll_ms;
-  $("heartbeatSeconds").value = settings.capture.heartbeat_seconds;
-  $("idleCutoffSeconds").value = settings.capture.idle_cutoff_seconds;
-  $("storeTitles").checked = settings.capture.store_titles;
-  $("storeExePath").checked = settings.capture.store_exe_path;
-  $("trackBrowser").checked = settings.capture.track_browser;
-  $("trackAudio").checked = settings.capture.track_audio;
+  if ($("apiPort")) $("apiPort").value = settings.api.port;
+  if ($("pollMs")) $("pollMs").value = settings.capture.poll_ms;
+  if ($("heartbeatSeconds")) $("heartbeatSeconds").value = settings.capture.heartbeat_seconds;
+  if ($("idleCutoffSeconds")) $("idleCutoffSeconds").value = settings.capture.idle_cutoff_seconds;
+  if ($("storeTitles")) $("storeTitles").checked = settings.capture.store_titles;
+  if ($("storeExePath")) $("storeExePath").checked = settings.capture.store_exe_path;
+  if ($("trackBrowser")) $("trackBrowser").checked = settings.capture.track_browser;
+  if ($("trackAudio")) $("trackAudio").checked = settings.capture.track_audio;
 }
 
 function renderRules(rules) {
-  const rows = rules.map((rule) => {
-    const tr = document.createElement("tr");
-    tr.append(
-      cell(String(rule.id)),
-      cell(rule.entity_type),
-      cell(rule.pattern),
-      cell(rule.action),
-      actionCell(rule.id)
-    );
-    return tr;
-  });
-  $("rulesTable").replaceChildren(...rows);
-}
-
-function renderTracking(tracking) {
-  $("pauseButton").disabled = tracking.paused;
-  $("resumeButton").disabled = !tracking.paused;
-  $("trackingPill").textContent = tracking.paused ? "Paused" : "Tracking";
-  $("trackingPill").classList.toggle("paused", tracking.paused);
+  const tbody = $("rulesTable");
+  if (!tbody) return;
+  tbody.replaceChildren(
+    ...rules.map((rule) => {
+      const tr = document.createElement("tr");
+      tr.append(
+        cell(String(rule.id)),
+        cell(rule.entity_type),
+        cell(rule.pattern),
+        cell(rule.action),
+        actionCell(rule.id)
+      );
+      return tr;
+    })
+  );
 }
 
 function cell(text) {
@@ -663,7 +509,6 @@ function entityAvatar(kind, entity, label, activity = "focus") {
   avatar.className = "entity-avatar";
   avatar.dataset.kind = kind || "app";
   avatar.dataset.activity = activity;
-  avatar.style.setProperty("--avatar-hue", String(hashHue(`${kind}:${entity}`)));
   avatar.append(iconForEntity(kind, activity));
   return avatar;
 }
@@ -673,12 +518,14 @@ function iconForEntity(kind, activity) {
   svg.setAttribute("viewBox", "0 0 24 24");
   svg.setAttribute("aria-hidden", "true");
   svg.classList.add("entity-icon");
-  const paths =
-    activity === "audio"
-      ? ["M4 14a8 8 0 0 1 16 0", "M6 14h2v6H6a2 2 0 0 1-2-2v-2a2 2 0 0 1 2-2Z", "M16 14h2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-2v-6Z"]
-      : kind === "domain"
-        ? ["M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z", "M3.6 9h16.8", "M3.6 15h16.8", "M12 3a13 13 0 0 1 0 18", "M12 3a13 13 0 0 0 0 18"]
-        : ["M4 5h16v11H4Z", "M8 20h8", "M10 16v4", "M14 16v4"];
+  let paths;
+  if (activity === "audio") {
+    paths = ["M4 14a8 8 0 0 1 16 0", "M6 14h2v6H6a2 2 0 0 1-2-2v-2a2 2 0 0 1 2-2Z", "M16 14h2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-2v-6Z"];
+  } else if (kind === "domain") {
+    paths = ["M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z", "M3.6 9h16.8", "M3.6 15h16.8", "M12 3a13 13 0 0 1 0 18", "M12 3a13 13 0 0 0 0 18"];
+  } else {
+    paths = ["M4 5h16v11H4Z", "M8 20h8", "M10 16v4", "M14 16v4"];
+  }
   for (const d of paths) {
     const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
     path.setAttribute("d", d);
@@ -689,9 +536,7 @@ function iconForEntity(kind, activity) {
 
 function settingsFromForm() {
   return {
-    api: {
-      port: Number.parseInt($("apiPort").value, 10)
-    },
+    api: { port: Number.parseInt($("apiPort").value, 10) },
     capture: {
       poll_ms: Number.parseInt($("pollMs").value, 10),
       heartbeat_seconds: Number.parseInt($("heartbeatSeconds").value, 10),
@@ -713,14 +558,12 @@ async function saveSettings() {
     });
     state.settings = body.settings;
     renderSettings(body.settings);
-    renderToday();
+    renderDashboard(state);
     if (body.restart_required?.includes("api.port")) {
-      setStatus("Saved; restart required for port");
-    } else {
-      setStatus("Saved");
+      console.info("restart required for port");
     }
   } catch (error) {
-    setStatus(error.message);
+    console.error(error);
   } finally {
     setBusy(false);
   }
@@ -742,7 +585,7 @@ async function addRule() {
     $("rulePattern").value = "";
     await loadAll();
   } catch (error) {
-    setStatus(error.message);
+    console.error(error);
   } finally {
     setBusy(false);
   }
@@ -754,7 +597,7 @@ async function deleteRule(id) {
     await api(`/privacy/rules/${id}`, { method: "DELETE" });
     await loadAll();
   } catch (error) {
-    setStatus(error.message);
+    console.error(error);
   } finally {
     setBusy(false);
   }
@@ -768,7 +611,7 @@ async function setTracking(path) {
     renderTracking(tracking);
     await loadAll();
   } catch (error) {
-    setStatus(error.message);
+    console.error(error);
   } finally {
     setBusy(false);
   }
@@ -857,10 +700,9 @@ function parseDate(value) {
 }
 
 function compareEventsAsc(a, b) {
-  return (
-    parseDate(a.observed_at).getTime() - parseDate(b.observed_at).getTime() ||
-    Number(a.id || 0) - Number(b.id || 0)
-  );
+  const ta = parseDate(a.observed_at)?.getTime() ?? 0;
+  const tb = parseDate(b.observed_at)?.getTime() ?? 0;
+  return ta - tb || (Number(a.id || 0) - Number(b.id || 0));
 }
 
 function compareEventsDesc(a, b) {
@@ -876,10 +718,6 @@ function isSameLocalDay(a, b) {
   );
 }
 
-function minuteOfDay(date) {
-  return date.getHours() * 60 + date.getMinutes() + date.getSeconds() / 60;
-}
-
 function sumSeconds(segments) {
   return segments.reduce((sum, item) => sum + item.seconds, 0);
 }
@@ -888,15 +726,6 @@ function displayEntity(event) {
   const entity = event?.entity || "";
   if (!entity) return "unknown";
   return entity;
-}
-
-function hashHue(input) {
-  let hash = 0x811c9dc5;
-  for (const char of input) {
-    hash ^= char.charCodeAt(0);
-    hash = Math.imul(hash, 0x01000193) >>> 0;
-  }
-  return hash % 360;
 }
 
 function formatDuration(seconds) {
@@ -908,58 +737,111 @@ function formatDuration(seconds) {
   return minutes ? `${hours}h ${minutes}m` : `${hours}h`;
 }
 
+function formatHm(seconds) {
+  const totalMinutes = Math.max(0, Math.round(seconds / 60));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${hours}:${String(minutes).padStart(2, "0")}`;
+}
+
 function formatTime(value) {
   const date = parseDate(value);
   if (!date) return value || "";
   return new Intl.DateTimeFormat(undefined, {
     hour: "2-digit",
     minute: "2-digit",
-    second: "2-digit"
+    second: "2-digit",
+    hour12: false
   }).format(date);
 }
 
-function formatFlowTime(value) {
-  const date = parseDate(value);
-  if (!date) return value || "";
-  return new Intl.DateTimeFormat(undefined, {
-    month: "short",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit"
-  }).format(date);
+function minutesToGo(seconds) {
+  const total = Math.max(0, Math.round(seconds / 60));
+  const hours = Math.floor(total / 60);
+  const minutes = total % 60;
+  if (hours > 0 && minutes > 0) return `${hours}h ${minutes}m`;
+  if (hours > 0) return `${hours}h`;
+  return `${minutes}m`;
 }
 
-function setSection(sectionId) {
-  state.activeSection = sectionId;
-  renderShell();
-  $(sectionId)?.scrollIntoView({ block: "start" });
+function hoursElapsed(now) {
+  const seconds = Math.max(1, Math.round((now - new Date(now.getFullYear(), now.getMonth(), now.getDate())) / 1000));
+  return Math.max(1, seconds / 3600);
 }
 
-function setStatus(text) {
-  $("statusLine").textContent = text;
+function sinceSeconds(observed_at, now) {
+  const at = parseDate(observed_at);
+  if (!at) return 0;
+  return Math.max(0, Math.round((now.getTime() - at.getTime()) / 1000));
+}
+
+function sinceMinutes(observed_at, now) {
+  return Math.floor(sinceSeconds(observed_at, now) / 60);
 }
 
 function setBusy(busy) {
   for (const button of document.querySelectorAll("button")) {
     button.disabled = busy;
   }
-  if (!busy) renderTracking(state.tracking);
 }
 
-for (const button of document.querySelectorAll(".nav-item")) {
-  button.addEventListener("click", () => setSection(button.dataset.section));
+// Navigation
+function showView(view) {
+  state.view = view;
+  const dash = $("dashboardView");
+  const settings = $("settingsView");
+  if (!dash || !settings) return;
+  dash.classList.toggle("active", view === "dashboard");
+  dash.classList.toggle("hidden", view !== "dashboard");
+  settings.classList.toggle("active", view === "settings");
+  settings.classList.toggle("hidden", view !== "settings");
+  for (const btn of document.querySelectorAll(".icon-rail-btn")) {
+    btn.classList.toggle("active", btn.dataset.rail === view);
+  }
 }
-for (const button of document.querySelectorAll(".segment")) {
-  button.addEventListener("click", () => {
-    state.topFilter = button.dataset.filter || "all";
-    renderToday();
+
+for (const btn of document.querySelectorAll(".icon-rail-btn")) {
+  btn.addEventListener("click", () => {
+    const target = btn.dataset.rail;
+    if (target === "settings") showView("settings");
+    else if (target === "dashboard" || target === "activity" || target === "apps" || target === "reports") {
+      showView("dashboard");
+    }
   });
 }
 
-$("refreshButton").addEventListener("click", loadAll);
-$("saveSettings").addEventListener("click", saveSettings);
-$("addRule").addEventListener("click", addRule);
-$("pauseButton").addEventListener("click", () => setTracking("/tracking/pause"));
-$("resumeButton").addEventListener("click", () => setTracking("/tracking/resume"));
+const backBtn = $("backToDashboard");
+if (backBtn) backBtn.addEventListener("click", () => showView("dashboard"));
 
+const refreshBtn = $("refreshButton");
+if (refreshBtn) refreshBtn.addEventListener("click", loadAll);
+
+const saveBtn = $("saveSettings");
+if (saveBtn) saveBtn.addEventListener("click", saveSettings);
+
+const addRuleBtn = $("addRule");
+if (addRuleBtn) addRuleBtn.addEventListener("click", addRule);
+
+const pauseBtn = $("pauseButton");
+if (pauseBtn) pauseBtn.addEventListener("click", () => setTracking("/tracking/pause"));
+
+const resumeBtn = $("resumeButton");
+if (resumeBtn) resumeBtn.addEventListener("click", () => setTracking("/tracking/resume"));
+
+// Update topbar crumb to today on first render
+function setTopbarCrumb() {
+  const crumb = $("topbarCrumb");
+  if (!crumb) return;
+  const now = new Date();
+  const datestr = new Intl.DateTimeFormat(undefined, {
+    year: "numeric", month: "2-digit", day: "2-digit"
+  }).format(now);
+  crumb.textContent = `Today · ${datestr}`;
+}
+
+setTopbarCrumb();
+showView("dashboard");
 loadAll();
+
+// Lightweight auto-refresh
+setInterval(loadAll, 30000);

@@ -3,233 +3,256 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>LocalTrace</title>
-    <link rel="stylesheet" href="/web/styles.css?v=20260705-flow" />
+    <title>LocalTrace — Command Center</title>
+    <link rel="stylesheet" href="/web/styles.css?v=20260705-a1" />
   </head>
   <body>
-    <svg class="icon-sprite" aria-hidden="true">
-      <symbol id="icon-activity" viewBox="0 0 24 24">
-        <path d="M3 12h4l2.3-7 5.4 14 2.3-7h4" />
-      </symbol>
-      <symbol id="icon-settings" viewBox="0 0 24 24">
-        <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" />
-        <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.3a2 2 0 1 1-4 0V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.4 7a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6V3a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1A2 2 0 1 1 20 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.8 1Z" />
-      </symbol>
-      <symbol id="icon-refresh" viewBox="0 0 24 24">
-        <path d="M21 12a9 9 0 0 1-15.2 6.5" />
-        <path d="M3 12A9 9 0 0 1 18.2 5.5" />
-        <path d="M18 2v4h4" />
-        <path d="M6 22v-4H2" />
-      </symbol>
-      <symbol id="icon-pause" viewBox="0 0 24 24">
-        <path d="M8 5v14" />
-        <path d="M16 5v14" />
-      </symbol>
-      <symbol id="icon-play" viewBox="0 0 24 24">
-        <path d="m8 5 11 7-11 7Z" />
-      </symbol>
-    </svg>
-    <div class="app-shell">
-      <aside class="nav-rail">
-        <div class="brand">
-          <div class="brand-mark" aria-hidden="true">LT</div>
-          <div>
-            <h1>LocalTrace</h1>
-            <p id="statusLine">Loading</p>
-          </div>
-        </div>
-        <nav class="nav-list" aria-label="Primary">
-          <button class="nav-item active" type="button" data-section="metricsView">
-            <svg class="icon" aria-hidden="true"><use href="#icon-activity"></use></svg>
-            <span>Metrics</span>
-          </button>
-          <button class="nav-item" type="button" data-section="settingsPanel">
-            <svg class="icon" aria-hidden="true"><use href="#icon-settings"></use></svg>
-            <span>Settings</span>
-          </button>
-        </nav>
-        <button id="refreshButton" class="secondary nav-refresh" type="button">
-          <svg class="button-icon" aria-hidden="true"><use href="#icon-refresh"></use></svg>
-          Refresh
+    <div class="app">
+
+      <aside class="icon-rail" aria-label="Primary">
+        <div class="icon-rail-mark" aria-hidden="true">LT</div>
+        <button class="icon-rail-btn active" type="button" data-rail="dashboard" title="Dashboard">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="3" y="3" width="7" height="7" rx="1.5"/>
+            <rect x="14" y="3" width="7" height="7" rx="1.5"/>
+            <rect x="3" y="14" width="7" height="7" rx="1.5"/>
+            <rect x="14" y="14" width="7" height="7" rx="1.5"/>
+          </svg>
+        </button>
+        <button class="icon-rail-btn" type="button" data-rail="activity" title="Activity">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+          </svg>
+        </button>
+        <button class="icon-rail-btn" type="button" data-rail="apps" title="Apps">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="3" y="3" width="7" height="7" rx="1"/>
+            <rect x="14" y="3" width="7" height="7" rx="1"/>
+            <rect x="3" y="14" width="7" height="7" rx="1"/>
+            <rect x="14" y="14" width="7" height="7" rx="1"/>
+            <rect x="7" y="7" width="10" height="10" rx="1"/>
+          </svg>
+        </button>
+        <button class="icon-rail-btn" type="button" data-rail="reports" title="Reports">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
+            <polyline points="14 3 14 9 20 9"/>
+            <line x1="8" y1="13" x2="16" y2="13"/>
+            <line x1="8" y1="17" x2="13" y2="17"/>
+          </svg>
+        </button>
+        <div class="icon-rail-spacer"></div>
+        <button class="icon-rail-btn" type="button" data-rail="help" title="Help">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="9"/>
+            <path d="M9.5 9.5a2.5 2.5 0 0 1 5 0c0 1.5-2.5 2-2.5 3.5"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+        </button>
+        <button class="icon-rail-btn" type="button" data-rail="settings" title="Settings">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.4 7a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6V3a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1A2 2 0 1 1 20 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.6 1Z"/>
+          </svg>
         </button>
       </aside>
 
-      <div class="workspace">
-        <header class="topbar">
-          <div>
-            <p class="eyebrow">Local capture</p>
-            <h2 id="pageTitle">Today</h2>
-          </div>
-          <div class="top-actions">
-            <span id="trackingPill" class="status-pill">Tracking</span>
-            <button id="pauseButton" class="secondary" type="button">
-              <svg class="button-icon" aria-hidden="true"><use href="#icon-pause"></use></svg>
-              Pause
-            </button>
-            <button id="resumeButton" class="secondary" type="button">
-              <svg class="button-icon" aria-hidden="true"><use href="#icon-play"></use></svg>
-              Resume
-            </button>
-          </div>
-        </header>
+      <header class="topbar">
+        <span class="topbar-brand">LocalTrace</span>
+        <span class="topbar-sep">/</span>
+        <span class="topbar-crumb" id="topbarCrumb">Today · 2026-07-05</span>
+        <div class="topbar-spacer"></div>
+        <button id="refreshButton" class="topbar-icon-btn" type="button" title="Refresh">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <polyline points="23 4 23 10 17 10"/>
+            <polyline points="1 20 1 14 7 14"/>
+            <path d="M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15"/>
+          </svg>
+        </button>
+        <div class="topbar-avatar">LT</div>
+      </header>
 
-        <main>
-          <section id="metricsView" class="view active">
-            <article id="hero" class="card hero-block">
-              <!-- populated by renderHero -->
-            </article>
+      <main id="dashboardView" class="dashboard view active">
 
-            <div class="workbench-grid">
-              <div class="main-stack">
-                <article class="card timeline-card">
-                  <div class="section-heading wrap">
-                    <div>
-                      <h3>Timeline</h3>
-                      <p class="section-note" id="timelineMeta">Top lanes from today</p>
-                    </div>
-                    <div class="legend">
-                      <span><i class="legend-focus"></i>Focus</span>
-                      <span><i class="legend-audio"></i>Audio</span>
-                    </div>
-                  </div>
-                  <p class="empty-state" id="timelineEmpty" hidden>No timeline activity yet.</p>
-                  <div class="timeline-grid" id="timelineGrid">
-                    <div class="timeline-label-spacer"></div>
-                    <div class="timeline-axis" id="timelineAxis"></div>
-                    <div class="timeline-lanes" id="timelineLanes"></div>
-                  </div>
-                </article>
-
-                <article class="card">
-                  <div class="section-heading">
-                    <div>
-                      <h3>Recent flow</h3>
-                      <p class="section-note" id="flowMeta">Latest captured activity</p>
-                    </div>
-                  </div>
-                  <p class="empty-state" id="flowEmpty" hidden>No recent activity yet.</p>
-                  <div class="flow-list" id="flowList"></div>
-                </article>
-              </div>
-
-              <aside class="side-stack">
-                <aside class="card right-now" id="rightNow">
-                  <!-- populated by renderRightNow -->
-                </aside>
-                <article class="card">
-                  <div class="section-heading wrap">
-                    <div>
-                      <h3>Today Top</h3>
-                      <p class="section-note" id="topMeta">No activity yet</p>
-                    </div>
-                    <div class="segmented" role="group" aria-label="Top filter">
-                      <button class="segment active" type="button" data-filter="all">All</button>
-                      <button class="segment" type="button" data-filter="app">Apps</button>
-                      <button class="segment" type="button" data-filter="domain">Web</button>
-                    </div>
-                  </div>
-                  <div class="top-list" id="topList"></div>
-                </article>
-              </aside>
+        <section class="kpi-row">
+          <article class="kpi-card accent">
+            <span class="label kpi-label">Focused</span>
+            <div>
+              <div class="kpi-num" id="kpiFocusNum">0:00</div>
+              <div class="kpi-foot" id="kpiFocusFoot">No focus yet</div>
             </div>
-
-            <article class="card">
-              <div class="section-heading">
-                <h3>Health</h3>
-              </div>
-              <dl class="metrics" id="healthMetrics"></dl>
-            </article>
-          </section>
-
-          <section id="settingsPanel" class="view">
-            <div class="settings-layout">
-              <article class="card">
-                <div class="section-heading">
-                  <h3>Core settings</h3>
-                  <button id="saveSettings" type="button">Save</button>
-                </div>
-                <form id="settingsForm" class="settings-grid">
-                  <label>
-                    <span>Port</span>
-                    <input id="apiPort" name="apiPort" type="number" min="1" max="65535" />
-                  </label>
-                  <label>
-                    <span>Poll ms</span>
-                    <input id="pollMs" name="pollMs" type="number" min="100" step="100" />
-                  </label>
-                  <label>
-                    <span>Heartbeat sec</span>
-                    <input id="heartbeatSeconds" name="heartbeatSeconds" type="number" min="1" />
-                  </label>
-                  <label>
-                    <span>Idle cutoff sec</span>
-                    <input id="idleCutoffSeconds" name="idleCutoffSeconds" type="number" min="1" />
-                  </label>
-                  <label class="toggle">
-                    <span>Store titles</span>
-                    <input id="storeTitles" name="storeTitles" type="checkbox" />
-                  </label>
-                  <label class="toggle">
-                    <span>Store exe path</span>
-                    <input id="storeExePath" name="storeExePath" type="checkbox" />
-                  </label>
-                  <label class="toggle">
-                    <span>Track browser</span>
-                    <input id="trackBrowser" name="trackBrowser" type="checkbox" />
-                  </label>
-                  <label class="toggle">
-                    <span>Track audio</span>
-                    <input id="trackAudio" name="trackAudio" type="checkbox" />
-                  </label>
-                </form>
-              </article>
-
-              <article class="card">
-                <div class="section-heading">
-                  <h3>Privacy</h3>
-                  <button id="addRule" type="button">Add Rule</button>
-                </div>
-                <form id="ruleForm" class="rule-form">
-                  <label>
-                    <span>Entity</span>
-                    <select id="ruleEntityType" name="ruleEntityType">
-                      <option value="domain">domain</option>
-                      <option value="app">app</option>
-                    </select>
-                  </label>
-                  <label>
-                    <span>Pattern</span>
-                    <input id="rulePattern" name="rulePattern" type="text" autocomplete="off" />
-                  </label>
-                  <label>
-                    <span>Action</span>
-                    <select id="ruleAction" name="ruleAction">
-                      <option value="mask">mask</option>
-                      <option value="drop">drop</option>
-                    </select>
-                  </label>
-                </form>
-                <div class="table-wrap">
-                  <table class="rules-table">
-                    <thead>
-                      <tr>
-                        <th>ID</th>
-                        <th>Entity</th>
-                        <th>Pattern</th>
-                        <th>Action</th>
-                        <th></th>
-                      </tr>
-                    </thead>
-                    <tbody id="rulesTable"></tbody>
-                  </table>
-                </div>
-              </article>
+          </article>
+          <article class="kpi-card">
+            <span class="label kpi-label">Audio playback</span>
+            <div>
+              <div class="kpi-num" id="kpiAudioNum">0<span class="unit">m</span></div>
+              <div class="kpi-foot" id="kpiAudioFoot">No audio captured</div>
             </div>
-          </section>
-        </main>
-      </div>
+          </article>
+          <article class="kpi-card">
+            <span class="label kpi-label">App switches</span>
+            <div>
+              <div class="kpi-num" id="kpiSwitchesNum">0</div>
+              <div class="kpi-foot" id="kpiSwitchesFoot">No activity yet</div>
+            </div>
+          </article>
+          <article class="kpi-card">
+            <span class="label kpi-label">Events logged</span>
+            <div>
+              <div class="kpi-num" id="kpiEventsNum">0</div>
+              <div class="kpi-foot" id="kpiEventsFoot">— / hr · db synced</div>
+            </div>
+          </article>
+        </section>
+
+        <section class="timeline-strip">
+          <div class="timeline-title">
+            <span class="label">Activity</span>
+            <span class="timeline-title-num mono" id="timelineTitle">0:00 / 0:00</span>
+          </div>
+          <div class="timeline-body">
+            <div class="timeline-bars" id="timelineBars"></div>
+            <div class="timeline-meta" id="timelineMeta">12h window · focus 0m · audio 0m</div>
+            <div class="timeline-axis" id="timelineAxis"></div>
+          </div>
+        </section>
+
+        <section class="bottom-split">
+          <article class="panel">
+            <div class="panel-h">
+              <span class="title">Right now</span>
+              <span class="count" id="nowCount">3 rows</span>
+            </div>
+            <div class="now-list" id="nowList"></div>
+            <div class="now-foot" id="nowFoot">Waiting for activity</div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-h">
+              <span class="title">Recent flow</span>
+              <span class="count">last 10 events</span>
+            </div>
+            <div class="flow-table">
+              <div class="flow-hd">
+                <span>TIME</span><span>APP / CONTEXT</span><span>DURATION</span><span>SOURCE</span>
+              </div>
+              <div id="flowBody"></div>
+            </div>
+          </article>
+        </section>
+
+      </main>
+
+      <section id="settingsView" class="dashboard view hidden">
+        <article class="panel" style="padding: 18px;">
+          <div class="settings-card-h">
+            <h3>Settings</h3>
+            <button id="backToDashboard" class="settings-back" type="button">Back</button>
+          </div>
+
+          <div class="settings-card" style="margin-bottom: 16px;">
+            <div class="settings-card-h">
+              <h3>Core settings</h3>
+              <button id="saveSettings" class="primary" type="button">Save</button>
+            </div>
+            <form id="settingsForm" class="settings-grid">
+              <label>
+                <span>Port</span>
+                <input id="apiPort" name="apiPort" type="number" min="1" max="65535" />
+              </label>
+              <label>
+                <span>Poll ms</span>
+                <input id="pollMs" name="pollMs" type="number" min="100" step="100" />
+              </label>
+              <label>
+                <span>Heartbeat sec</span>
+                <input id="heartbeatSeconds" name="heartbeatSeconds" type="number" min="1" />
+              </label>
+              <label>
+                <span>Idle cutoff sec</span>
+                <input id="idleCutoffSeconds" name="idleCutoffSeconds" type="number" min="1" />
+              </label>
+              <label class="toggle">
+                <span>Store titles</span>
+                <input id="storeTitles" name="storeTitles" type="checkbox" />
+              </label>
+              <label class="toggle">
+                <span>Store exe path</span>
+                <input id="storeExePath" name="storeExePath" type="checkbox" />
+              </label>
+              <label class="toggle">
+                <span>Track browser</span>
+                <input id="trackBrowser" name="trackBrowser" type="checkbox" />
+              </label>
+              <label class="toggle">
+                <span>Track audio</span>
+                <input id="trackAudio" name="trackAudio" type="checkbox" />
+              </label>
+            </form>
+            <div style="margin-top: 16px; display: flex; gap: 12px;">
+              <span id="trackingPill" class="status-pill">Tracking</span>
+              <button id="pauseButton" class="secondary" type="button">Pause</button>
+              <button id="resumeButton" class="secondary" type="button">Resume</button>
+            </div>
+          </div>
+
+          <div class="settings-card">
+            <div class="settings-card-h">
+              <h3>Privacy</h3>
+              <button id="addRule" class="primary" type="button">Add Rule</button>
+            </div>
+            <form id="ruleForm" class="rule-form">
+              <label>
+                <span>Entity</span>
+                <select id="ruleEntityType" name="ruleEntityType">
+                  <option value="domain">domain</option>
+                  <option value="app">app</option>
+                </select>
+              </label>
+              <label>
+                <span>Pattern</span>
+                <input id="rulePattern" name="rulePattern" type="text" autocomplete="off" />
+              </label>
+              <label>
+                <span>Action</span>
+                <select id="ruleAction" name="ruleAction">
+                  <option value="mask">mask</option>
+                  <option value="drop">drop</option>
+                </select>
+              </label>
+              <div></div>
+            </form>
+            <div class="table-wrap">
+              <table class="rules-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Entity</th>
+                    <th>Pattern</th>
+                    <th>Action</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="rulesTable"></tbody>
+              </table>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <footer class="status-bar" id="statusBar">
+        <span><span class="dot" data-health="db"></span>db</span>
+        <span class="sep">·</span>
+        <span><span class="dot" data-health="browser"></span>browser</span>
+        <span class="sep">·</span>
+        <span><span class="dot" data-health="winprobe"></span>winprobe</span>
+        <span class="sep">·</span>
+        <span>Updated <span class="upd" id="statusUpdated">—</span></span>
+        <span class="sep">·</span>
+        <span id="statusCounts">0 events · 0m focused</span>
+      </footer>
     </div>
 
-    <script type="module" src="/web/app.js?v=20260705-flow"></script>
+    <script type="module" src="/web/app.js?v=20260705-a1"></script>
   </body>
 </html>
