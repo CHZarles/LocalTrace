@@ -75,10 +75,102 @@ function renderShell() {
 
 function renderToday() {
   const model = buildTodayModel(state.events, state.settings);
+  renderHero(model);
   renderNow(model);
   renderSummary(model);
   renderTop(model);
   renderTimeline(model);
+}
+
+function buildHeadline(model) {
+  const focus = model.focusSeconds || 0;
+  const audio = model.audioSeconds || 0;
+  const switches = model.focusSwitches || 0;
+  const events = (model.todayEvents || []).length;
+
+  const fmt = (sec) => {
+    if (sec < 60) return `${sec}s`;
+    const total = Math.round(sec / 60);
+    if (total < 60) return `${total}m`;
+    const h = Math.floor(total / 60);
+    const m = total % 60;
+    return m ? `${h}h ${m}m` : `${h}h`;
+  };
+
+  const sentence =
+    focus >= 3600
+      ? `Today, you focused ${fmt(focus)}.`
+      : focus >= 60
+        ? `Today so far — ${fmt(focus)} focused.`
+        : "Nothing tracked yet today.";
+
+  const tallyApps = new Set(
+    (model.todayEvents || [])
+      .filter(isFocusEvent)
+      .map((e) => `${e.source}:${e.entity}`)
+  );
+  const tallySites = new Set(
+    (model.todayEvents || [])
+      .filter((e) => e.source === "browser_extension" && isFocusEvent(e))
+      .map((e) => e.entity)
+  );
+
+  const sub = focus <= 0
+    ? "Once activity starts, it will appear here."
+    : `across ${tallyApps.size} apps and ${tallySites.size} sites. ${switches} focus switches. ${fmt(audio)} of background audio. — a quieter day.`;
+
+  const date = new Intl.DateTimeFormat(undefined, {
+    year: "numeric", month: "2-digit", day: "2-digit"
+  }).format(model.now);
+
+  const numerals = [
+    { tag: "Focus", value: fmt(focus) || "—" },
+    ...(audio > 0 ? [{ tag: "Audio", value: fmt(audio) }] : []),
+    { tag: "Switches", value: String(switches) },
+    { tag: "Events", value: String(events) }
+  ];
+  while (numerals.length < 4) numerals.push({ tag: "Events", value: "0" });
+
+  return { eyebrow: `LOCALTRACE · ${date}`, sentence, sub, numerals };
+}
+
+function renderHero(model) {
+  const root = $("hero");
+  if (!root) return;
+  const h = model.headline;
+  if (!h) return;
+
+  const eyebrow = document.createElement("p");
+  eyebrow.className = "hero-eyebrow";
+  eyebrow.textContent = h.eyebrow;
+
+  const headline = document.createElement("h1");
+  headline.className = "hero-headline";
+  headline.textContent = h.sentence;
+
+  const sub = document.createElement("p");
+  sub.className = "hero-sub";
+  sub.append(document.createTextNode(h.sub.replace(/\s*—\s*.*$/, "").trim() + " "));
+  const emMatch = h.sub.match(/—\s*(.+)$/);
+  if (emMatch) {
+    const em = document.createElement("em");
+    em.textContent = "— " + emMatch[1].trim();
+    sub.append(em);
+  }
+
+  const numerals = document.createElement("dl");
+  numerals.className = "hero-numerals";
+  for (const item of h.numerals) {
+    const cell = document.createElement("div");
+    const dt = document.createElement("dt");
+    const dd = document.createElement("dd");
+    dt.textContent = item.tag;
+    dd.textContent = item.value;
+    cell.append(dt, dd);
+    numerals.append(cell);
+  }
+
+  root.replaceChildren(eyebrow, headline, sub, numerals);
 }
 
 function buildTodayModel(events, settings) {
@@ -110,7 +202,10 @@ function buildTodayModel(events, settings) {
     now
   );
 
-  return {
+  const focusSeconds = sumSeconds(focusSegments);
+  const audioSeconds = sumSeconds(audioSegments);
+
+  const model = {
     now,
     todayEvents,
     focusSegments,
@@ -120,10 +215,12 @@ function buildTodayModel(events, settings) {
     latestFocus,
     latestTab: latestTab || null,
     latestAudio,
-    focusSeconds: sumSeconds(focusSegments),
-    audioSeconds: sumSeconds(audioSegments),
+    focusSeconds,
+    audioSeconds,
     focusSwitches: focusSegments.length
   };
+  model.headline = buildHeadline(model);
+  return model;
 }
 
 function buildFocusSegments(events, idleSeconds, now) {

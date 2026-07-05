@@ -317,3 +317,83 @@ test("mobile timeline keeps axis labels readable", async ({ page }) => {
     await server.close();
   }
 });
+
+test("hero renders serif headline and inline numerals", async ({ page }) => {
+  const server = await startWebUiServer({
+    events: [
+      {
+        id: 1,
+        observed_at: "2026-07-03T09:00:00.000Z",
+        received_at: "2026-07-03T09:00:00.000Z",
+        source: "windows_probe",
+        kind: "app_active",
+        entity_type: "app",
+        entity: "Code.exe",
+        title: "LocalTrace",
+        payload: { activity: "focus" }
+      },
+      {
+        id: 2,
+        observed_at: "2026-07-03T10:00:00.000Z",
+        received_at: "2026-07-03T10:00:00.000Z",
+        source: "windows_probe",
+        kind: "app_active",
+        entity_type: "app",
+        entity: "Code.exe",
+        payload: { activity: "focus" }
+      }
+    ]
+  });
+  try {
+    await page.addInitScript(() => {
+      const fixedNow = new Date("2026-07-03T17:00:00.000Z").valueOf();
+      const RealDate = Date;
+      class FixedDate extends RealDate {
+        constructor(...args) { super(...(args.length ? args : [fixedNow])); }
+        static now() { return fixedNow; }
+      }
+      FixedDate.UTC = RealDate.UTC;
+      FixedDate.parse = RealDate.parse;
+      globalThis.Date = FixedDate;
+    });
+    await page.goto(server.url);
+
+    const hero = page.locator("#hero");
+    await expect(hero).toBeVisible();
+    const heroH1 = hero.locator("h1");
+    await expect(heroH1).toBeVisible();
+    const headline = (await heroH1.textContent()).trim();
+    expect(headline.length).toBeGreaterThan(0);
+    const family = await heroH1.evaluate((el) => getComputedStyle(el).fontFamily);
+    expect(family.toLowerCase()).toContain("serif");
+
+    await expect(hero.locator(".hero-numerals")).toHaveCount(1);
+    const numerals = hero.locator(".hero-numerals dt");
+    await expect(numerals.first()).toHaveText(/Focus/i);
+    const numeralTexts = await numerals.allTextContents();
+    expect(numeralTexts.length).toBe(4);
+    expect(numeralTexts.map((t) => t.trim().toLowerCase())).toEqual(
+      expect.arrayContaining(["focus", "events"])
+    );
+  } finally {
+    await server.close();
+  }
+});
+
+test("mobile hero downsizes below 700px", async ({ page }) => {
+  const server = await startWebUiServer();
+  try {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(server.url);
+
+    const hero = page.locator("#hero");
+    await expect(hero).toBeVisible();
+    const heroH1 = hero.locator("h1");
+    const heroSize = await heroH1.evaluate((el) =>
+      parseFloat(getComputedStyle(el).fontSize)
+    );
+    expect(heroSize).toBeLessThanOrEqual(32);
+  } finally {
+    await server.close();
+  }
+});
