@@ -886,7 +886,9 @@ label span {
   display: block;
   margin-bottom: var(--space1);
   color: var(--text2);
-  font-size: 12px;
+  font: 600 11px/1 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .toggle {
@@ -898,7 +900,8 @@ label span {
   padding: 0 var(--space3);
   border: 1px solid var(--border0);
   border-radius: var(--radiusM);
-  background: var(--surface0);
+  background: var(--surface1);
+  color: var(--text0);
 }
 
 .toggle span {
@@ -907,7 +910,8 @@ label span {
 
 .toggle input {
   width: 18px;
-  min-height: 18px;
+  height: 18px;
+  accent-color: var(--accent0);
 }
 
 .danger {
