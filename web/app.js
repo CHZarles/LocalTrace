@@ -236,30 +236,42 @@ function buildTimelineModel(model) {
 }
 
 function renderNow(model) {
-  $("nowFreshness").textContent = model.todayEvents.length
-    ? `Updated ${formatTime(model.todayEvents[0].observed_at)}`
-    : "No data";
-  renderNowRow($("nowFocus"), {
-    label: "Focus app",
-    event: model.latestFocus,
-    fallback: "No focus activity"
-  });
-  renderNowRow($("nowTab"), {
-    label: "Using tab",
-    event: model.latestTab,
-    fallback: "No browser activity"
-  });
-  renderNowRow($("nowAudio"), {
-    label: "Background audio",
-    event: model.latestAudio,
-    fallback: "No audio activity"
-  });
+  renderRightNow(model);
 }
 
-function renderNowRow(target, { label, event, fallback }) {
-  target.replaceChildren();
+function renderRightNow(model) {
+  const root = $("rightNow");
+  if (!root) return;
+  const rows = [
+    { label: "Focus app", event: model.latestFocus, fallback: "No focus activity" },
+    { label: "Using tab", event: model.latestTab, fallback: "No browser activity" },
+    { label: "Background audio", event: model.latestAudio, fallback: "No audio activity" }
+  ];
+
+  const heading = document.createElement("h3");
+  heading.className = "caps-tag";
+  heading.textContent = "Right now";
+
+  const list = document.createElement("div");
+  list.className = "right-now-list";
+  for (const row of rows) list.append(rightNowRow(row));
+
+  const footer = document.createElement("p");
+  footer.className = "right-now-footer";
+  const latestAt =
+    model.latestAudio?.observed_at ||
+    model.latestTab?.observed_at ||
+    model.latestFocus?.observed_at;
+  footer.textContent = latestAt ? `Updated ${formatTime(latestAt)}` : "Waiting for activity";
+
+  root.replaceChildren(heading, list, footer);
+}
+
+function rightNowRow({ label, event, fallback }) {
+  const row = document.createElement("div");
+  row.className = "right-now-row";
   const meta = document.createElement("span");
-  meta.className = "row-label";
+  meta.className = "caps-tag";
   meta.textContent = label;
   const value = document.createElement("div");
   value.className = "row-value";
@@ -282,11 +294,14 @@ function renderNowRow(target, { label, event, fallback }) {
   } else {
     value.textContent = fallback;
   }
-  target.append(meta, value);
+  row.append(meta, value);
+  return row;
 }
 
 function renderSummary(model) {
-  $("focusTotal").textContent = formatDuration(model.focusSeconds);
+  const focusTotal = $("focusTotal");
+  if (!focusTotal) return;
+  focusTotal.textContent = formatDuration(model.focusSeconds);
   $("audioTotal").textContent = formatDuration(model.audioSeconds);
   $("focusSwitches").textContent = String(model.focusSwitches);
   $("todayEventsCount").textContent = String(model.todayEvents.length);

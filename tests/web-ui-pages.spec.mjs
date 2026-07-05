@@ -147,8 +147,8 @@ test("stale browser audio is not shown as current background audio", async ({
     });
     await page.goto(server.url);
 
-    await expect(page.locator("#nowAudio")).toContainText("No audio activity");
-    await expect(page.locator("#nowAudio")).not.toContainText(staleTitle);
+    await expect(page.locator("#rightNow")).toContainText("No audio activity");
+    await expect(page.locator("#rightNow")).not.toContainText(staleTitle);
   } finally {
     await server.close();
   }
@@ -204,8 +204,8 @@ test("stale browser audio is hidden even when idle cutoff is long", async ({
     });
     await page.goto(server.url);
 
-    await expect(page.locator("#nowAudio")).toContainText("No audio activity");
-    await expect(page.locator("#nowAudio")).not.toContainText(staleTitle);
+    await expect(page.locator("#rightNow")).toContainText("No audio activity");
+    await expect(page.locator("#rightNow")).not.toContainText(staleTitle);
   } finally {
     await server.close();
   }
@@ -284,7 +284,7 @@ test("mobile metrics use a single-column layout", async ({ page }) => {
     await page.goto(server.url);
 
     await expect(page.locator("#metricsView")).toBeVisible();
-    await expect(page.locator(".now-list")).toHaveCSS(
+    await expect(page.locator(".right-now-list")).toHaveCSS(
       "grid-template-columns",
       /^(?!.*\s).+$/
     );

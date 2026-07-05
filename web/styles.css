@@ -928,3 +928,49 @@ label span {
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
+
+.right-now {
+  padding: var(--space4);
+}
+
+.right-now-list {
+  display: grid;
+  gap: var(--space3);
+  margin-top: var(--space3);
+}
+
+.right-now-row {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space2);
+  min-width: 0;
+  min-height: 64px;
+  padding: var(--space3);
+  border: 1px solid var(--border0);
+  border-radius: var(--radiusM);
+  background: var(--surface1);
+}
+
+.right-now-footer {
+  margin-top: var(--space3);
+  padding-top: var(--space3);
+  border-top: 1px solid var(--border0);
+  color: var(--text2);
+  font-size: 12px;
+}
+
+.right-now-row .entity-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+}
+
+.right-now-row .entity-avatar[data-kind="domain"] {
+  border-radius: 999px;
+}
+
+.right-now-row .entity-icon {
+  width: 14px;
+  height: 14px;
+}

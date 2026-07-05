@@ -75,49 +75,9 @@
 
         <main>
           <section id="metricsView" class="view active">
-            <div class="hero-grid">
-              <article class="card now-card">
-                <div class="section-heading">
-                  <div>
-                    <h3>Now</h3>
-                    <p class="section-note">Current focus and media</p>
-                  </div>
-                  <span id="nowFreshness" class="status-pill muted">Waiting</span>
-                </div>
-                <div class="now-list">
-                  <div class="now-row" id="nowFocus"></div>
-                  <div class="now-row" id="nowTab"></div>
-                  <div class="now-row" id="nowAudio"></div>
-                </div>
-              </article>
-
-              <article class="card summary-card">
-                <div class="section-heading">
-                  <div>
-                    <h3>Today summary</h3>
-                    <p class="section-note" id="summaryMeta">Today so far</p>
-                  </div>
-                </div>
-                <div class="metric-grid">
-                  <div>
-                    <span>Focus</span>
-                    <strong id="focusTotal">0m</strong>
-                  </div>
-                  <div>
-                    <span>Audio</span>
-                    <strong id="audioTotal">0m</strong>
-                  </div>
-                  <div>
-                    <span>Switches</span>
-                    <strong id="focusSwitches">0</strong>
-                  </div>
-                  <div>
-                    <span>Events</span>
-                    <strong id="todayEventsCount">0</strong>
-                  </div>
-                </div>
-              </article>
-            </div>
+            <article id="hero" class="card hero-block">
+              <!-- populated by renderHero -->
+            </article>
 
             <div class="workbench-grid">
               <div class="main-stack">
@@ -153,6 +113,9 @@
               </div>
 
               <aside class="side-stack">
+                <article class="card right-now" id="rightNow">
+                  <!-- populated by renderRightNow -->
+                </article>
                 <article class="card">
                   <div class="section-heading wrap">
                     <div>
