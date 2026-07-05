@@ -1,20 +1,20 @@
-/* ===== A2-P design tokens ===== */
+/* ===== A2-P design tokens (light cream) ===== */
 :root {
-  color-scheme: dark;
-  --bg: #0f0d0a;
-  --surface: #161310;
-  --surface-2: #1d1814;
-  --border: #2a241e;
-  --border-2: #1a1612;
-  --text: #ece6dc;
-  --text-2: #8a8074;
-  --text-3: #5a5249;
-  --accent: #c9a26b;
-  --accent-2: #a8854f;
-  --audio: #6c8a82;
-  --success: #7ea585;
-  --warning: #c9a26b;
-  --danger: #b87060;
+  color-scheme: light;
+  --bg: #f7f3eb;
+  --surface: #ffffff;
+  --surface-2: #f0ebe1;
+  --border: #d8d0c0;
+  --border-2: #ebe5d8;
+  --text: #1f1c16;
+  --text-2: #6b6253;
+  --text-3: #968b78;
+  --accent: #a8743a;
+  --accent-2: #8a5e2e;
+  --audio: #4d7a72;
+  --success: #4f7a4a;
+  --warning: #a8743a;
+  --danger: #b85a48;
   --radius: 6px;
   --radius-sm: 4px;
   --font-sans: "Inter", "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -489,7 +489,7 @@ html, body {
   border: 1px solid var(--border);
 }
 .entity-avatar[data-kind="domain"] { border-radius: 999px; }
-.entity-avatar[data-activity="audio"] { background: var(--audio); color: var(--bg); border-color: transparent; }
+.entity-avatar[data-activity="audio"] { background: var(--audio); color: #ffffff; border-color: transparent; }
 .entity-avatar svg {
   width: 14px;
   height: 14px;
@@ -700,14 +700,14 @@ button {
   font-weight: 500;
   transition: background .12s, border-color .12s;
 }
-button:hover { background: var(--border); }
+button:hover { background: var(--surface-2); }
 button.primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: var(--bg);
+  color: #ffffff;
 }
 button.primary:hover { background: var(--accent-2); border-color: var(--accent-2); }
-button.danger { background: var(--danger); border-color: var(--danger); color: var(--bg); }
+button.danger { background: var(--danger); border-color: var(--danger); color: #ffffff; }
 button.secondary { background: var(--surface-2); color: var(--text); }
 input, select {
   width: 100%;
