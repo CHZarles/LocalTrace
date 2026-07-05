@@ -54,3 +54,6 @@ localtrace_ui/**/.flutter-plugins-dependencies
 localtrace_ui/**/.idea/
 localtrace_ui/pubspec.lock
 package-installer.log
+
+# Local tooling (visual companion, etc.)
+.superpowers/

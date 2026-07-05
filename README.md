@@ -4,7 +4,6 @@ LocalTrace 是给 Windows agent 使用的本地活动上下文工具。它记录
 
 ## 先让 Agent 安装 Skill
 
-
 可以直接对 agent 说：
 
 > 请从 GitHub 仓库 [CHZarles/LocalTrace](https://github.com/CHZarles/LocalTrace) 安装 LocalTrace Skill。
@@ -16,7 +15,6 @@ LocalTrace 是给 Windows agent 使用的本地活动上下文工具。它记录
 > 3. 安装器要负责准备浏览器插件目录；如果安装结果里 `browser_extension.prepared` 不是 `true`，请直接告诉我失败原因。
 > 4. 安装完成后，马上输出浏览器插件解压路径、Chrome 扩展页地址、Edge 扩展页地址，并把这些信息原样告诉我。
 > 5. 然后检查 LocalTrace Skill 是否已经可用，并打开 LocalTrace Web UI。
-
 
 安装完成后，agent 必须马上输出浏览器插件加载信息：插件解压路径、Chrome 扩展页地址、Edge 扩展页地址。用户只需要打开 chrome 或者 edge 浏览器加载插件。
 
