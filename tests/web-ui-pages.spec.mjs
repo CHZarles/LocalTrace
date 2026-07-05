@@ -381,13 +381,46 @@ test("mobile dashboard has single-column bottom split", async ({ page }) => {
   }
 });
 
-test("timeline shows 24 hourly buckets", async ({ page }) => {
-  const server = await startWebUiServer();
+test("timeline shows focus and audio rows with Gantt blocks", async ({ page }) => {
+  const server = await startWebUiServer({
+    events: [
+      {
+        id: 1, observed_at: "2026-07-05T16:30:00.000Z", received_at: "2026-07-05T16:30:00.000Z",
+        source: "windows_probe", kind: "app_active", entity_type: "app", entity: "Code.exe",
+        title: "VS Code", payload: { activity: "focus" }
+      },
+      {
+        id: 2, observed_at: "2026-07-05T17:00:00.000Z", received_at: "2026-07-05T17:00:00.000Z",
+        source: "windows_probe", kind: "app_active", entity_type: "app", entity: "Code.exe",
+        payload: { activity: "focus" }
+      },
+      {
+        id: 3, observed_at: "2026-07-05T17:30:00.000Z", received_at: "2026-07-05T17:30:00.000Z",
+        source: "browser_extension", kind: "tab_audio", entity_type: "domain", entity: "youtube.com",
+        title: "Live set", payload: { activity: "audio", browser: "chrome" }
+      }
+    ]
+  });
   try {
+    await page.addInitScript(() => {
+      const fixedNow = new Date("2026-07-05T17:45:00.000Z").valueOf();
+      const RealDate = Date;
+      class FixedDate extends RealDate {
+        constructor(...args) { super(...(args.length ? args : [fixedNow])); }
+        static now() { return fixedNow; }
+      }
+      FixedDate.UTC = RealDate.UTC;
+      FixedDate.parse = RealDate.parse;
+      globalThis.Date = FixedDate;
+    });
     await page.goto(server.url);
-    await expect(page.locator("#timelineBars")).toBeVisible();
-    const bars = await page.locator(".timeline-bar").count();
-    expect(bars).toBe(24);
+
+    const focusRow = page.locator("#timelineFocusRow");
+    const audioRow = page.locator("#timelineAudioRow");
+    await expect(focusRow).toBeVisible();
+    await expect(audioRow).toBeVisible();
+    await expect(focusRow.locator(".tl-block.focus")).toHaveCount(2);
+    await expect(audioRow.locator(".tl-block.audio")).toHaveCount(1);
   } finally {
     await server.close();
   }

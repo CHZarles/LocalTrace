@@ -277,56 +277,64 @@ html, body {
   letter-spacing: -0.01em;
 }
 .timeline-title-sub {
-  font: 400 11px/1.4 var(--font-sans);
+  font: 400 11px/1.3 var(--font-sans);
   color: var(--text-2);
   margin-top: 2px;
 }
 .timeline-body {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
-  min-height: 0;
 }
-.timeline-bars {
+.timeline-rows {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 4px 10px;
+  align-items: center;
+}
+.timeline-row {
+  display: contents;
+}
+.timeline-row-label {
+  font: 600 9px/1 var(--font-sans);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  text-align: right;
+}
+.timeline-track {
   position: relative;
-  height: 88px;
-  display: flex;
-  align-items: flex-end;
-  gap: 3px;
-  padding: 0 2px;
-}
-.timeline-bar {
-  flex: 1;
-  background: var(--border-2);
-  border-radius: 1px;
-  height: 4px;
-  min-width: 0;
-}
-.timeline-bar.focus {
-  background: var(--accent);
-  height: 56px;
+  background: var(--bg);
+  border: 1px solid var(--border-2);
   border-radius: 2px;
+  height: 36px;
+  overflow: hidden;
 }
-.timeline-bar.audio {
+#timelineFocusRow { height: 36px; }
+#timelineAudioRow { height: 18px; }
+.tl-block {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 1px;
+}
+.tl-block.focus {
+  background: var(--accent);
+  opacity: 0.85;
+}
+.tl-block.audio {
   background: var(--audio);
-  height: 24px;
-  align-self: flex-start;
-  margin-top: 4px;
-  border-radius: 2px;
+  opacity: 0.85;
 }
-.timeline-bar.idle {
-  background: var(--border);
-  height: 2px;
-  opacity: 0.5;
-}
-.timeline-bar.now {
+.tl-now {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  right: -1px;
+  width: 1.5px;
   background: var(--accent);
-  height: 88px;
-  width: 2px;
-  flex: 0 0 2px;
-  border-radius: 1px;
-  opacity: 0.7;
+  pointer-events: none;
 }
 .timeline-axis {
   display: flex;
@@ -334,8 +342,8 @@ html, body {
   font: 400 10px/1 var(--font-mono);
   font-feature-settings: 'tnum';
   color: var(--text-3);
-  letter-spacing: 0.06em;
-  padding: 0 2px;
+  letter-spacing: 0.04em;
+  padding: 0 60px 0 66px; /* offset to align under the tracks not the labels */
 }
 .timeline-axis span.now-label { color: var(--accent); }
 .timeline-meta {

@@ -79,7 +79,7 @@ function buildDashboardModel(events, settings) {
   );
   const latestAudio = latestActiveAudioEvent(todayEvents, audioFreshnessSeconds, now);
 
-  const timelineBuckets = buildTimelineBuckets(focusSegments, audioSegments, now);
+  const timelineWindow = buildTimelineWindow(todayEvents, idleSeconds, now);
 
   const latestObservedAt =
     state.events.length > 0
@@ -95,7 +95,7 @@ function buildDashboardModel(events, settings) {
     audioSeconds,
     focusSwitches: focusSegments.length,
     todayEventsCount: todayEvents.length,
-    timelineBuckets,
+    timelineWindow,
     latestFocus,
     latestTab,
     latestAudio,
@@ -103,31 +103,30 @@ function buildDashboardModel(events, settings) {
   };
 }
 
-function buildTimelineBuckets(focusSegments, audioSegments, now) {
-  const HOURS = 24;
-  const bucketMs = (60 * 60 * 1000) / 2; // 30-min slots
-  const buckets = [];
-  for (let i = 0; i < HOURS; i += 1) {
-    buckets.push({ index: i, start: null, end: null, focus: false, audio: false, idle: true });
-  }
-  const mark = (segment) => {
-    if (!segment.start || !segment.end) return;
-    let s = segment.start.getTime();
-    const e = segment.end.getTime();
-    while (s < e) {
-      const hour = s.getUTCHours ? s : new Date(s).getUTCHours();
-      // hour-of-day in UTC for placement; clamped into 0..HOURS-1
-      const hourOfDay = new Date(s).getUTCHours();
-      const idx = Math.min(HOURS - 1, Math.max(0, hourOfDay));
-      const b = buckets[idx];
-      if (segment.audio) b.audio = true; else b.focus = true;
-      b.idle = !(b.focus || b.audio);
-      s += bucketMs;
-    }
-  };
-  for (const seg of focusSegments) mark(seg);
-  for (const seg of audioSegments) mark(seg);
-  return buckets;
+function buildTimelineWindow(todayEvents, idleSeconds, now) {
+  // Window: last 12 hours. Start = now - 12h.
+  const windowMs = 12 * 60 * 60 * 1000;
+  const start = new Date(now.getTime() - windowMs);
+  const end = now;
+
+  // Slice today events to those that fall in the window
+  const ascending = [...todayEvents].sort(compareEventsAsc);
+  const focusSegments = buildFocusSegments(ascending, idleSeconds, end);
+  const audioSegments = buildAudioSegments(ascending, idleSeconds, end);
+
+  // Filter segments to those overlapping the window
+  const inWindow = (seg) => seg.end > start && seg.start < end;
+
+  // Clamp to the window: a segment starting before `start` should be clipped to `start`
+  const clamp = (seg) => ({
+    startPct: Math.max(0, (seg.start.getTime() - start.getTime()) / windowMs) * 100,
+    endPct: Math.min(1, (seg.end.getTime() - start.getTime()) / windowMs) * 100,
+  });
+
+  const focusBars = focusSegments.filter(inWindow).map(clamp);
+  const audioBars = audioSegments.filter(inWindow).map(clamp);
+
+  return { focusBars, audioBars, windowMs, start, end };
 }
 
 function currentAudioFreshnessSeconds(settings) {
@@ -213,51 +212,45 @@ function renderTimeline(model) {
   const focusMinutes = Math.round(model.focusSeconds / 60);
   const totalMinutes = focusMinutes + Math.round(model.audioSeconds / 60);
   $("timelineTitle").textContent = `${formatHm(model.focusSeconds)} / ${totalMinutes}m`;
+  $("timelineSub").textContent = `12h window · ${model.todayEventsCount} events`;
 
-  const bars = $("timelineBars");
-  bars.replaceChildren();
-  const now = model.now;
-  const nowHourIdx = computeNowIndex(model.now);
-  for (let i = 0; i < 24; i += 1) {
-    const cell = document.createElement("span");
-    cell.className = "timeline-bar";
-    const bucket = model.timelineBuckets[i];
-    if (i === nowHourIdx) {
-      cell.classList.add("now");
-    } else if (bucket?.audio && !bucket?.focus) {
-      cell.classList.add("audio");
-    } else if (bucket?.focus) {
-      cell.classList.add("focus");
-    } else {
-      cell.classList.add("idle");
-    }
-    bars.append(cell);
+  const focus = $("timelineFocusRow");
+  focus.replaceChildren();
+  for (const bar of model.timelineWindow.focusBars) {
+    const block = document.createElement("span");
+    block.className = "tl-block focus";
+    block.style.left = `${bar.startPct}%`;
+    block.style.width = `${Math.max(0.4, bar.endPct - bar.startPct)}%`;
+    focus.append(block);
   }
+  const nowMarker = document.createElement("span");
+  nowMarker.className = "tl-now";
+  focus.append(nowMarker);
 
-  $("timelineMeta").textContent =
-    `12h window · focus ${formatHm(model.focusSeconds)} · audio ${Math.round(model.audioSeconds / 60)}m`;
+  const audio = $("timelineAudioRow");
+  audio.replaceChildren();
+  for (const bar of model.timelineWindow.audioBars) {
+    const block = document.createElement("span");
+    block.className = "tl-block audio";
+    block.style.left = `${bar.startPct}%`;
+    block.style.width = `${Math.max(0.4, bar.endPct - bar.startPct)}%`;
+    audio.append(block);
+  }
 
   const axis = $("timelineAxis");
   axis.replaceChildren();
   const ticks = [
-    { label: "02", at: 2 },
-    { label: "06", at: 6 },
-    { label: "10", at: 10 },
-    { label: "14", at: 14 },
-    { label: "18", at: 18 },
-    { label: "22", at: 22 },
-    { label: "NOW", at: 24 }
+    "12h ago", "10h ago", "8h ago", "6h ago", "4h ago", "2h ago", "now"
   ];
-  for (const t of ticks) {
+  for (const label of ticks) {
     const span = document.createElement("span");
-    span.textContent = t.label;
+    if (label === "now") span.className = "now-label";
+    span.textContent = label;
     axis.append(span);
   }
-}
 
-function computeNowIndex(now) {
-  const h = now.getHours();
-  return Math.min(23, Math.max(0, h));
+  $("timelineMeta").textContent =
+    `12h window · focus ${formatHm(model.focusSeconds)} · audio ${Math.round(model.audioSeconds / 60)}m`;
 }
 
 function renderRightNow(model) {
