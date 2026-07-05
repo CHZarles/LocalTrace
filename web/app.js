@@ -1,10 +1,7 @@
 const state = {
   events: [],
   settings: null,
-  rules: [],
-  tracking: { paused: false },
-  health: null,
-  view: "dashboard"
+  health: null
 };
 
 const $ = (id) => document.getElementById(id);
@@ -24,144 +21,425 @@ async function api(path, options = {}) {
 async function loadAll() {
   setBusy(true);
   try {
-    const [health, events, settings, privacy, tracking] = await Promise.all([
+    const [health, events, settings] = await Promise.all([
       api("/health"),
       api("/events?limit=500&order=desc"),
-      api("/settings"),
-      api("/privacy/rules"),
-      api("/tracking/status")
+      api("/settings")
     ]);
     state.health = health;
     state.events = events.events || [];
     state.settings = settings.settings;
-    state.rules = privacy.rules;
-    state.tracking = tracking;
-    renderDashboard(state);
+    const m = buildModel(state.events, state.settings, state.health);
+    renderHero(m);
+    renderDataGrid(m);
+    renderTimeline(m);
+    renderNow(m);
+    renderRecentFlow(m);
+    renderHealth(m);
+    renderCommandBar(m);
+    renderTopBar(m);
+    setStatus("");
   } catch (error) {
+    setStatus(error.message);
     console.error(error);
   } finally {
     setBusy(false);
   }
 }
 
-function renderDashboard(state) {
-  const model = buildDashboardModel(state.events, state.settings);
-  renderKpis(model);
-  renderTimeline(model);
-  renderRightNow(model);
-  renderRecentFlow(state.events);
-  renderStatusBar(model, state.health);
-  renderTracking(state.tracking);
-  renderSettings(state.settings);
-  renderRules(state.rules);
-}
+/* ====== Model ====== */
 
-function buildDashboardModel(events, settings) {
+function buildModel(events, settings, health) {
   const now = new Date();
-  const todayEvents = events
-    .filter((event) => isSameLocalDay(parseDate(event.observed_at), now))
+  const todayEvents = (events || [])
+    .filter((e) => isSameLocalDay(parseDate(e.observed_at), now))
     .sort(compareEventsDesc);
   const ascending = [...todayEvents].sort(compareEventsAsc);
-  const idleSeconds =
-    settings?.capture?.idle_cutoff_seconds && Number.isFinite(settings.capture.idle_cutoff_seconds)
-      ? settings.capture.idle_cutoff_seconds
-      : 300;
-  const audioFreshnessSeconds = currentAudioFreshnessSeconds(settings);
-
+  const idleSeconds = settings?.capture?.idle_cutoff_seconds || 300;
   const focusSegments = buildFocusSegments(ascending, idleSeconds, now);
   const audioSegments = buildAudioSegments(ascending, idleSeconds, now);
   const focusSeconds = sumSeconds(focusSegments);
   const audioSeconds = sumSeconds(audioSegments);
+  const focusSwitches = focusSegments.length;
+  const todayEventsCount = todayEvents.length;
+
+  const heroNumber =
+    focusSeconds >= 60
+      ? formatHm(focusSeconds)
+      : focusSeconds > 0
+        ? `${Math.round(focusSeconds / 60)}m`
+        : "0:00";
+
+  const heroAnnotation =
+    focusSeconds === 0
+      ? "— waiting for activity"
+      : focusSeconds < 60 * 60
+        ? "— a steady start"
+        : focusSeconds < 4 * 60 * 60
+          ? "— a quieter day"
+          : "— a deep day";
+
+  const apps = uniqueEntities(todayEvents, "app", "windows_probe");
+  const sites = uniqueEntities(todayEvents, "domain", "browser_extension");
+  const heroMeta =
+    focusSeconds === 0
+      ? "Once activity starts, it will appear here."
+      : `across ${apps} apps and ${sites} sites. ${focusSwitches} focus switches. ${Math.round(audioSeconds / 60)}m of background audio.`;
+
+  const dataGrid = [
+    {
+      label: "Today focus",
+      value: focusSeconds >= 60 ? formatHm(focusSeconds) : "0m",
+      sub: "hours focused",
+      serif: false
+    },
+    {
+      label: "Today audio",
+      value: `${Math.round(audioSeconds / 60)}m`,
+      sub: "background audio",
+      serif: false
+    },
+    {
+      label: "Today switches",
+      value: String(focusSwitches),
+      sub: "app / tab changes",
+      serif: false
+    },
+    {
+      label: "Today events",
+      value: String(todayEventsCount),
+      sub: "captured events",
+      serif: false
+    },
+    {
+      label: "Top app",
+      value: topEntity(todayEvents, "windows_probe"),
+      sub: "longest focus",
+      serif: true
+    },
+    {
+      label: "Top site",
+      value: topEntity(todayEvents, "browser_extension"),
+      sub: "longest focus",
+      serif: true
+    },
+    {
+      label: "Peak",
+      value: peakHourLabel(focusSegments),
+      sub: "busiest hour",
+      serif: false
+    },
+    {
+      label: "Avg focus",
+      value: avgFocusLabel(focusSegments),
+      sub: "per session",
+      serif: false
+    }
+  ];
+
+  const timeline = {
+    focus: focusSegments.map((s) => ({
+      start: minuteOfDay(s.start),
+      end: minuteOfDay(s.end)
+    })),
+    audio: audioSegments.map((s) => ({
+      start: minuteOfDay(s.start),
+      end: minuteOfDay(s.end)
+    })),
+    events: todayEvents
+      .filter(
+        (e) =>
+          e.kind === "app_active" ||
+          e.kind === "tab_active" ||
+          e.kind === "app_audio" ||
+          e.kind === "tab_audio"
+      )
+      .map((e) => ({ at: minuteOfDay(parseDate(e.observed_at)) })),
+    nowAt: minuteOfDay(now)
+  };
 
   const latestFocus = todayEvents.find(isFocusEvent) || null;
-  const latestTab = todayEvents.find(
-    (event) => event.source === "browser_extension" && isFocusEvent(event)
-  );
-  const latestAudio = latestActiveAudioEvent(todayEvents, audioFreshnessSeconds, now);
+  const latestTab =
+    todayEvents.find((e) => e.source === "browser_extension" && isFocusEvent(e)) ||
+    null;
+  const latestAudio =
+    todayEvents.find((e) => isAudioStartEvent(e) || isAudioStopEvent(e)) || null;
 
-  const timelineLanes = buildTimelineLanes(todayEvents, focusSegments, audioSegments, now);
+  const recentFlow = todayEvents.slice(0, 5);
 
-  const latestObservedAt =
-    state.events.length > 0
-      ? parseDate(state.events.slice().sort(compareEventsAsc).slice(-1)[0]?.observed_at)
-      : null;
+  const sources = health?.sources || {};
+  const healthItems = [
+    { label: "db", ok: health?.database?.exists === true },
+    {
+      label: "browser",
+      ok: !!sources.browser_extension?.last_observed_at
+    },
+    {
+      label: "winprobe",
+      ok: !!sources.windows_probe?.last_observed_at
+    }
+  ];
 
   return {
     now,
     todayEvents,
-    focusSegments,
-    audioSegments,
     focusSeconds,
     audioSeconds,
-    focusSwitches: focusSegments.length,
-    todayEventsCount: todayEvents.length,
-    timelineLanes,
+    focusSwitches,
+    todayEventsCount,
+    heroNumber,
+    heroAnnotation,
+    heroMeta,
+    dataGrid,
+    timeline,
     latestFocus,
     latestTab,
     latestAudio,
-    latestObservedAt
+    recentFlow,
+    healthItems
   };
 }
 
-function buildTimelineLanes(todayEvents, focusSegments, audioSegments, now) {
-  const byEntity = new Map();
-  for (const seg of focusSegments) {
-    const key = `${seg.kind}:${seg.entity}`;
-    if (!byEntity.has(key)) {
-      byEntity.set(key, {
-        kind: seg.kind,
-        entity: seg.entity,
-        label: seg.label,
-        totalSeconds: 0,
-        bars: []
-      });
-    }
-    const lane = byEntity.get(key);
-    lane.totalSeconds += seg.seconds;
-    lane.bars.push({
-      startMinute: minuteOfDay(seg.start),
-      endMinute: minuteOfDay(seg.end),
-      audio: false
-    });
+/* ====== Renders ====== */
+
+function renderHero(m) {
+  $("heroNumber").textContent = m.heroNumber;
+  $("heroAnnotation").textContent = m.heroAnnotation;
+  $("heroMeta").textContent = m.heroMeta;
+}
+
+function renderDataGrid(m) {
+  const grid = $("dataGrid");
+  grid.replaceChildren();
+  for (let i = 0; i < m.dataGrid.length; i += 1) {
+    const tile = document.createElement("div");
+    tile.className = "data-tile";
+
+    const label = document.createElement("span");
+    label.className = "data-tile-label";
+    label.textContent = m.dataGrid[i].label;
+
+    const value = document.createElement("span");
+    value.className = m.dataGrid[i].serif
+      ? "data-tile-value serif"
+      : "data-tile-value";
+    value.textContent = m.dataGrid[i].value;
+
+    const sub = document.createElement("span");
+    sub.className = "data-tile-sub";
+    sub.textContent = m.dataGrid[i].sub;
+
+    tile.append(label, value, sub);
+    grid.append(tile);
   }
-  for (const seg of audioSegments) {
-    const key = `${seg.kind}:${seg.entity}`;
-    if (byEntity.has(key)) {
-      byEntity.get(key).bars.push({
-        startMinute: minuteOfDay(seg.start),
-        endMinute: minuteOfDay(seg.end),
-        audio: true
-      });
+}
+
+function renderTimeline(m) {
+  const axis = $("timelineAxis");
+  axis.replaceChildren();
+  for (const t of [2, 6, 10, 14, 18, 22]) {
+    const span = document.createElement("span");
+    span.textContent = String(t).padStart(2, "0");
+    axis.append(span);
+  }
+  const now = document.createElement("span");
+  now.className = "now-label";
+  now.textContent = "NOW";
+  axis.append(now);
+
+  const lanes = $("timelineLanes");
+  lanes.replaceChildren();
+  const laneDefs = [
+    {
+      key: "focus",
+      label: "Focus",
+      items: m.timeline.focus,
+      heightPx: 8
+    },
+    {
+      key: "audio",
+      label: "Audio",
+      items: m.timeline.audio,
+      heightPx: 5
+    },
+    {
+      key: "events",
+      label: "Events",
+      items: m.timeline.events,
+      heightPx: 2
+    }
+  ];
+  for (const def of laneDefs) {
+    const lane = document.createElement("div");
+    lane.className = "timeline-lane";
+
+    const label = document.createElement("span");
+    label.className = "timeline-lane-label";
+    label.textContent = def.label;
+
+    const track = document.createElement("div");
+    track.className = "timeline-track";
+
+    for (const item of def.items) {
+      const bar = document.createElement("span");
+      bar.className = `timeline-bar timeline-bar-${def.key}`;
+      if (def.key === "events") {
+        bar.style.left = `${(item.at / 1440) * 100}%`;
+        bar.style.width = "2px";
+      } else {
+        bar.style.left = `${(item.start / 1440) * 100}%`;
+        bar.style.width = `${Math.max(0.4, ((item.end - item.start) / 1440) * 100)}%`;
+      }
+      track.append(bar);
+    }
+
+    lane.append(label, track);
+    lanes.append(lane);
+  }
+
+  // NOW marker as a vertical line over the lanes area. Use absolute positioning
+  // relative to the .timeline container by injecting a single element.
+  const existing = document.querySelector(".timeline-now");
+  if (existing) existing.remove();
+  const track = lanes.querySelector(".timeline-track");
+  if (track && m.timeline.nowAt >= 0 && m.timeline.nowAt <= 1440) {
+    const nowLine = document.createElement("span");
+    nowLine.className = "timeline-now";
+    const trackRect = track.getBoundingClientRect();
+    const lanesRect = lanes.getBoundingClientRect();
+    const offsetFromLanes = trackRect.left - lanesRect.left;
+    nowLine.style.left = `${offsetFromLanes + (m.timeline.nowAt / 1440) * trackRect.width}px`;
+    lanes.append(nowLine);
+  }
+}
+
+function renderNow(m) {
+  const list = $("nowList");
+  list.replaceChildren();
+  const rows = [
+    { label: "Focus app", event: m.latestFocus, fallback: "No focus" },
+    { label: "Using tab", event: m.latestTab, fallback: "No browser" },
+    { label: "Background audio", event: m.latestAudio, fallback: "No audio" }
+  ];
+  for (const r of rows) {
+    const row = document.createElement("div");
+    row.className = "now-row";
+    if (r.event) row.classList.add("active");
+
+    const meta = document.createElement("span");
+    meta.className = "now-row-label";
+    meta.textContent = r.label;
+
+    const value = document.createElement("div");
+    value.className = "now-row-value";
+
+    if (r.event) {
+      const activity =
+        r.event.payload?.activity === "audio" ? "audio" : "focus";
+      value.append(
+        entityAvatar(r.event.entity_type, r.event.entity, displayEntity(r.event), activity)
+      );
+      const text = document.createElement("div");
+      const t = document.createElement("strong");
+      t.textContent = displayEntity(r.event);
+      const s = document.createElement("span");
+      s.textContent = r.event.title || formatTime(r.event.observed_at);
+      text.append(t, s);
+      value.append(text);
     } else {
-      byEntity.set(key, {
-        kind: seg.kind,
-        entity: seg.entity,
-        label: seg.label,
-        totalSeconds: 0,
-        bars: [{
-          startMinute: minuteOfDay(seg.start),
-          endMinute: minuteOfDay(seg.end),
-          audio: true
-        }]
-      });
+      const text = document.createElement("div");
+      const t = document.createElement("strong");
+      t.textContent = r.fallback;
+      text.append(t);
+      value.append(text);
     }
+    row.append(meta, value);
+    list.append(row);
   }
-  return [...byEntity.values()]
-    .sort((a, b) => b.totalSeconds - a.totalSeconds || a.label.localeCompare(b.label))
-    .slice(0, 12);
 }
 
-function minuteOfDay(date) {
-  return date.getHours() * 60 + date.getMinutes();
+function renderRecentFlow(m) {
+  const list = $("flowList");
+  list.replaceChildren();
+  for (const ev of m.recentFlow) {
+    const row = document.createElement("div");
+    row.className = "flow-row";
+    row.append(flowCell("time flow-time", formatTime(ev.observed_at)));
+    row.append(flowCell("app flow-app", displayEntity(ev)));
+    row.append(flowCell("event flow-event", eventLabel(ev)));
+    row.append(flowCell(`kind flow-kind flow-kind-${kindClass(ev)}`, kindLabel(ev)));
+    list.append(row);
+  }
 }
 
-function currentAudioFreshnessSeconds(settings) {
-  const heartbeatSeconds = Number(settings?.capture?.heartbeat_seconds);
-  const heartbeat = Number.isFinite(heartbeatSeconds) && heartbeatSeconds > 0
-    ? heartbeatSeconds
-    : 60;
-  return Math.max(90, heartbeat * 3);
+function flowCell(cls, text) {
+  const span = document.createElement("span");
+  span.className = `flow-cell ${cls}`;
+  span.textContent = text;
+  return span;
 }
+
+function eventLabel(ev) {
+  if (ev.payload?.activity === "audio") return "audio start";
+  if (ev.kind === "app_audio_stop" || ev.kind === "tab_audio_stop") {
+    return "audio stop";
+  }
+  if (ev.kind === "app_active" || ev.kind === "tab_active") return "started";
+  return ev.kind || "event";
+}
+
+function kindLabel(ev) {
+  if (ev.kind === "app_active" || ev.kind === "tab_active") return "focus";
+  if (typeof ev.kind === "string" && ev.kind.includes("audio")) return "audio";
+  return "switch";
+}
+
+function kindClass(ev) {
+  if (ev.kind === "app_active" || ev.kind === "tab_active") return "focus";
+  if (typeof ev.kind === "string" && ev.kind.includes("audio")) return "audio";
+  return "switch";
+}
+
+function renderHealth(m) {
+  const pills = $("healthPills");
+  pills.replaceChildren();
+  for (const h of m.healthItems) {
+    const pill = document.createElement("span");
+    pill.className = `health-pill ${h.ok ? "ok" : "down"}`;
+    pill.textContent = `${h.ok ? "●" : "○"} ${h.label}`;
+    pills.append(pill);
+  }
+  const blurb =
+    m.focusSwitches < 30
+      ? `${m.focusSwitches} switches — lowest this week`
+      : `${m.focusSwitches} switches — a busy day`;
+  $("healthBlurb").textContent = blurb;
+}
+
+function renderCommandBar(m) {
+  const bar = $("commandBar");
+  const focusText = m.focusSeconds >= 60 ? formatHm(m.focusSeconds) : "0m";
+  const audioText = `${Math.round(m.audioSeconds / 60)}m`;
+  const apps = uniqueEntities(m.todayEvents, "app", "windows_probe");
+  const sites = uniqueEntities(m.todayEvents, "domain", "browser_extension");
+  bar.textContent =
+    `localtrace · today · focus ${focusText} · audio ${audioText} · ` +
+    `${m.focusSwitches} switches · ${m.todayEventsCount} events · ` +
+    `${apps} apps · ${sites} sites`;
+}
+
+function renderTopBar(m) {
+  const live = document.querySelector(".topbar .live-meta");
+  if (!live) return;
+  const dateText = new Intl.DateTimeFormat(undefined, {
+    day: "numeric",
+    month: "long",
+    year: "numeric"
+  }).format(m.now);
+  live.textContent = `TODAY · ${dateText} · LIVE`;
+}
+
+/* ====== Helpers (kept from the previous app) ====== */
 
 function buildFocusSegments(events, idleSeconds, now) {
   const focusEvents = events.filter(isFocusEvent);
@@ -212,484 +490,6 @@ function segmentFromEvent(event, start, next, idleSeconds, audio) {
   ];
 }
 
-function renderKpis(model) {
-  const focusText = formatHm(model.focusSeconds);
-  maybeAnimate("kpiFocusNum", focusText);
-  $("kpiFocusNum").innerHTML = `${focusText}<span class="unit">h:m</span>`;
-  $("kpiFocusFoot").textContent = model.focusSeconds > 0
-    ? `Goal 5:00 · ${minutesToGo(5 * 3600 - model.focusSeconds)} to go`
-    : "No focus yet";
-
-  const audioText = String(Math.max(0, Math.round(model.audioSeconds / 60)));
-  maybeAnimate("kpiAudioNum", audioText);
-  $("kpiAudioNum").innerHTML = `${audioText}<span class="unit">m</span>`;
-  $("kpiAudioFoot").textContent = model.audioSegments.length
-    ? `${model.audioSegments.length} session${model.audioSegments.length === 1 ? "" : "s"}`
-    : "No audio captured";
-
-  const switchesText = String(model.focusSwitches);
-  maybeAnimate("kpiSwitchesNum", switchesText);
-  $("kpiSwitchesNum").textContent = switchesText;
-  $("kpiSwitchesFoot").textContent = model.todayEventsCount
-    ? `${model.todayEventsCount} events today`
-    : "No activity yet";
-
-  const eventsText = String(model.todayEventsCount);
-  maybeAnimate("kpiEventsNum", eventsText);
-  $("kpiEventsNum").textContent = eventsText;
-  $("kpiEventsFoot").textContent = model.todayEventsCount
-    ? `${Math.round(model.todayEventsCount / Math.max(1, hoursElapsed(model.now)))} / hr · db synced`
-    : "— / hr · db synced";
-}
-
-function maybeAnimate(kpiId, newValue) {
-  const el = $(kpiId);
-  if (!el) return;
-  // Compare against the first text node (the numeric portion), not the trailing unit span
-  const currentNode = el.firstChild;
-  const current = currentNode && currentNode.nodeType === Node.TEXT_NODE
-    ? currentNode.nodeValue
-    : el.textContent;
-  if (current !== newValue && current !== "0" && current !== "0:00" && current !== "") {
-    el.classList.remove("kpi-num-pulse");
-    void el.offsetWidth; // force reflow
-    el.classList.add("kpi-num-pulse");
-  }
-}
-
-function renderTimeline(model) {
-  const focusMinutes = Math.round(model.focusSeconds / 60);
-  const totalMinutes = focusMinutes + Math.round(model.audioSeconds / 60);
-  $("timelineTitle").textContent = `${formatHm(model.focusSeconds)} / ${totalMinutes}m`;
-  $("timelineSub").textContent = `${model.timelineLanes.length} lanes · today`;
-
-  const axis = $("timelineAxis");
-  axis.replaceChildren();
-  for (const t of [2, 6, 10, 14, 18, 22]) {
-    const span = document.createElement("span");
-    span.textContent = String(t).padStart(2, "0");
-    axis.append(span);
-  }
-  const nowLabel = document.createElement("span");
-  nowLabel.className = "now-label";
-  nowLabel.textContent = "NOW";
-  axis.append(nowLabel);
-
-  const lanes = $("timelineLanes");
-  lanes.replaceChildren();
-  for (const lane of model.timelineLanes) {
-    lanes.append(renderTimelineLane(lane));
-  }
-
-  $("timelineMeta").textContent =
-    `24h window · focus ${formatHm(model.focusSeconds)} · audio ${Math.round(model.audioSeconds / 60)}m`;
-}
-
-function renderTimelineLane(lane) {
-  const row = document.createElement("div");
-  row.className = "timeline-lane";
-
-  const label = document.createElement("div");
-  label.className = "timeline-lane-label";
-  const text = document.createElement("div");
-  const title = document.createElement("strong");
-  const sub = document.createElement("span");
-  title.textContent = lane.label;
-  sub.textContent = formatDuration(lane.totalSeconds);
-  text.append(title, sub);
-  const avatar = document.createElement("span");
-  avatar.className = "entity-avatar";
-  avatar.dataset.kind = lane.kind;
-  avatar.append(entityIconSvg(lane.kind));
-  label.append(avatar, text);
-
-  const track = document.createElement("div");
-  track.className = "timeline-track";
-  for (const bar of lane.bars) {
-    const block = document.createElement("span");
-    block.className = bar.audio ? "timeline-bar audio" : "timeline-bar focus";
-    block.style.left = `${(bar.startMinute / 1440) * 100}%`;
-    block.style.width = `${Math.max(0.4, ((bar.endMinute - bar.startMinute) / 1440) * 100)}%`;
-    track.append(block);
-  }
-
-  row.append(label, track);
-  return row;
-}
-
-function entityIconSvg(kind) {
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("viewBox", "0 0 24 24");
-  svg.setAttribute("aria-hidden", "true");
-  svg.classList.add("entity-icon");
-  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-  if (kind === "domain") {
-    path.setAttribute("d", "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z M3.6 9h16.8 M3.6 15h16.8 M12 3a13 13 0 0 1 0 18 M12 3a13 13 0 0 0 0 18");
-  } else {
-    path.setAttribute("d", "M4 5h16v11H4Z M8 20h8 M10 16v4 M14 16v4");
-  }
-  svg.append(path);
-  return svg;
-}
-
-function renderRightNow(model) {
-  const rows = [
-    { label: "Focus app", event: model.latestFocus, fallback: "No focus activity" },
-    { label: "Using tab", event: model.latestTab, fallback: "No browser activity" },
-    { label: "Background audio", event: model.latestAudio, fallback: "No audio activity" }
-  ];
-  const list = $("nowList");
-  list.replaceChildren();
-  for (const row of rows) list.append(rightNowRow(row));
-
-  let active = 0;
-  for (const row of rows) if (row.event) active += 1;
-  $("nowCount").textContent = `${active} active`;
-
-  const latestAt =
-    model.latestAudio?.observed_at ||
-    model.latestTab?.observed_at ||
-    model.latestFocus?.observed_at;
-  $("nowFoot").textContent = latestAt
-    ? `Updated ${formatTime(latestAt)}`
-    : "Waiting for activity";
-}
-
-function rightNowRow({ label, event, fallback }) {
-  const row = document.createElement("div");
-  row.className = "now-row";
-
-  const entity = document.createElement("div");
-  entity.className = "row-entity";
-  if (event) {
-    entity.append(
-      entityAvatar(
-        event.entity_type,
-        event.entity,
-        displayEntity(event),
-        isAudioStartEvent(event) ? "audio" : "focus"
-      )
-    );
-    const text = document.createElement("div");
-    text.className = "text";
-    const title = document.createElement("div");
-    title.className = "now-name";
-    title.textContent = displayEntity(event);
-    const ctx = document.createElement("span");
-    ctx.className = "ctx";
-    ctx.textContent = event.title || formatTime(event.observed_at);
-    text.append(title, ctx);
-    entity.append(text);
-  } else {
-    entity.append(document.createTextNode(fallback));
-  }
-  row.append(entity);
-
-  const time = document.createElement("div");
-  time.className = "now-time";
-  if (event) {
-    if (isAudioStartEvent(event)) {
-      time.innerHTML = `<span class="v">playing</span>`;
-    } else if (isAudioStopEvent(event)) {
-      time.innerHTML = `<span class="v">stopped</span>`;
-    } else {
-      const recentMinutes = sinceMinutes(event.observed_at, new Date());
-      time.innerHTML = `<span class="v">${recentMinutes}m</span> ago`;
-    }
-  }
-  row.append(time);
-  return row;
-}
-
-function renderRecentFlow(events) {
-  const body = $("flowBody");
-  if (!body) return;
-  body.replaceChildren();
-  body.className = "flow-list";
-  const items = [...events].sort(compareEventsDesc).slice(0, 10);
-  if (items.length === 0) {
-    const empty = document.createElement("p");
-    empty.className = "flow-empty";
-    empty.textContent = "No events captured yet.";
-    body.append(empty);
-    return;
-  }
-  for (const event of items) body.append(appendFlowRow(event));
-}
-
-function appendFlowRow(event) {
-  const row = document.createElement("div");
-  row.className = "flow-row";
-
-  const t = document.createElement("span");
-  t.className = "flow-time mono";
-  t.textContent = formatTime(event.observed_at);
-  row.append(t);
-
-  const nameWrap = document.createElement("div");
-  nameWrap.className = "flow-name";
-  const name = document.createElement("strong");
-  name.textContent = displayEntity(event);
-  const title = document.createElement("span");
-  title.className = "flow-title";
-  title.textContent = event.title || eventKindLabel(event);
-  nameWrap.append(name, title);
-  row.append(nameWrap);
-
-  const dur = document.createElement("span");
-  dur.className = "flow-dur mono";
-  dur.textContent = computeEventDurationLabel(event);
-  row.append(dur);
-
-  const src = document.createElement("span");
-  src.className = "flow-src";
-  const dot = document.createElement("span");
-  dot.className = "flow-src-dot";
-  dot.dataset.source = event.source || "system";
-  const srcText = document.createElement("span");
-  srcText.textContent = sourceLabel(event.source);
-  src.append(dot, srcText);
-  row.append(src);
-
-  return row;
-}
-
-function computeEventDurationLabel(event) {
-  if (event.kind?.endsWith("_stop")) return "stop";
-  if (isAudioStartEvent(event) || isAudioStopEvent(event)) return "audio";
-  const at = parseDate(event.observed_at);
-  if (!at) return "—";
-  const minutes = Math.max(0, Math.round((Date.now() - at.getTime()) / 60000));
-  if (minutes >= 60) return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
-  return `${minutes}m`;
-}
-
-function sourceLabel(source) {
-  if (source === "windows_probe") return "win";
-  if (source === "browser_extension") return "browser";
-  if (source === "system") return "system";
-  return source || "system";
-}
-
-function eventKindLabel(event) {
-  switch (event.kind) {
-    case "app_active":
-      return "App focus";
-    case "tab_active":
-      return isAudioStartEvent(event) ? "Tab audio" : "Tab focus";
-    case "app_audio":
-      return "App audio";
-    case "app_audio_stop":
-      return "Audio stopped";
-    case "tab_audio_stop":
-      return "Tab audio stopped";
-    default:
-      return event.kind || "Event";
-  }
-}
-
-function renderStatusBar(model, health) {
-  const dots = document.querySelectorAll(".status-bar .dot");
-  const dbExists = health?.database?.exists;
-  const wLast = health?.sources?.windows_probe?.last_observed_at;
-  const bLast = health?.sources?.browser_extension?.last_observed_at;
-  for (const dot of dots) {
-    const kind = dot.dataset.health;
-    dot.classList.remove("red", "green");
-    if (kind === "db") {
-      dot.classList.add(dbExists ? "green" : "red");
-    } else if (kind === "browser") {
-      dot.classList.add(bLast ? "green" : "red");
-    } else if (kind === "winprobe") {
-      dot.classList.add(wLast ? "green" : "red");
-    }
-  }
-  const upd = $("statusUpdated");
-  if (upd) {
-    const latest = state.events
-      .slice()
-      .sort(compareEventsAsc)
-      .slice(-1)[0];
-    if (latest) {
-      upd.textContent = `${sinceSeconds(latest.observed_at, new Date())}s ago`;
-    } else {
-      upd.textContent = "—";
-    }
-  }
-  const counts = $("statusCounts");
-  if (counts) {
-    counts.textContent = `${model.todayEventsCount} events · ${formatHm(model.focusSeconds)} focused`;
-  }
-}
-
-function renderTracking(tracking) {
-  if (!tracking) return;
-  const pill = $("trackingPill");
-  if (pill) {
-    pill.textContent = tracking.paused ? "Paused" : "Tracking";
-  }
-}
-
-function renderSettings(settings) {
-  if (!settings) return;
-  if ($("apiPort")) $("apiPort").value = settings.api.port;
-  if ($("pollMs")) $("pollMs").value = settings.capture.poll_ms;
-  if ($("heartbeatSeconds")) $("heartbeatSeconds").value = settings.capture.heartbeat_seconds;
-  if ($("idleCutoffSeconds")) $("idleCutoffSeconds").value = settings.capture.idle_cutoff_seconds;
-  if ($("storeTitles")) $("storeTitles").checked = settings.capture.store_titles;
-  if ($("storeExePath")) $("storeExePath").checked = settings.capture.store_exe_path;
-  if ($("trackBrowser")) $("trackBrowser").checked = settings.capture.track_browser;
-  if ($("trackAudio")) $("trackAudio").checked = settings.capture.track_audio;
-}
-
-function renderRules(rules) {
-  const tbody = $("rulesTable");
-  if (!tbody) return;
-  tbody.replaceChildren(
-    ...rules.map((rule) => {
-      const tr = document.createElement("tr");
-      tr.append(
-        cell(String(rule.id)),
-        cell(rule.entity_type),
-        cell(rule.pattern),
-        cell(rule.action),
-        actionCell(rule.id)
-      );
-      return tr;
-    })
-  );
-}
-
-function cell(text) {
-  const td = document.createElement("td");
-  td.textContent = text;
-  return td;
-}
-
-function actionCell(id) {
-  const td = document.createElement("td");
-  const button = document.createElement("button");
-  button.className = "danger";
-  button.type = "button";
-  button.textContent = "Delete";
-  button.addEventListener("click", () => deleteRule(id));
-  td.append(button);
-  return td;
-}
-
-function entityAvatar(kind, entity, label, activity = "focus") {
-  const avatar = document.createElement("span");
-  avatar.className = "entity-avatar";
-  avatar.dataset.kind = kind || "app";
-  avatar.dataset.activity = activity;
-  avatar.append(iconForEntity(kind, activity));
-  return avatar;
-}
-
-function iconForEntity(kind, activity) {
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("viewBox", "0 0 24 24");
-  svg.setAttribute("aria-hidden", "true");
-  svg.classList.add("entity-icon");
-  let paths;
-  if (activity === "audio") {
-    paths = ["M4 14a8 8 0 0 1 16 0", "M6 14h2v6H6a2 2 0 0 1-2-2v-2a2 2 0 0 1 2-2Z", "M16 14h2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-2v-6Z"];
-  } else if (kind === "domain") {
-    paths = ["M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z", "M3.6 9h16.8", "M3.6 15h16.8", "M12 3a13 13 0 0 1 0 18", "M12 3a13 13 0 0 0 0 18"];
-  } else {
-    paths = ["M4 5h16v11H4Z", "M8 20h8", "M10 16v4", "M14 16v4"];
-  }
-  for (const d of paths) {
-    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    path.setAttribute("d", d);
-    svg.append(path);
-  }
-  return svg;
-}
-
-function settingsFromForm() {
-  return {
-    api: { port: Number.parseInt($("apiPort").value, 10) },
-    capture: {
-      poll_ms: Number.parseInt($("pollMs").value, 10),
-      heartbeat_seconds: Number.parseInt($("heartbeatSeconds").value, 10),
-      idle_cutoff_seconds: Number.parseInt($("idleCutoffSeconds").value, 10),
-      store_titles: $("storeTitles").checked,
-      store_exe_path: $("storeExePath").checked,
-      track_browser: $("trackBrowser").checked,
-      track_audio: $("trackAudio").checked
-    }
-  };
-}
-
-async function saveSettings() {
-  setBusy(true);
-  try {
-    const body = await api("/settings", {
-      method: "POST",
-      body: JSON.stringify(settingsFromForm())
-    });
-    state.settings = body.settings;
-    renderSettings(body.settings);
-    renderDashboard(state);
-    if (body.restart_required?.includes("api.port")) {
-      console.info("restart required for port");
-    }
-  } catch (error) {
-    console.error(error);
-  } finally {
-    setBusy(false);
-  }
-}
-
-async function addRule() {
-  const pattern = $("rulePattern").value.trim();
-  if (!pattern) return;
-  setBusy(true);
-  try {
-    await api("/privacy/rules", {
-      method: "POST",
-      body: JSON.stringify({
-        entity_type: $("ruleEntityType").value,
-        pattern,
-        action: $("ruleAction").value
-      })
-    });
-    $("rulePattern").value = "";
-    await loadAll();
-  } catch (error) {
-    console.error(error);
-  } finally {
-    setBusy(false);
-  }
-}
-
-async function deleteRule(id) {
-  setBusy(true);
-  try {
-    await api(`/privacy/rules/${id}`, { method: "DELETE" });
-    await loadAll();
-  } catch (error) {
-    console.error(error);
-  } finally {
-    setBusy(false);
-  }
-}
-
-async function setTracking(path) {
-  setBusy(true);
-  try {
-    const tracking = await api(path, { method: "POST" });
-    state.tracking = tracking;
-    renderTracking(tracking);
-    await loadAll();
-  } catch (error) {
-    console.error(error);
-  } finally {
-    setBusy(false);
-  }
-}
-
 function isFocusEvent(event) {
   if (!event || event.kind?.endsWith("_stop")) return false;
   const activity = event.payload?.activity || "focus";
@@ -699,7 +499,7 @@ function isFocusEvent(event) {
 
 function isAudioStartEvent(event) {
   if (!event || event.kind?.endsWith("_stop")) return false;
-  return event.kind === "app_audio" || event.payload?.activity === "audio";
+  return event.kind === "app_audio" || event.kind === "tab_audio";
 }
 
 function isAudioStopEvent(event) {
@@ -747,26 +547,6 @@ function nextAudioBoundary(audioEvents, index, event, now) {
   return now;
 }
 
-function latestActiveAudioEvent(eventsDesc, idleSeconds, now) {
-  const latestStopByKey = new Map();
-  const maxAgeMs = Math.max(1, Number(idleSeconds) || 300) * 1000;
-  for (const event of eventsDesc) {
-    const observedAt = parseDate(event.observed_at);
-    if (!observedAt) continue;
-    if (now.getTime() - observedAt.getTime() > maxAgeMs) break;
-
-    const key = `${event.source}:${event.entity_type}:${event.entity}`;
-    if (isAudioStopEvent(event) && !latestStopByKey.has(key)) {
-      latestStopByKey.set(key, observedAt);
-      continue;
-    }
-    if (!isAudioStartEvent(event)) continue;
-    const stopAt = latestStopByKey.get(key);
-    if (!stopAt || observedAt > stopAt) return event;
-  }
-  return null;
-}
-
 function parseDate(value) {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
@@ -811,10 +591,10 @@ function formatDuration(seconds) {
 }
 
 function formatHm(seconds) {
-  const totalMinutes = Math.max(0, Math.round(seconds / 60));
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  return `${hours}:${String(minutes).padStart(2, "0")}`;
+  const total = Math.max(0, Math.round(seconds / 60));
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  return `${h}:${String(m).padStart(2, "0")}`;
 }
 
 function formatTime(value) {
@@ -828,28 +608,121 @@ function formatTime(value) {
   }).format(date);
 }
 
-function minutesToGo(seconds) {
-  const total = Math.max(0, Math.round(seconds / 60));
-  const hours = Math.floor(total / 60);
-  const minutes = total % 60;
-  if (hours > 0 && minutes > 0) return `${hours}h ${minutes}m`;
-  if (hours > 0) return `${hours}h`;
-  return `${minutes}m`;
+function minuteOfDay(date) {
+  return date.getHours() * 60 + date.getMinutes();
 }
 
-function hoursElapsed(now) {
-  const seconds = Math.max(1, Math.round((now - new Date(now.getFullYear(), now.getMonth(), now.getDate())) / 1000));
-  return Math.max(1, seconds / 3600);
+function hashHue(input) {
+  if (!input) return 0;
+  let h = 0;
+  for (let i = 0; i < input.length; i += 1) {
+    h = (h * 31 + input.charCodeAt(i)) >>> 0;
+  }
+  return h % 360;
 }
 
-function sinceSeconds(observed_at, now) {
-  const at = parseDate(observed_at);
-  if (!at) return 0;
-  return Math.max(0, Math.round((now.getTime() - at.getTime()) / 1000));
+function iconForEntity(kind, activity) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-hidden", "true");
+  svg.classList.add("entity-icon");
+  let paths;
+  if (activity === "audio") {
+    paths = [
+      "M4 14a8 8 0 0 1 16 0",
+      "M6 14h2v6H6a2 2 0 0 1-2-2v-2a2 2 0 0 1 2-2Z",
+      "M16 14h2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-2v-6Z"
+    ];
+  } else if (kind === "domain") {
+    paths = [
+      "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z",
+      "M3.6 9h16.8",
+      "M3.6 15h16.8",
+      "M12 3a13 13 0 0 1 0 18",
+      "M12 3a13 13 0 0 0 0 18"
+    ];
+  } else {
+    paths = [
+      "M4 5h16v11H4Z",
+      "M8 20h8",
+      "M10 16v4",
+      "M14 16v4"
+    ];
+  }
+  for (const d of paths) {
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", d);
+    svg.append(path);
+  }
+  return svg;
 }
 
-function sinceMinutes(observed_at, now) {
-  return Math.floor(sinceSeconds(observed_at, now) / 60);
+function entityAvatar(kind, entity, label, activity = "focus") {
+  const avatar = document.createElement("span");
+  avatar.className = "entity-avatar";
+  avatar.dataset.kind = kind || "app";
+  avatar.dataset.activity = activity;
+  avatar.append(iconForEntity(kind, activity));
+  return avatar;
+}
+
+/* ====== Model helpers for the data grid ====== */
+
+function uniqueEntities(events, entityType, source) {
+  const set = new Set();
+  for (const e of events) {
+    if (e.entity_type === entityType && e.source === source && isFocusEvent(e)) {
+      set.add(e.entity);
+    }
+  }
+  return set.size;
+}
+
+function topEntity(events, source) {
+  const counts = new Map();
+  for (const e of events) {
+    if (e.source !== source || !isFocusEvent(e)) continue;
+    counts.set(e.entity, (counts.get(e.entity) || 0) + 1);
+  }
+  let top = "—";
+  let max = 0;
+  for (const [k, v] of counts) {
+    if (v > max) { top = k; max = v; }
+  }
+  return top;
+}
+
+function peakHourLabel(segments) {
+  if (!segments.length) return "—";
+  const byHour = new Array(24).fill(0);
+  for (const s of segments) {
+    const h = s.start.getHours();
+    byHour[h] += s.seconds;
+  }
+  let max = 0;
+  let peakH = 9;
+  for (let h = 0; h < 24; h += 1) {
+    if (byHour[h] > max) { max = byHour[h]; peakH = h; }
+  }
+  if (max === 0) return "—";
+  return `${String(peakH).padStart(2, "0")}:00`;
+}
+
+function avgFocusLabel(segments) {
+  if (!segments.length) return "0m";
+  const total = segments.reduce((sum, s) => sum + s.seconds, 0);
+  const avg = total / segments.length;
+  const mins = Math.round(avg / 60);
+  if (mins < 60) return `${mins}m`;
+  return `${Math.floor(mins / 60)}h ${mins % 60}m`;
+}
+
+/* ====== Status / busy ====== */
+
+function setStatus(message) {
+  const bar = $("commandBar");
+  if (!bar) return;
+  if (message) bar.textContent = `localtrace · error · ${message}`;
 }
 
 function setBusy(busy) {
@@ -858,63 +731,5 @@ function setBusy(busy) {
   }
 }
 
-// Navigation
-function showView(view) {
-  state.view = view;
-  const dash = $("dashboardView");
-  const settings = $("settingsView");
-  if (!dash || !settings) return;
-  dash.classList.toggle("active", view === "dashboard");
-  dash.classList.toggle("hidden", view !== "dashboard");
-  settings.classList.toggle("active", view === "settings");
-  settings.classList.toggle("hidden", view !== "settings");
-  for (const btn of document.querySelectorAll(".icon-rail-btn")) {
-    btn.classList.toggle("active", btn.dataset.rail === view);
-  }
-}
-
-for (const btn of document.querySelectorAll(".icon-rail-btn")) {
-  btn.addEventListener("click", () => {
-    const target = btn.dataset.rail;
-    if (target === "settings") showView("settings");
-    else if (target === "dashboard" || target === "activity" || target === "apps" || target === "reports") {
-      showView("dashboard");
-    }
-  });
-}
-
-const backBtn = $("backToDashboard");
-if (backBtn) backBtn.addEventListener("click", () => showView("dashboard"));
-
-const refreshBtn = $("refreshButton");
-if (refreshBtn) refreshBtn.addEventListener("click", loadAll);
-
-const saveBtn = $("saveSettings");
-if (saveBtn) saveBtn.addEventListener("click", saveSettings);
-
-const addRuleBtn = $("addRule");
-if (addRuleBtn) addRuleBtn.addEventListener("click", addRule);
-
-const pauseBtn = $("pauseButton");
-if (pauseBtn) pauseBtn.addEventListener("click", () => setTracking("/tracking/pause"));
-
-const resumeBtn = $("resumeButton");
-if (resumeBtn) resumeBtn.addEventListener("click", () => setTracking("/tracking/resume"));
-
-// Update topbar crumb to today on first render
-function setTopbarCrumb() {
-  const crumb = $("topbarCrumb");
-  if (!crumb) return;
-  const now = new Date();
-  const datestr = new Intl.DateTimeFormat(undefined, {
-    year: "numeric", month: "2-digit", day: "2-digit"
-  }).format(now);
-  crumb.textContent = `Today · ${datestr}`;
-}
-
-setTopbarCrumb();
-showView("dashboard");
 loadAll();
-
-// Lightweight auto-refresh
 setInterval(loadAll, 30000);

@@ -319,68 +319,92 @@ def test_http_routes_expose_web_settings_and_local_json_apis(tmp_path: Path) -> 
         assert "Today" in html
         assert "Right now" in html
         assert "Recent flow" in html
-        assert "Activity" in html
-        assert 'id="dashboard"' not in html
-        assert 'class="icon-rail"' in html
-        assert 'class="kpi-row"' in html
-        assert 'class="bottom-split"' in html
+        assert 'class="layout"' in html
+        assert 'class="topbar"' in html
+        assert 'class="hero"' in html
+        assert 'class="hero-eyebrow"' in html
+        assert 'class="hero-number"' in html
+        assert 'id="heroNumber"' in html
+        assert 'id="heroAnnotation"' in html
+        assert 'id="heroMeta"' in html
+        assert 'class="data-grid"' in html
+        assert 'id="dataGrid"' in html
+        assert 'class="timeline"' in html
+        assert 'id="timelineAxis"' in html
+        assert 'id="timelineLanes"' in html
+        assert 'class="bottom-row"' in html
         assert 'id="nowList"' in html
-        assert 'id="nowFoot"' in html
-        assert 'id="flowBody"' in html
-        assert 'id="statusBar"' in html
-        assert 'id="hero"' not in html
-        assert 'id="rightNow"' not in html
-        assert 'id="metricsView"' not in html
-        assert 'id="settingsPanel"' not in html
-        assert 'id="healthMetrics"' not in html
-        assert 'class="hero-block"' not in html
-        assert "Today Top" not in html
-        assert "flow-list" not in html
+        assert 'id="flowList"' in html
+        assert 'id="healthPills"' in html
+        assert 'id="healthBlurb"' in html
+        assert 'id="commandBar"' in html
+        assert 'id="dashboardView"' not in html
+        assert 'id="settingsView"' not in html
+        assert 'class="icon-rail"' not in html
+        assert 'class="kpi-row"' not in html
+        assert 'class="bottom-split"' not in html
+        assert 'id="nowFoot"' not in html
+        assert 'id="flowBody"' not in html
+        assert 'id="statusBar"' not in html
+        assert "icon-rail-btn" not in html
+        assert 'data-rail="' not in html
         assert "eventsTable" not in html
         assert 'data-section=' not in html
         assert "data-view=" not in html
-        assert "icon-rail-btn" in html
-        assert 'data-rail="dashboard"' in html
-        assert 'data-rail="settings"' in html
+        assert "Planner" not in html
+        assert "Review" not in html
         assert "/web/app.js" in html
         assert 'src="/web/app.js?v=' in html
         assert 'href="/web/styles.css?v=' in html
-        assert "Planner" not in html
-        assert "Review" not in html
 
         status, content_type, script = request_text(base_url, "/web/app.js")
         assert status == 200
         assert "javascript" in content_type
         assert "fetch" in script
         assert "/settings" in script
-        assert "/privacy/rules" in script
-        assert "/tracking/status" in script
         assert "/events?limit=500&order=desc" in script
-        assert "renderKpis" in script
+        assert "renderHero" in script
+        assert "renderDataGrid" in script
         assert "renderTimeline" in script
-        assert "renderRightNow" in script
+        assert "renderNow" in script
         assert "renderRecentFlow" in script
-        assert "renderStatusBar" in script
-        assert "renderDashboard" in script
-        assert "renderHero" not in script
+        assert "renderHealth" in script
+        assert "renderCommandBar" in script
+        assert "buildModel" in script
+        assert "renderKpis" not in script
+        assert "renderRightNow" not in script
+        assert "renderStatusBar" not in script
+        assert "renderDashboard" not in script
         assert "buildHeadline" not in script
         assert "buildTimelineModel" not in script
         assert ".scrollIntoView(" not in script
         assert "view.hidden" not in script
         assert "avatar.append(badge)" not in script
+        assert "/privacy/rules" not in script
+        assert "/tracking/status" not in script
 
         status, content_type, styles = request_text(base_url, "/web/styles.css")
         assert status == 200
         assert "text/css" in content_type
         assert ":root" in styles
-        assert ".icon-rail" in styles
-        assert ".kpi-row" in styles
-        assert ".timeline-strip" in styles
-        assert ".bottom-split" in styles
+        assert ".layout" in styles
+        assert ".topbar" in styles
+        assert ".hero" in styles
+        assert ".data-grid" in styles
+        assert ".data-tile" in styles
+        assert ".timeline-lanes" in styles
+        assert ".timeline-lane" in styles
+        assert ".bottom-row" in styles
+        assert ".panel" in styles
         assert ".flow-row" in styles
-        assert ".status-bar" in styles
+        assert ".command-bar" in styles
+        assert ".health-pill" in styles
+        assert ".icon-rail" not in styles
+        assert ".kpi-row" not in styles
+        assert ".timeline-strip" not in styles
+        assert ".bottom-split" not in styles
+        assert ".status-bar" not in styles
         assert ".hero-block" not in styles
-        assert ".hero-headline" not in styles
         assert ".timeline-grid" not in styles
         assert ".row-value" not in styles
         assert ".entity-avatar" in styles

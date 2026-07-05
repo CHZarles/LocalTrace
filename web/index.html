@@ -3,257 +3,59 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>LocalTrace — Command Center</title>
-    <link rel="stylesheet" href="/web/styles.css?v=20260705-motion" />
+    <title>LocalTrace — Today, you focused</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;1,9..144,300;1,9..144,400&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/web/styles.css?v=20260705-ed" />
   </head>
   <body>
-    <div class="app">
-
-      <aside class="icon-rail" aria-label="Primary">
-        <div class="icon-rail-mark" aria-hidden="true">LT</div>
-        <button class="icon-rail-btn active" type="button" data-rail="dashboard" title="Dashboard">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <rect x="3" y="3" width="7" height="7" rx="1.5"/>
-            <rect x="14" y="3" width="7" height="7" rx="1.5"/>
-            <rect x="3" y="14" width="7" height="7" rx="1.5"/>
-            <rect x="14" y="14" width="7" height="7" rx="1.5"/>
-          </svg>
-        </button>
-        <button class="icon-rail-btn" type="button" data-rail="activity" title="Activity">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-          </svg>
-        </button>
-        <button class="icon-rail-btn" type="button" data-rail="apps" title="Apps">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <rect x="3" y="3" width="7" height="7" rx="1"/>
-            <rect x="14" y="3" width="7" height="7" rx="1"/>
-            <rect x="3" y="14" width="7" height="7" rx="1"/>
-            <rect x="14" y="14" width="7" height="7" rx="1"/>
-            <rect x="7" y="7" width="10" height="10" rx="1"/>
-          </svg>
-        </button>
-        <button class="icon-rail-btn" type="button" data-rail="reports" title="Reports">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
-            <polyline points="14 3 14 9 20 9"/>
-            <line x1="8" y1="13" x2="16" y2="13"/>
-            <line x1="8" y1="17" x2="13" y2="17"/>
-          </svg>
-        </button>
-        <div class="icon-rail-spacer"></div>
-        <button class="icon-rail-btn" type="button" data-rail="help" title="Help">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="12" r="9"/>
-            <path d="M9.5 9.5a2.5 2.5 0 0 1 5 0c0 1.5-2.5 2-2.5 3.5"/>
-            <line x1="12" y1="17" x2="12.01" y2="17"/>
-          </svg>
-        </button>
-        <button class="icon-rail-btn" type="button" data-rail="settings" title="Settings">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="12" r="3"/>
-            <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.4 7a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6V3a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1A2 2 0 1 1 20 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.6 1Z"/>
-          </svg>
-        </button>
-      </aside>
-
+    <div class="layout">
       <header class="topbar">
-        <span class="topbar-brand">LocalTrace</span>
-        <span class="topbar-sep">/</span>
-        <span class="topbar-crumb" id="topbarCrumb">Today · 2026-07-05</span>
-        <div class="topbar-spacer"></div>
-        <button id="refreshButton" class="topbar-btn refresh" type="button" title="Refresh">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <polyline points="23 4 23 10 17 10"/>
-            <polyline points="1 20 1 14 7 14"/>
-            <path d="M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15"/>
-          </svg>
-        </button>
-        <div class="topbar-avatar">LT</div>
+        <div class="brand"><span class="brand-dot"></span><em>LocalTrace</em></div>
+        <div class="live">
+          <span class="live-dot"></span>
+          <span class="live-meta">TODAY · 5 July 2026 · LIVE</span>
+        </div>
       </header>
 
-      <main id="dashboardView" class="dashboard view active">
-
-        <section class="kpi-row">
-          <article class="kpi-card accent" data-accent="focus">
-            <span class="label kpi-label">Focused</span>
-            <div>
-              <div class="kpi-num" id="kpiFocusNum">0:00</div>
-              <div class="kpi-foot" id="kpiFocusFoot">No focus yet</div>
-            </div>
-          </article>
-          <article class="kpi-card" data-accent="audio">
-            <span class="label kpi-label">Audio playback</span>
-            <div>
-              <div class="kpi-num" id="kpiAudioNum">0<span class="unit">m</span></div>
-              <div class="kpi-foot" id="kpiAudioFoot">No audio captured</div>
-            </div>
-          </article>
-          <article class="kpi-card" data-accent="switches">
-            <span class="label kpi-label">App switches</span>
-            <div>
-              <div class="kpi-num" id="kpiSwitchesNum">0</div>
-              <div class="kpi-foot" id="kpiSwitchesFoot">No activity yet</div>
-            </div>
-          </article>
-          <article class="kpi-card" data-accent="events">
-            <span class="label kpi-label">Events logged</span>
-            <div>
-              <div class="kpi-num" id="kpiEventsNum">0</div>
-              <div class="kpi-foot" id="kpiEventsFoot">— / hr · db synced</div>
-            </div>
-          </article>
-        </section>
-
-        <section class="timeline-strip">
-          <div class="timeline-title">
-            <span class="timeline-title-label">Activity</span>
-            <span class="timeline-title-num mono" id="timelineTitle">0:00 / 0m</span>
-            <span class="timeline-title-sub" id="timelineSub">0 lanes · today</span>
-          </div>
-          <div class="timeline-body">
-            <div class="timeline-axis" id="timelineAxis"></div>
-            <div class="timeline-lanes" id="timelineLanes"></div>
-            <div class="timeline-meta" id="timelineMeta">24h window · focus 0m · audio 0m</div>
-          </div>
-        </section>
-
-        <section class="bottom-split">
-          <article class="panel">
-            <div class="panel-h">
-              <span class="title">Right now</span>
-              <span class="count" id="nowCount">3 rows</span>
-            </div>
-            <div class="now-list" id="nowList"></div>
-            <div class="now-foot" id="nowFoot">Waiting for activity</div>
-          </article>
-
-          <article class="panel">
-            <div class="panel-h">
-              <span class="title">Recent flow</span>
-              <span class="count">last 10 events</span>
-            </div>
-            <div class="flow-table">
-              <div class="flow-hd">
-                <span>TIME</span><span>APP / CONTEXT</span><span>DURATION</span><span>SOURCE</span>
-              </div>
-              <div id="flowBody"></div>
-            </div>
-          </article>
-        </section>
-
-      </main>
-
-      <section id="settingsView" class="dashboard view hidden">
-        <article class="panel" style="padding: 18px;">
-          <div class="settings-card-h">
-            <h3>Settings</h3>
-            <button id="backToDashboard" class="settings-back" type="button">Back</button>
-          </div>
-
-          <div class="settings-card" style="margin-bottom: 16px;">
-            <div class="settings-card-h">
-              <h3>Core settings</h3>
-              <button id="saveSettings" class="primary" type="button">Save</button>
-            </div>
-            <form id="settingsForm" class="settings-grid">
-              <label>
-                <span>Port</span>
-                <input id="apiPort" name="apiPort" type="number" min="1" max="65535" />
-              </label>
-              <label>
-                <span>Poll ms</span>
-                <input id="pollMs" name="pollMs" type="number" min="100" step="100" />
-              </label>
-              <label>
-                <span>Heartbeat sec</span>
-                <input id="heartbeatSeconds" name="heartbeatSeconds" type="number" min="1" />
-              </label>
-              <label>
-                <span>Idle cutoff sec</span>
-                <input id="idleCutoffSeconds" name="idleCutoffSeconds" type="number" min="1" />
-              </label>
-              <label class="toggle">
-                <span>Store titles</span>
-                <input id="storeTitles" name="storeTitles" type="checkbox" />
-              </label>
-              <label class="toggle">
-                <span>Store exe path</span>
-                <input id="storeExePath" name="storeExePath" type="checkbox" />
-              </label>
-              <label class="toggle">
-                <span>Track browser</span>
-                <input id="trackBrowser" name="trackBrowser" type="checkbox" />
-              </label>
-              <label class="toggle">
-                <span>Track audio</span>
-                <input id="trackAudio" name="trackAudio" type="checkbox" />
-              </label>
-            </form>
-            <div style="margin-top: 16px; display: flex; gap: 12px;">
-              <span id="trackingPill" class="status-pill">Tracking</span>
-              <button id="pauseButton" class="secondary" type="button">Pause</button>
-              <button id="resumeButton" class="secondary" type="button">Resume</button>
-            </div>
-          </div>
-
-          <div class="settings-card">
-            <div class="settings-card-h">
-              <h3>Privacy</h3>
-              <button id="addRule" class="primary" type="button">Add Rule</button>
-            </div>
-            <form id="ruleForm" class="rule-form">
-              <label>
-                <span>Entity</span>
-                <select id="ruleEntityType" name="ruleEntityType">
-                  <option value="domain">domain</option>
-                  <option value="app">app</option>
-                </select>
-              </label>
-              <label>
-                <span>Pattern</span>
-                <input id="rulePattern" name="rulePattern" type="text" autocomplete="off" />
-              </label>
-              <label>
-                <span>Action</span>
-                <select id="ruleAction" name="ruleAction">
-                  <option value="mask">mask</option>
-                  <option value="drop">drop</option>
-                </select>
-              </label>
-              <div></div>
-            </form>
-            <div class="table-wrap">
-              <table class="rules-table">
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Entity</th>
-                    <th>Pattern</th>
-                    <th>Action</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody id="rulesTable"></tbody>
-              </table>
-            </div>
-          </div>
-        </article>
+      <section class="hero">
+        <div class="hero-eyebrow">TODAY</div>
+        <div class="hero-headline-italic">Today, you focused</div>
+        <div class="hero-number" id="heroNumber">0:00</div>
+        <div class="hero-annotation" id="heroAnnotation">— a quieter day</div>
+        <div class="hero-meta" id="heroMeta">Waiting for activity</div>
       </section>
 
-      <footer class="status-bar" id="statusBar">
-        <span><span class="dot" data-health="db"></span>db</span>
-        <span class="sep">·</span>
-        <span><span class="dot" data-health="browser"></span>browser</span>
-        <span class="sep">·</span>
-        <span><span class="dot" data-health="winprobe"></span>winprobe</span>
-        <span class="sep">·</span>
-        <span>Updated <span class="upd" id="statusUpdated">—</span></span>
-        <span class="sep">·</span>
-        <span id="statusCounts">0 events · 0m focused</span>
-      </footer>
+      <div class="data-grid" id="dataGrid"></div>
+
+      <section class="timeline">
+        <div class="timeline-axis" id="timelineAxis"></div>
+        <div class="timeline-lanes" id="timelineLanes"></div>
+      </section>
+
+      <div class="bottom-row">
+        <article class="panel right-now">
+          <h3 class="panel-title">Right now</h3>
+          <div class="now-list" id="nowList"></div>
+        </article>
+        <article class="panel recent-flow">
+          <h3 class="panel-title">Recent flow</h3>
+          <div class="flow-list" id="flowList"></div>
+        </article>
+        <article class="panel health">
+          <h3 class="panel-title">Health</h3>
+          <div class="health-pills" id="healthPills"></div>
+          <p class="health-blurb" id="healthBlurb">— lowest this week</p>
+        </article>
+      </div>
+
+      <footer class="command-bar" id="commandBar"></footer>
     </div>
 
-    <script type="module" src="/web/app.js?v=20260705-motion"></script>
+    <script type="module" src="/web/app.js?v=20260705-ed"></script>
   </body>
 </html>
