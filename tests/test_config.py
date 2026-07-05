@@ -47,6 +47,46 @@ def test_config_can_be_saved_and_loaded(tmp_path: Path) -> None:
     assert "host" not in config_path.read_text(encoding="utf-8")
 
 
+def test_legacy_false_title_default_is_migrated_to_enabled(
+    tmp_path: Path,
+) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "api": {"port": 8765},
+                "capture": {
+                    "poll_ms": 1000,
+                    "heartbeat_seconds": 60,
+                    "idle_cutoff_seconds": 300,
+                    "store_titles": False,
+                    "store_exe_path": False,
+                    "track_browser": True,
+                    "track_audio": True,
+                },
+                "privacy": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_config(config_path, data_dir=tmp_path)
+
+    assert config.capture.store_titles is True
+    assert config.capture.store_exe_path is False
+
+
+def test_current_config_can_keep_titles_disabled(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config = default_config(data_dir=tmp_path)
+    config.capture.store_titles = False
+
+    save_config(config, config_path)
+    loaded = load_config(config_path, data_dir=tmp_path)
+
+    assert loaded.capture.store_titles is False
+
+
 @pytest.mark.parametrize("port", [0, -1, 65536])
 def test_invalid_stored_api_port_falls_back_to_default(
     tmp_path: Path, port: int

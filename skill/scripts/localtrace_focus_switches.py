@@ -152,12 +152,22 @@ def focus_switch_facts(
         "switch_count": len(switches),
         "unknown_or_idle_seconds": _rounded_seconds(unknown_or_idle_seconds),
         "long_gap_count": long_gap_count,
+        "title_capture": _title_capture(focus_events),
         "target_durations": target_durations,
         "switches": switches,
         "prompt_context": {
             "focus_target": (
                 "entity_type + entity + title when title is present; "
                 "otherwise entity_type + entity"
+            ),
+            "title_capture": (
+                "windows_probe app_active events support title when the "
+                "runtime captures it. Use title_capture counts and raw events "
+                "to describe current data. Do not conclude that windows_probe "
+                "cannot track titles solely because current samples have null "
+                "title; report that current captured data has no Windows app "
+                "titles and check runtime version, restart state, and "
+                "capture.store_titles."
             ),
             "duration_rule": (
                 "time until the next focus event is attributed to the current "
@@ -180,6 +190,54 @@ def _target(event: dict[str, Any]) -> dict[str, str]:
     if isinstance(title, str) and title:
         target["title"] = title
     return target
+
+
+def _title_capture(events: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    return {
+        "browser_extension": _title_capture_for_source(events, "browser_extension"),
+        "windows_probe": _title_capture_for_source(events, "windows_probe"),
+    }
+
+
+def _title_capture_for_source(
+    events: list[dict[str, Any]], source: str
+) -> dict[str, Any]:
+    source_events = [event for event in events if event.get("source") == source]
+    examples: list[dict[str, str]] = []
+    seen_titles: set[tuple[str, str, str]] = set()
+    with_title_count = 0
+
+    for event in source_events:
+        title = event.get("title")
+        if not isinstance(title, str) or not title:
+            continue
+
+        with_title_count += 1
+        example_key = (
+            str(event.get("entity_type", "")),
+            str(event.get("entity", "")),
+            title,
+        )
+        if example_key in seen_titles:
+            continue
+        seen_titles.add(example_key)
+        if len(examples) >= 5:
+            continue
+        examples.append(
+            {
+                "observed_at": str(event.get("observed_at", "")),
+                "entity_type": example_key[0],
+                "entity": example_key[1],
+                "title": title,
+            }
+        )
+
+    return {
+        "focus_event_count": len(source_events),
+        "with_title_count": with_title_count,
+        "without_title_count": len(source_events) - with_title_count,
+        "title_examples": examples,
+    }
 
 
 def _target_key(target: dict[str, str]) -> tuple[str, str, str | None]:

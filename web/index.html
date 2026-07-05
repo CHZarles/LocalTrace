@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>LocalTrace</title>
-    <link rel="stylesheet" href="/web/styles.css?v=20260703-pages" />
+    <link rel="stylesheet" href="/web/styles.css?v=20260705-flow" />
   </head>
   <body>
     <svg class="icon-sprite" aria-hidden="true">
@@ -139,6 +139,17 @@
                     <div class="timeline-lanes" id="timelineLanes"></div>
                   </div>
                 </article>
+
+                <article class="card">
+                  <div class="section-heading">
+                    <div>
+                      <h3>Recent flow</h3>
+                      <p class="section-note" id="flowMeta">Latest captured activity</p>
+                    </div>
+                  </div>
+                  <p class="empty-state" id="flowEmpty" hidden>No recent activity yet.</p>
+                  <div class="flow-list" id="flowList"></div>
+                </article>
               </div>
 
               <aside class="side-stack">
@@ -256,6 +267,6 @@
       </div>
     </div>
 
-    <script type="module" src="/web/app.js?v=20260703-pages"></script>
+    <script type="module" src="/web/app.js?v=20260705-flow"></script>
   </body>
 </html>

@@ -46,8 +46,9 @@ result.
 2. Health or "is tracking working": run `health`; report `ok`, tracking pause
    state, database presence, and recent source timestamps.
 3. Focus switching or attention review: run `focus-switches`; report facts,
-   `target_durations`, switches, idle/unknown time, and `prompt_context`.
-   Do not invent a rating unless the user provides an evaluation prompt.
+   `target_durations`, switches, idle/unknown time, `title_capture`, and
+   `prompt_context`. Do not invent a rating unless the user provides an
+   evaluation prompt.
 4. Recent activity or "what was I doing": run `recent-events --limit 25`;
    group by time, app/domain, source, and kind.
 5. One-day summary or "today": run `day-summary --date YYYY-MM-DD`; summarize
@@ -56,6 +57,12 @@ result.
    keep RFC3339 UTC timestamps and include filters only when requested.
 7. Missing activity or "gap": run `explain-gap --from ... --to ...`; report
    inside events, nearest before/after events, and whether context is exact.
+8. Desktop app title or "does windows_probe capture titles": use
+   `focus-switches` `title_capture.windows_probe` and, when needed, query raw
+   `events-between --source windows_probe --kind app_active`. Do not say
+   windows_probe cannot track titles just because current samples have null
+   `title`; say the current captured data has no Windows app titles, then
+   mention runtime version/restart state and `capture.store_titles`.
 
 ## Command reference
 

@@ -4,6 +4,7 @@ import {
   buildTabAudioStopEvent,
   clearPendingSeq,
   endpointFromSettings,
+  normalizeSettings,
   reserveSeq,
   safeHostname
 } from "./event_builder.mjs";
@@ -102,21 +103,22 @@ async function persistState() {
 }
 
 async function getSettings() {
-  const stored = await chrome.storage.local.get(DEFAULT_SETTINGS);
-  return { ...DEFAULT_SETTINGS, ...stored };
+  const stored = await chrome.storage.local.get(Object.keys(DEFAULT_SETTINGS));
+  const settings = normalizeSettings(stored);
+  const patch = {};
+  for (const [key, value] of Object.entries(settings)) {
+    if (stored[key] !== value) {
+      patch[key] = value;
+    }
+  }
+  if (Object.keys(patch).length > 0) {
+    await chrome.storage.local.set(patch);
+  }
+  return settings;
 }
 
 async function ensureDefaultSettings() {
-  const stored = await chrome.storage.local.get(Object.keys(DEFAULT_SETTINGS));
-  const missing = {};
-  for (const [key, value] of Object.entries(DEFAULT_SETTINGS)) {
-    if (stored[key] === undefined) {
-      missing[key] = value;
-    }
-  }
-  if (Object.keys(missing).length > 0) {
-    await chrome.storage.local.set(missing);
-  }
+  await getSettings();
 }
 
 function detectBrowser() {

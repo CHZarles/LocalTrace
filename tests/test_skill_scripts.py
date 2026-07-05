@@ -353,6 +353,40 @@ def test_focus_switches_reports_facts_without_scoring() -> None:
             "duration_seconds": 0,
         },
     ]
+    assert body["title_capture"] == {
+        "browser_extension": {
+            "focus_event_count": 2,
+            "with_title_count": 2,
+            "without_title_count": 0,
+            "title_examples": [
+                {
+                    "observed_at": "2026-07-01T09:02:00.000Z",
+                    "entity_type": "domain",
+                    "entity": "github.com",
+                    "title": "Review PR",
+                }
+            ],
+        },
+        "windows_probe": {
+            "focus_event_count": 2,
+            "with_title_count": 2,
+            "without_title_count": 0,
+            "title_examples": [
+                {
+                    "observed_at": "2026-07-01T09:00:00.000Z",
+                    "entity_type": "app",
+                    "entity": "Code.exe",
+                    "title": "LocalTrace",
+                },
+                {
+                    "observed_at": "2026-07-01T09:20:00.000Z",
+                    "entity_type": "app",
+                    "entity": "Code.exe",
+                    "title": "Terminal",
+                },
+            ],
+        },
+    }
     assert body["switches"] == [
         {
             "at": "2026-07-01T09:02:00.000Z",
@@ -409,6 +443,37 @@ def test_unified_entrypoint_invokes_focus_switches_subcommand() -> None:
     assert body["ok"] is True
     assert body["focus_event_count"] == 0
     assert body["switch_count"] == 0
+
+
+def test_focus_switches_reports_absent_windows_titles_as_capture_facts() -> None:
+    events = [
+        event_at(1, "2026-07-01T09:00:00.000Z", "WindowsTerminal.exe"),
+        event_at(2, "2026-07-01T09:05:00.000Z", "Cursor.exe"),
+    ]
+    with FakeLocalTraceServer(
+        {
+            "/settings": {"body": {"ok": True, "settings": {"capture": {}}}},
+            "/events": {"body": events_route(events)},
+        }
+    ) as server:
+        result = run_script(
+            "localtrace_focus_switches.py",
+            ["--to", "2026-07-04T00:00:00.000Z"],
+            server.base_url,
+        )
+
+    assert result.returncode == 0
+    body = output_json(result)
+    assert body["title_capture"]["windows_probe"] == {
+        "focus_event_count": 2,
+        "with_title_count": 0,
+        "without_title_count": 2,
+        "title_examples": [],
+    }
+    assert (
+        "Do not conclude that windows_probe cannot track titles"
+        in body["prompt_context"]["title_capture"]
+    )
 
 
 def test_skill_installer_copies_skill_and_creates_invocation_command(

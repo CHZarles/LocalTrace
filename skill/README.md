@@ -60,9 +60,15 @@ partial-error JSON payload instead of silently truncating.
 
 `focus-switches` reads the past 3 days of focus events (`app_active` and
 `tab_active`) and returns factual JSON: switch count, switch list,
-`target_durations`, idle/unknown seconds, and `prompt_context`. It does not rate
-attention by itself; agents should combine `prompt_context` with the user's own
-prompt when the user asks for an AI judgment.
+`target_durations`, title capture coverage, idle/unknown seconds, and
+`prompt_context`. It does not rate attention by itself; agents should combine
+`prompt_context` with the user's own prompt when the user asks for an AI
+judgment.
+
+Use `title_capture.windows_probe` when checking whether desktop app titles are
+present in the captured data. If `with_title_count` is zero, report that the
+current sample has no Windows app titles; do not conclude that `windows_probe`
+cannot track titles.
 
 Use `--base-url` or `LOCALTRACE_BASE_URL` to target a non-default LocalTrace
 port on `127.0.0.1`. The default is `http://127.0.0.1:8765`; base URLs with

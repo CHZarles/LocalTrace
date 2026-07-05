@@ -2,6 +2,7 @@ import {
   DEFAULT_SETTINGS,
   endpointFromSettings,
   healthEndpointFromSettings,
+  normalizeSettings,
   normalizePort
 } from "./event_builder.mjs";
 
@@ -12,7 +13,9 @@ function byId(id) {
 }
 
 async function load() {
-  const settings = await chrome.storage.local.get(DEFAULT_SETTINGS);
+  const settings = normalizeSettings(
+    await chrome.storage.local.get(Object.keys(DEFAULT_SETTINGS))
+  );
   byId("enabled").checked = settings.enabled !== false;
   byId("sendTitle").checked = settings.sendTitle === true;
   byId("trackBgAudio").checked = settings.trackBackgroundAudio !== false;
@@ -30,7 +33,8 @@ function settingsFromForm() {
     sendTitle: byId("sendTitle").checked,
     trackBackgroundAudio: byId("trackBgAudio").checked,
     keepAlive: byId("keepAlive").checked,
-    port: normalizePort(byId("port").value)
+    port: normalizePort(byId("port").value),
+    settingsSchemaVersion: DEFAULT_SETTINGS.settingsSchemaVersion
   };
 }
 

@@ -64,7 +64,7 @@ Edge：
 
 Web UI 默认在本机 `127.0.0.1` 上打开。它分成两个页面：
 
-- **Metrics**：当前活动、今日汇总、时间轴、Top 应用/网站、Health。
+- **Metrics**：当前活动、今日汇总、时间轴、Recent flow、Top 应用/网站、Health。
 - **Settings**：采集设置和隐私规则。
 
 ## 它记录什么

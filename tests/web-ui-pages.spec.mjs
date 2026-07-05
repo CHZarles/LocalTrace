@@ -211,6 +211,72 @@ test("stale browser audio is hidden even when idle cutoff is long", async ({
   }
 });
 
+test("recent flow renders latest events in descending order", async ({ page }) => {
+  const server = await startWebUiServer({
+    events: [
+      {
+        id: 1,
+        observed_at: "2026-07-03T09:00:00.000Z",
+        received_at: "2026-07-03T09:00:00.000Z",
+        source: "windows_probe",
+        kind: "app_active",
+        entity_type: "app",
+        entity: "Code.exe",
+        title: "LocalTrace - Visual Studio Code",
+        payload: { activity: "focus" }
+      },
+      {
+        id: 3,
+        observed_at: "2026-07-03T09:07:00.000Z",
+        received_at: "2026-07-03T09:07:00.000Z",
+        source: "windows_probe",
+        kind: "app_audio_stop",
+        entity_type: "app",
+        entity: "Spotify.exe",
+        title: "",
+        payload: { activity: "audio", reason: "session_ended" }
+      },
+      {
+        id: 2,
+        observed_at: "2026-07-03T09:05:00.000Z",
+        received_at: "2026-07-03T09:05:00.000Z",
+        source: "browser_extension",
+        kind: "tab_active",
+        entity_type: "domain",
+        entity: "docs.python.org",
+        title: "datetime - Basic date and time types",
+        payload: { activity: "focus", browser: "chrome" }
+      },
+      {
+        id: 4,
+        observed_at: "2026-07-03T09:09:00.000Z",
+        received_at: "2026-07-03T09:09:00.000Z",
+        source: "browser_extension",
+        kind: "tab_active",
+        entity_type: "domain",
+        entity: "youtube.com",
+        title: "Live set",
+        payload: { activity: "audio", browser: "chrome" }
+      }
+    ]
+  });
+  try {
+    await page.goto(server.url);
+
+    const rows = page.locator("#flowList .flow-item");
+    await expect(rows).toHaveCount(4);
+    await expect(rows.nth(0)).toContainText("youtube.com");
+    await expect(rows.nth(0)).toContainText("Tab audio");
+    await expect(rows.nth(1)).toContainText("Spotify.exe");
+    await expect(rows.nth(1)).toContainText("Audio stopped");
+    await expect(rows.nth(1)).toContainText("windows_probe");
+    await expect(rows.nth(2)).toContainText("docs.python.org");
+    await expect(rows.nth(3)).toContainText("Code.exe");
+  } finally {
+    await server.close();
+  }
+});
+
 test("mobile metrics use a single-column layout", async ({ page }) => {
   const server = await startWebUiServer();
   try {

@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 LOOPBACK_HOST = "127.0.0.1"
+CONFIG_VERSION = 2
 
 
 @dataclass
@@ -77,6 +78,12 @@ def load_config(path: Path, data_dir: Path | None = None) -> LocalTraceConfig:
 
     api = _section(raw, "api")
     capture = _section(raw, "capture")
+    config_version = _config_version(raw)
+    legacy_false_title_default = (
+        config_version < 2
+        and capture.get("store_titles") is False
+        and capture.get("store_exe_path") is False
+    )
     config.api.port = _bounded_int(api, "port", config.api.port, 1, 65535)
     config.capture.poll_ms = _int(capture, "poll_ms", config.capture.poll_ms)
     config.capture.heartbeat_seconds = _int(
@@ -85,9 +92,10 @@ def load_config(path: Path, data_dir: Path | None = None) -> LocalTraceConfig:
     config.capture.idle_cutoff_seconds = _int(
         capture, "idle_cutoff_seconds", config.capture.idle_cutoff_seconds
     )
-    config.capture.store_titles = _bool(
-        capture, "store_titles", config.capture.store_titles
-    )
+    if not legacy_false_title_default:
+        config.capture.store_titles = _bool(
+            capture, "store_titles", config.capture.store_titles
+        )
     config.capture.store_exe_path = _bool(
         capture, "store_exe_path", config.capture.store_exe_path
     )
@@ -111,6 +119,7 @@ def load_or_create_config(path: Path, data_dir: Path | None = None) -> LocalTrac
 def save_config(config: LocalTraceConfig, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     data = {
+        "config_version": CONFIG_VERSION,
         "api": {"port": config.api.port},
         "capture": asdict(config.capture),
         "privacy": asdict(config.privacy),
@@ -121,6 +130,11 @@ def save_config(config: LocalTraceConfig, path: Path) -> None:
 def _section(raw: dict[str, Any], key: str) -> dict[str, Any]:
     value = raw.get(key, {})
     return value if isinstance(value, dict) else {}
+
+
+def _config_version(raw: dict[str, Any]) -> int:
+    value = raw.get("config_version", 1)
+    return value if isinstance(value, int) and not isinstance(value, bool) else 1
 
 
 def _int(raw: dict[str, Any], key: str, default: int) -> int:

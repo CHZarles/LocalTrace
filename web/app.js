@@ -54,6 +54,7 @@ async function loadAll() {
 function renderAll() {
   renderShell();
   renderToday();
+  renderFlow(state.events);
   renderHealth(state.health);
   renderSettings(state.settings);
   renderRules(state.rules);
@@ -384,6 +385,89 @@ function renderTimelineLane(lane) {
   }
   row.append(label, track);
   return row;
+}
+
+function renderFlow(events) {
+  const items = [...events].sort(compareEventsDesc).slice(0, 14);
+  $("flowEmpty").hidden = items.length !== 0;
+  $("flowList").hidden = items.length === 0;
+  $("flowMeta").textContent = items.length
+    ? `${items.length} latest events`
+    : "Latest captured activity";
+  $("flowList").replaceChildren(...items.map(renderFlowItem));
+}
+
+function renderFlowItem(event) {
+  const row = document.createElement("div");
+  row.className = "flow-item";
+
+  const time = document.createElement("time");
+  time.className = "flow-time";
+  time.dateTime = event.observed_at || "";
+  time.textContent = formatFlowTime(event.observed_at);
+
+  const body = document.createElement("div");
+  body.className = "flow-body";
+  const title = document.createElement("strong");
+  const sub = document.createElement("span");
+  title.textContent = displayEntity(event);
+  sub.textContent = flowSubtitle(event);
+  body.append(title, sub);
+
+  const meta = document.createElement("div");
+  meta.className = "flow-meta";
+  meta.append(
+    flowChip(eventKindLabel(event), flowActivity(event)),
+    flowChip(event.source || "unknown")
+  );
+
+  row.append(
+    time,
+    entityAvatar(
+      event.entity_type,
+      event.entity,
+      displayEntity(event),
+      flowActivity(event)
+    ),
+    body,
+    meta
+  );
+  return row;
+}
+
+function flowChip(text, activity = "focus") {
+  const chip = document.createElement("span");
+  chip.className = "flow-chip";
+  chip.dataset.activity = activity;
+  chip.textContent = text;
+  return chip;
+}
+
+function flowSubtitle(event) {
+  if (event.title) return event.title;
+  if (event.payload?.reason) return `Reason: ${event.payload.reason}`;
+  return event.kind || "";
+}
+
+function flowActivity(event) {
+  return isAudioStartEvent(event) || isAudioStopEvent(event) ? "audio" : "focus";
+}
+
+function eventKindLabel(event) {
+  switch (event.kind) {
+    case "app_active":
+      return "App focus";
+    case "tab_active":
+      return flowActivity(event) === "audio" ? "Tab audio" : "Tab focus";
+    case "app_audio":
+      return "App audio";
+    case "app_audio_stop":
+      return "Audio stopped";
+    case "tab_audio_stop":
+      return "Tab audio stopped";
+    default:
+      return event.kind || "Event";
+  }
 }
 
 function renderHealth(health) {
@@ -720,6 +804,17 @@ function formatTime(value) {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit"
+  }).format(date);
+}
+
+function formatFlowTime(value) {
+  const date = parseDate(value);
+  if (!date) return value || "";
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
   }).format(date);
 }
 

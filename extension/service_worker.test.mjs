@@ -14,8 +14,8 @@ async function waitForPostedEvents(posted, count) {
   }
 }
 
-function installChromeMock({ focused, activeTab, audibleTabs }) {
-  const storage = {};
+function installChromeMock({ focused, activeTab, audibleTabs, initialStorage = {} }) {
+  const storage = { ...initialStorage };
   globalThis.self = {
     navigator: {
       userAgent:
@@ -103,4 +103,32 @@ test("service worker reports audible web tabs even when the browser is focused",
     posted.some((event) => event.kind === "tab_audio_stop"),
     false
   );
+});
+
+test("service worker migrates the old sendTitle default to enabled", async () => {
+  const posted = [];
+  const tab = {
+    id: 8,
+    windowId: 4,
+    title: "Research title",
+    url: "https://docs.example/article",
+    audible: false,
+    lastAccessed: 2000
+  };
+
+  installChromeMock({
+    focused: true,
+    activeTab: tab,
+    audibleTabs: [],
+    initialStorage: { sendTitle: false }
+  });
+  globalThis.fetch = async (_url, options) => {
+    posted.push(JSON.parse(options.body));
+    return { ok: true };
+  };
+
+  await import(`./service_worker.js?legacy-title-default=${Date.now()}`);
+  await waitForPostedEvents(posted, 1);
+
+  assert.equal(posted[0].title, "Research title");
 });

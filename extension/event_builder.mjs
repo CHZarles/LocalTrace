@@ -1,5 +1,6 @@
 export const LOOPBACK_HOST = "127.0.0.1";
 export const DEFAULT_PORT = 8765;
+export const SETTINGS_SCHEMA_VERSION = 2;
 
 export const DEFAULT_SETTINGS = {
   enabled: true,
@@ -7,8 +8,23 @@ export const DEFAULT_SETTINGS = {
   sendTitle: true,
   trackBackgroundAudio: true,
   keepAlive: true,
-  heartbeatSeconds: 60
+  heartbeatSeconds: 60,
+  settingsSchemaVersion: SETTINGS_SCHEMA_VERSION
 };
+
+export function normalizeSettings(stored = {}) {
+  const storedVersion =
+    Number.isInteger(stored.settingsSchemaVersion) ? stored.settingsSchemaVersion : 1;
+  const settings = {
+    ...DEFAULT_SETTINGS,
+    ...stored,
+    settingsSchemaVersion: SETTINGS_SCHEMA_VERSION
+  };
+  if (storedVersion < 2 && stored.sendTitle === false) {
+    settings.sendTitle = true;
+  }
+  return settings;
+}
 
 export function endpointFromSettings(settings = {}) {
   const port = normalizePort(settings.port);
