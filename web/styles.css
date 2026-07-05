@@ -187,9 +187,9 @@ html, body {
   background: var(--bg);
   padding: 16px;
   display: grid;
-  grid-template-rows: 132px 168px 1fr;
+  grid-template-rows: auto auto minmax(0, 1fr);
   gap: 12px;
-  overflow: hidden;
+  overflow-y: auto;
   min-height: 0;
 }
 
@@ -254,8 +254,7 @@ html, body {
   display: grid;
   grid-template-columns: 168px 1fr;
   gap: 24px;
-  align-items: stretch;
-  min-height: 168px;
+  align-items: start;
 }
 .timeline-title {
   display: flex;
