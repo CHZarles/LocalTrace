@@ -10,7 +10,7 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;1,9..144,300;1,9..144,400&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/web/styles.css?v=20260705-ed" />
+    <link rel="stylesheet" href="/web/styles.css?v=20260705-ed-lanes" />
   </head>
   <body>
     <div class="layout">
@@ -33,6 +33,13 @@
       <div class="data-grid" id="dataGrid"></div>
 
       <section class="timeline">
+        <div class="timeline-head">
+          <div>
+            <span class="timeline-eyebrow">TIMELINE</span>
+            <span class="timeline-range">last 12 hours</span>
+          </div>
+          <div class="timeline-stats" id="timelineStats"></div>
+        </div>
         <div class="timeline-axis" id="timelineAxis"></div>
         <div class="timeline-lanes" id="timelineLanes"></div>
       </section>
@@ -56,6 +63,6 @@
       <footer class="command-bar" id="commandBar"></footer>
     </div>
 
-    <script type="module" src="/web/app.js?v=20260705-ed"></script>
+    <script type="module" src="/web/app.js?v=20260705-ed-lanes"></script>
   </body>
 </html>

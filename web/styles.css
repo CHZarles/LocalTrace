@@ -221,70 +221,134 @@ html, body {
 .timeline {
   border-top: 1px solid var(--rule);
   border-bottom: 1px solid var(--rule);
-  padding: 22px 36px 24px;
+  padding: 36px 48px 44px;
   position: relative;
+}
+.timeline-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+.timeline-eyebrow {
+  font: 600 11px/1 var(--sans);
+  letter-spacing: 0.20em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  margin-right: 16px;
+}
+.timeline-range {
+  font: 400 12px/1 var(--serif);
+  font-style: italic;
+  color: var(--ink-3);
+}
+.timeline-stats {
+  font: 400 11px/1 var(--mono);
+  color: var(--ink-2);
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
 }
 .timeline-axis {
   display: flex;
   justify-content: space-between;
-  font-family: var(--mono);
-  font-size: 10px;
-  color: var(--ink-2);
+  font: 400 10px/1 var(--mono);
+  color: var(--ink-3);
   letter-spacing: 0.05em;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
+  padding-left: 248px;  /* offset to align under tracks, not labels */
+  padding-right: 12px;
 }
 .timeline-axis .now-label {
   color: var(--copper);
+  font-weight: 600;
 }
 .timeline-lanes {
-  display: grid;
-  grid-template-rows: repeat(3, 28px);
-  row-gap: 8px;
-  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 .timeline-lane {
   display: grid;
-  grid-template-columns: 80px minmax(0, 1fr);
-  gap: 12px;
+  grid-template-columns: 248px minmax(0, 1fr);
+  gap: 16px;
   align-items: center;
+  min-height: 60px;
 }
 .timeline-lane-label {
-  font-family: var(--sans);
-  font-weight: 600;
-  font-size: 10px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.timeline-lane-label .lane-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: var(--bg);
+  border: 1px solid var(--rule);
+  display: grid;
+  place-items: center;
   color: var(--ink-2);
+  flex: 0 0 28px;
+}
+.timeline-lane-label .lane-avatar[data-kind="domain"] {
+  border-radius: 50%;
+}
+.timeline-lane-label .lane-avatar svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.timeline-lane-label .lane-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.timeline-lane-label .lane-name {
+  font: 500 16px/1 var(--serif);
+  color: var(--ink);
+  letter-spacing: -0.005em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.timeline-lane-label .lane-duration {
+  font: 400 10px/1 var(--mono);
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
 }
 .timeline-track {
   position: relative;
-  height: 28px;
+  height: 60px;
+  background: var(--bg);
   border-top: 1px solid var(--rule-2);
   border-bottom: 1px solid var(--rule-2);
+  border-radius: 1px;
 }
 .timeline-bar {
   position: absolute;
-  display: block;
-  border-radius: 0;
+  border-radius: 2px;
   transform-origin: left center;
+  animation: fade-in 600ms ease-out both;
 }
-.timeline-bar-focus {
-  top: 10px;
-  height: 8px;
+.timeline-bar.focus {
+  top: 16px;
+  height: 28px;
   background: var(--copper);
   opacity: 0.85;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18);
 }
-.timeline-bar-audio {
-  top: 12px;
-  height: 5px;
+.timeline-bar.audio {
+  top: 8px;
+  height: 8px;
   background: var(--teal);
-  opacity: 0.85;
-}
-.timeline-bar-events {
-  top: 13px;
-  height: 2px;
-  width: 2px;
-  background: var(--ink-2);
+  opacity: 0.88;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.22);
 }
 .timeline-now {
   position: absolute;
@@ -298,12 +362,13 @@ html, body {
   content: "";
   position: absolute;
   top: 50%;
-  left: -3px;
-  width: 6px;
-  height: 6px;
-  margin-top: -3px;
+  left: -4px;
+  width: 8px;
+  height: 8px;
+  margin-top: -4px;
   border-radius: 50%;
   background: var(--copper);
+  animation: live-pulse 1.8s ease-in-out infinite;
 }
 
 /* =========== Bottom row =========== */

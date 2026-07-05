@@ -137,26 +137,7 @@ function buildModel(events, settings, health) {
     }
   ];
 
-  const timeline = {
-    focus: focusSegments.map((s) => ({
-      start: minuteOfDay(s.start),
-      end: minuteOfDay(s.end)
-    })),
-    audio: audioSegments.map((s) => ({
-      start: minuteOfDay(s.start),
-      end: minuteOfDay(s.end)
-    })),
-    events: todayEvents
-      .filter(
-        (e) =>
-          e.kind === "app_active" ||
-          e.kind === "tab_active" ||
-          e.kind === "app_audio" ||
-          e.kind === "tab_audio"
-      )
-      .map((e) => ({ at: minuteOfDay(parseDate(e.observed_at)) })),
-    nowAt: minuteOfDay(now)
-  };
+  const lanes = buildAppLanes(todayEvents, focusSegments, audioSegments);
 
   const latestFocus = todayEvents.find(isFocusEvent) || null;
   const latestTab =
@@ -191,7 +172,7 @@ function buildModel(events, settings, health) {
     heroAnnotation,
     heroMeta,
     dataGrid,
-    timeline,
+    lanes,
     latestFocus,
     latestTab,
     latestAudio,
@@ -242,75 +223,76 @@ function renderTimeline(m) {
     span.textContent = String(t).padStart(2, "0");
     axis.append(span);
   }
-  const now = document.createElement("span");
-  now.className = "now-label";
-  now.textContent = "NOW";
-  axis.append(now);
+  const nowLabel = document.createElement("span");
+  nowLabel.className = "now-label";
+  nowLabel.textContent = "NOW";
+  axis.append(nowLabel);
 
   const lanes = $("timelineLanes");
   lanes.replaceChildren();
-  const laneDefs = [
-    {
-      key: "focus",
-      label: "Focus",
-      items: m.timeline.focus,
-      heightPx: 8
-    },
-    {
-      key: "audio",
-      label: "Audio",
-      items: m.timeline.audio,
-      heightPx: 5
-    },
-    {
-      key: "events",
-      label: "Events",
-      items: m.timeline.events,
-      heightPx: 2
-    }
-  ];
-  for (const def of laneDefs) {
-    const lane = document.createElement("div");
-    lane.className = "timeline-lane";
-
-    const label = document.createElement("span");
-    label.className = "timeline-lane-label";
-    label.textContent = def.label;
-
-    const track = document.createElement("div");
-    track.className = "timeline-track";
-
-    for (const item of def.items) {
-      const bar = document.createElement("span");
-      bar.className = `timeline-bar timeline-bar-${def.key}`;
-      if (def.key === "events") {
-        bar.style.left = `${(item.at / 1440) * 100}%`;
-        bar.style.width = "2px";
-      } else {
-        bar.style.left = `${(item.start / 1440) * 100}%`;
-        bar.style.width = `${Math.max(0.4, ((item.end - item.start) / 1440) * 100)}%`;
-      }
-      track.append(bar);
-    }
-
-    lane.append(label, track);
-    lanes.append(lane);
+  for (const lane of m.lanes) {
+    lanes.append(renderTimelineLane(lane));
   }
 
-  // NOW marker as a vertical line over the lanes area. Use absolute positioning
-  // relative to the .timeline container by injecting a single element.
-  const existing = document.querySelector(".timeline-now");
-  if (existing) existing.remove();
-  const track = lanes.querySelector(".timeline-track");
-  if (track && m.timeline.nowAt >= 0 && m.timeline.nowAt <= 1440) {
-    const nowLine = document.createElement("span");
-    nowLine.className = "timeline-now";
-    const trackRect = track.getBoundingClientRect();
-    const lanesRect = lanes.getBoundingClientRect();
-    const offsetFromLanes = trackRect.left - lanesRect.left;
-    nowLine.style.left = `${offsetFromLanes + (m.timeline.nowAt / 1440) * trackRect.width}px`;
-    lanes.append(nowLine);
+  // Add the NOW line overlay to the last track
+  const tracks = lanes.querySelectorAll(".timeline-track");
+  if (tracks.length > 0) {
+    const now = document.createElement("span");
+    now.className = "timeline-now";
+    now.style.right = "0px";
+    tracks[0].append(now);
   }
+
+  $("timelineStats").textContent =
+    `${m.lanes.length} apps · ${m.todayEventsCount} events · ${m.focusSwitches} switches`;
+}
+
+function renderTimelineLane(lane) {
+  const row = document.createElement("div");
+  row.className = "timeline-lane";
+
+  const label = document.createElement("div");
+  label.className = "timeline-lane-label";
+
+  const avatar = document.createElement("span");
+  avatar.className = "lane-avatar";
+  avatar.dataset.kind = lane.kind;
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-hidden", "true");
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  if (lane.kind === "domain") {
+    path.setAttribute("d", "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z M3.6 9h16.8 M3.6 15h16.8 M12 3a13 13 0 0 1 0 18 M12 3a13 13 0 0 0 0 18");
+  } else {
+    path.setAttribute("d", "M4 5h16v11H4Z M8 20h8 M10 16v4 M14 16v4");
+  }
+  svg.append(path);
+  avatar.append(svg);
+
+  const text = document.createElement("div");
+  text.className = "lane-text";
+  const name = document.createElement("span");
+  name.className = "lane-name";
+  name.textContent = lane.label;
+  const dur = document.createElement("span");
+  dur.className = "lane-duration";
+  dur.textContent = formatDuration(lane.totalSeconds);
+  text.append(name, dur);
+
+  label.append(avatar, text);
+
+  const track = document.createElement("div");
+  track.className = "timeline-track";
+  for (const bar of lane.bars) {
+    const block = document.createElement("span");
+    block.className = bar.audio ? "timeline-bar audio" : "timeline-bar focus";
+    block.style.left = `${(bar.start / 1440) * 100}%`;
+    block.style.width = `${Math.max(0.4, ((bar.end - bar.start) / 1440) * 100)}%`;
+    track.append(block);
+  }
+
+  row.append(label, track);
+  return row;
 }
 
 function renderNow(m) {
@@ -437,6 +419,34 @@ function renderTopBar(m) {
     year: "numeric"
   }).format(m.now);
   live.textContent = `TODAY · ${dateText} · LIVE`;
+}
+
+function buildAppLanes(todayEvents, focusSegments, audioSegments) {
+  const byEntity = new Map();
+  for (const seg of focusSegments) {
+    const key = `${seg.kind}:${seg.entity}`;
+    if (!byEntity.has(key)) {
+      byEntity.set(key, {
+        kind: seg.kind,
+        entity: seg.entity,
+        label: seg.label,
+        totalSeconds: 0,
+        bars: []
+      });
+    }
+    const lane = byEntity.get(key);
+    lane.totalSeconds += seg.seconds;
+    lane.bars.push({ start: minuteOfDay(seg.start), end: minuteOfDay(seg.end), audio: false });
+  }
+  for (const seg of audioSegments) {
+    const key = `${seg.kind}:${seg.entity}`;
+    if (byEntity.has(key)) {
+      byEntity.get(key).bars.push({ start: minuteOfDay(seg.start), end: minuteOfDay(seg.end), audio: true });
+    }
+  }
+  return [...byEntity.values()]
+    .sort((a, b) => b.totalSeconds - a.totalSeconds || a.label.localeCompare(b.label))
+    .slice(0, 6);
 }
 
 /* ====== Helpers (kept from the previous app) ====== */
