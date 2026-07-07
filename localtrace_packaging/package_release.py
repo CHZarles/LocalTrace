@@ -35,6 +35,7 @@ WEB_RUNTIME_FILES = (
 )
 
 SCRIPT_FILES = (
+    "check-localtrace.ps1",
     "install-localtrace.ps1",
     "uninstall-localtrace.ps1",
 )
@@ -182,6 +183,7 @@ def _write_release_readme(destination: Path) -> None:
                 "- `localtrace-winprobe.exe`: Windows activity probe.",
                 "- `web/`: Web Settings assets served by `localtrace.exe`.",
                 "- `extension/localtrace-extension.zip`: browser extension package.",
+                "- `scripts/check-localtrace.ps1`: local runtime health check.",
                 "- `scripts/install-localtrace.ps1`: current-user install script.",
                 "- `scripts/uninstall-localtrace.ps1`: current-user uninstall script.",
                 "",
@@ -190,6 +192,13 @@ def _write_release_readme(destination: Path) -> None:
                 "```powershell",
                 "powershell -ExecutionPolicy Bypass -File "
                 ".\\scripts\\install-localtrace.ps1",
+                "```",
+                "",
+                "Check local runtime status from PowerShell:",
+                "",
+                "```powershell",
+                "powershell -ExecutionPolicy Bypass -File "
+                ".\\scripts\\check-localtrace.ps1",
                 "```",
                 "",
                 "Uninstall from PowerShell:",

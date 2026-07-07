@@ -11,9 +11,24 @@ function json(response, body) {
   response.end(JSON.stringify(body));
 }
 
-async function startWebUiServer({ events = [], settings = null } = {}) {
-  const server = http.createServer((request, response) => {
+function valueOf(value) {
+  return typeof value === "function" ? value() : value;
+}
+
+async function startWebUiServer({
+  events = [],
+  settings = null,
+  health = null,
+  delay = null,
+  onRequest = null
+} = {}) {
+  const server = http.createServer(async (request, response) => {
     const url = new URL(request.url, "http://127.0.0.1");
+    onRequest?.(url);
+    const delayMs = delay?.(url) || 0;
+    if (delayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
     if (url.pathname === "/") {
       response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
       response.end(fs.readFileSync(path.join(WEB_DIR, "index.html")));
@@ -30,22 +45,22 @@ async function startWebUiServer({ events = [], settings = null } = {}) {
       return;
     }
     if (url.pathname === "/health") {
-      json(response, {
+      json(response, valueOf(health) || {
         ok: true,
         service: "localtrace",
         bind: { host: "127.0.0.1", port: 8765 },
         database: { path: "%LOCALAPPDATA%\\LocalTrace\\localtrace.db", exists: true },
         events: { recent_count: 0 },
         sources: {
-          windows_probe: { last_observed_at: null },
-          browser_extension: { last_observed_at: null }
+          windows_probe: { last_observed_at: null, last_received_at: null },
+          browser_extension: { last_observed_at: null, last_received_at: null }
         },
         tracking: { paused: false }
       });
       return;
     }
     if (url.pathname === "/events") {
-      json(response, { ok: true, events });
+      json(response, { ok: true, events: valueOf(events) });
       return;
     }
     if (url.pathname === "/settings") {
@@ -372,6 +387,111 @@ test("recent flow renders latest events in descending order", async ({ page }) =
     expect(cells[2]).toContain("docs.python.org");
     expect(cells[3]).toContain("Code.exe");
   } finally {
+    await server.close();
+  }
+});
+
+test("health and recent flow expose freshness and receive lag", async ({
+  page
+}) => {
+  const server = await startWebUiServer({
+    health: {
+      ok: true,
+      service: "localtrace",
+      bind: { host: "127.0.0.1", port: 8765 },
+      database: { path: "%LOCALAPPDATA%\\LocalTrace\\localtrace.db", exists: true },
+      events: { recent_count: 1 },
+      sources: {
+        windows_probe: { last_observed_at: null, last_received_at: null },
+        browser_extension: {
+          last_observed_at: "2026-07-03T09:44:00.000Z",
+          last_received_at: "2026-07-03T09:46:00.000Z"
+        }
+      },
+      tracking: { paused: false }
+    },
+    events: [
+      {
+        id: 1,
+        observed_at: "2026-07-03T09:44:00.000Z",
+        received_at: "2026-07-03T09:46:00.000Z",
+        source: "browser_extension",
+        kind: "tab_active",
+        entity_type: "domain",
+        entity: "docs.example",
+        title: "Latency notes",
+        payload: { activity: "focus", browser: "chrome" }
+      }
+    ]
+  });
+  try {
+    await page.addInitScript(() => {
+      const fixedNow = new Date("2026-07-03T10:00:00.000Z").valueOf();
+      const RealDate = Date;
+      class FixedDate extends RealDate {
+        constructor(...args) {
+          super(...(args.length ? args : [fixedNow]));
+        }
+        static now() { return fixedNow; }
+      }
+      FixedDate.UTC = RealDate.UTC;
+      FixedDate.parse = RealDate.parse;
+      globalThis.Date = FixedDate;
+    });
+    await page.goto(server.url);
+
+    await expect(page.locator("#commandBar")).toContainText("UI refreshed <1s ago");
+    await expect(page.locator("#healthPills")).toContainText("winprobe not seen");
+    await expect(page.locator("#healthPills")).toContainText("browser stale 16m ago");
+    await expect(page.locator("#healthPills")).toContainText("lag 2m");
+    await expect(page.locator("#flowList .flow-row").first()).toContainText(
+      "receive lag 2m"
+    );
+  } finally {
+    await server.close();
+  }
+});
+
+test("metrics auto-refresh updates recent flow without overlapping requests", async ({
+  page
+}) => {
+  const eventState = [];
+  let eventRequests = 0;
+  let eventDelayMs = 0;
+  const server = await startWebUiServer({
+    events: () => eventState,
+    delay: (url) => (url.pathname === "/events" ? eventDelayMs : 0),
+    onRequest: (url) => {
+      if (url.pathname === "/events") eventRequests += 1;
+    }
+  });
+  try {
+    await page.goto(server.url);
+    await expect(page.locator("#flowList .flow-row")).toHaveCount(0);
+
+    eventState.push({
+      id: 1,
+      observed_at: new Date().toISOString(),
+      received_at: new Date().toISOString(),
+      source: "windows_probe",
+      kind: "app_active",
+      entity_type: "app",
+      entity: "Code.exe",
+      title: "LocalTrace",
+      payload: { activity: "focus" }
+    });
+
+    await expect(page.locator("#flowList .flow-row").first()).toContainText(
+      "Code.exe",
+      { timeout: 4000 }
+    );
+
+    eventRequests = 0;
+    eventDelayMs = 3200;
+    await page.waitForTimeout(3000);
+    expect(eventRequests).toBe(1);
+  } finally {
+    eventDelayMs = 0;
     await server.close();
   }
 });

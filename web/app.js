@@ -1,10 +1,15 @@
 const state = {
   events: [],
   settings: null,
-  health: null
+  health: null,
+  lastRefreshAt: null,
+  refreshInFlight: false,
+  autoRefreshTimer: null
 };
 
 const $ = (id) => document.getElementById(id);
+const METRICS_AUTO_REFRESH_MS = 2500;
+const SOURCE_STALE_SECONDS = 300;
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -19,7 +24,8 @@ async function api(path, options = {}) {
 }
 
 async function loadAll() {
-  setBusy(true);
+  if (state.refreshInFlight) return;
+  state.refreshInFlight = true;
   try {
     const [health, events, settings] = await Promise.all([
       api("/health"),
@@ -29,6 +35,7 @@ async function loadAll() {
     state.health = health;
     state.events = events.events || [];
     state.settings = settings.settings;
+    state.lastRefreshAt = new Date();
     const m = buildModel(state.events, state.settings, state.health);
     renderHero(m);
     renderDataGrid(m);
@@ -38,12 +45,11 @@ async function loadAll() {
     renderHealth(m);
     renderCommandBar(m);
     renderTopBar(m);
-    setStatus("");
   } catch (error) {
     setStatus(error.message);
     console.error(error);
   } finally {
-    setBusy(false);
+    state.refreshInFlight = false;
   }
 }
 
@@ -152,11 +158,13 @@ function buildModel(events, settings, health) {
   const healthItems = [
     { label: "db", ok: health?.database?.exists === true },
     {
-      label: "browser",
+      label: sourceHealthLabel("browser", sources.browser_extension, now),
       ok: !!sources.browser_extension?.last_observed_at
     },
     {
-      label: "winprobe",
+      label: sourceHealthLabel("winprobe", sources.windows_probe, now, {
+        missing: "winprobe not seen"
+      }),
       ok: !!sources.windows_probe?.last_observed_at
     }
   ];
@@ -348,7 +356,7 @@ function renderRecentFlow(m) {
     row.className = "flow-row";
     row.append(flowCell("time flow-time", formatTime(ev.observed_at)));
     row.append(flowCell("app flow-app", displayEntity(ev)));
-    row.append(flowCell("event flow-event", eventLabel(ev)));
+    row.append(flowCell("event flow-event", flowEventLabel(ev)));
     row.append(flowCell(`kind flow-kind flow-kind-${kindClass(ev)}`, kindLabel(ev)));
     list.append(row);
   }
@@ -370,6 +378,12 @@ function eventLabel(ev) {
   return ev.kind || "event";
 }
 
+function flowEventLabel(ev) {
+  const lag = receiveLagSeconds(ev);
+  if (lag === null) return eventLabel(ev);
+  return `${eventLabel(ev)} · receive lag ${formatCompactDuration(lag)}`;
+}
+
 function kindLabel(ev) {
   if (ev.kind === "app_active" || ev.kind === "tab_active") return "focus";
   if (typeof ev.kind === "string" && ev.kind.includes("audio")) return "audio";
@@ -385,6 +399,12 @@ function kindClass(ev) {
 function renderHealth(m) {
   const pills = $("healthPills");
   pills.replaceChildren();
+  if (state.lastRefreshAt) {
+    const pill = document.createElement("span");
+    pill.className = "health-pill ok";
+    pill.textContent = `● ui ${formatAgeSince(state.lastRefreshAt, new Date())}`;
+    pills.append(pill);
+  }
   for (const h of m.healthItems) {
     const pill = document.createElement("span");
     pill.className = `health-pill ${h.ok ? "ok" : "down"}`;
@@ -404,10 +424,13 @@ function renderCommandBar(m) {
   const audioText = `${Math.round(m.audioSeconds / 60)}m`;
   const apps = uniqueEntities(m.todayEvents, "app", "windows_probe");
   const sites = uniqueEntities(m.todayEvents, "domain", "browser_extension");
+  const uiText = state.lastRefreshAt
+    ? ` · UI refreshed ${formatAgeSince(state.lastRefreshAt, new Date())}`
+    : "";
   bar.textContent =
     `localtrace · today · focus ${focusText} · audio ${audioText} · ` +
     `${m.focusSwitches} switches · ${m.todayEventsCount} events · ` +
-    `${apps} apps · ${sites} sites`;
+    `${apps} apps · ${sites} sites${uiText}`;
 }
 
 function renderTopBar(m) {
@@ -558,6 +581,7 @@ function nextAudioBoundary(audioEvents, index, event, now) {
 }
 
 function parseDate(value) {
+  if (!value) return null;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
 }
@@ -583,6 +607,50 @@ function isSameLocalDay(a, b) {
 
 function sumSeconds(segments) {
   return segments.reduce((sum, item) => sum + item.seconds, 0);
+}
+
+function sourceHealthLabel(label, source, now, options = {}) {
+  const observedAt = parseDate(source?.last_observed_at);
+  if (!observedAt) return options.missing || `${label} not seen`;
+  const ageSeconds = elapsedSeconds(observedAt, now);
+  const freshness = ageSeconds > SOURCE_STALE_SECONDS ? "stale" : "fresh";
+  const parts = [
+    `${label} ${freshness} ${formatCompactDuration(ageSeconds)} ago`
+  ];
+  const lag = receiveLagSeconds({
+    observed_at: source.last_observed_at,
+    received_at: source.last_received_at
+  });
+  if (lag !== null) parts.push(`lag ${formatCompactDuration(lag)}`);
+  return parts.join(" · ");
+}
+
+function receiveLagSeconds(event) {
+  const observedAt = parseDate(event?.observed_at);
+  const receivedAt = parseDate(event?.received_at);
+  if (!observedAt || !receivedAt) return null;
+  return elapsedSeconds(observedAt, receivedAt);
+}
+
+function elapsedSeconds(start, end) {
+  return Math.max(0, Math.round((end.getTime() - start.getTime()) / 1000));
+}
+
+function formatAgeSince(value, now) {
+  const date = parseDate(value);
+  if (!date) return "unknown";
+  return `${formatCompactDuration(elapsedSeconds(date, now))} ago`;
+}
+
+function formatCompactDuration(seconds) {
+  const value = Math.max(0, Number(seconds) || 0);
+  if (value < 1) return "<1s";
+  if (value < 60) return `${Math.round(value)}s`;
+  const minutes = Math.round(value / 60);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  return `${Math.round(hours / 24)}d`;
 }
 
 function displayEntity(event) {
@@ -732,14 +800,13 @@ function avgFocusLabel(segments) {
 function setStatus(message) {
   const bar = $("commandBar");
   if (!bar) return;
-  if (message) bar.textContent = `localtrace · error · ${message}`;
-}
-
-function setBusy(busy) {
-  for (const button of document.querySelectorAll("button")) {
-    button.disabled = busy;
-  }
+  if (message) bar.textContent = `localtrace · ${message}`;
 }
 
 loadAll();
-setInterval(loadAll, 30000);
+if (!state.autoRefreshTimer) {
+  state.autoRefreshTimer = window.setInterval(() => {
+    if (document.hidden) return;
+    loadAll();
+  }, METRICS_AUTO_REFRESH_MS);
+}

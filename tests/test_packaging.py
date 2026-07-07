@@ -64,6 +64,7 @@ def test_packager_creates_release_zip_with_expected_layout(tmp_path: Path) -> No
     assert "LocalTrace/localtrace-winprobe.exe" in names
     assert "LocalTrace/web/index.html" in names
     assert "LocalTrace/scripts/install-localtrace.ps1" in names
+    assert "LocalTrace/scripts/check-localtrace.ps1" in names
     assert "LocalTrace/scripts/uninstall-localtrace.ps1" in names
     assert "LocalTrace/extension/localtrace-extension.zip" in names
     assert "LocalTrace/README.md" in names
@@ -229,6 +230,21 @@ def test_install_script_prepares_browser_extension_for_manual_load() -> None:
     assert "Load unpacked extension directory" in script
 
 
+def test_check_script_diagnoses_winprobe_process_and_health_source() -> None:
+    script = (
+        LOCALTRACE_ROOT / "packaging" / "scripts" / "check-localtrace.ps1"
+    ).read_text(encoding="utf-8")
+
+    assert "Get-Process -Name $Name" in script
+    assert 'Test-ProcessRunning -Name "localtrace-winprobe"' in script
+    assert "Invoke-RestMethod" in script
+    assert "/health" in script
+    assert "windows_probe" in script
+    assert "probe_not_running" in script
+    assert "probe_running_no_events" in script
+    assert "last_observed_at" in script
+
+
 def test_install_script_rejects_running_from_installed_copy() -> None:
     script = (
         LOCALTRACE_ROOT / "packaging" / "scripts" / "install-localtrace.ps1"
@@ -258,6 +274,7 @@ def test_powershell_scripts_parse_when_powershell_is_available() -> None:
 
     scripts = [
         LOCALTRACE_ROOT / "packaging" / "build-windows.ps1",
+        LOCALTRACE_ROOT / "packaging" / "scripts" / "check-localtrace.ps1",
         LOCALTRACE_ROOT / "packaging" / "scripts" / "install-localtrace.ps1",
         LOCALTRACE_ROOT / "packaging" / "scripts" / "uninstall-localtrace.ps1",
     ]
@@ -297,6 +314,7 @@ def test_packaging_docs_are_in_mkdocs_nav() -> None:
     assert "localtrace.exe" in docs
     assert "localtrace-winprobe.exe" in docs
     assert "LocalTrace-windows.zip" in docs
+    assert "check-localtrace.ps1" in docs
     assert "The installer extracts the browser extension" in docs
     assert "Extract `extension/localtrace-extension.zip`" not in docs
     assert "Load unpacked" in docs

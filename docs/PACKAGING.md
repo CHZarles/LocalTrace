@@ -21,6 +21,7 @@ Inside the zip, `LocalTrace/` contains:
 - `localtrace-winprobe.exe`
 - `web/`
 - `extension/localtrace-extension.zip`
+- `scripts/check-localtrace.ps1`
 - `scripts/install-localtrace.ps1`
 - `scripts/uninstall-localtrace.ps1`
 - `manifest.json`
@@ -139,11 +140,14 @@ After install:
 3. Confirm the Web Settings health view loads.
 4. Start `%LOCALAPPDATA%\LocalTrace\App\localtrace-winprobe.exe` on Windows.
 5. Confirm `GET /health` reports LocalTrace and recent source diagnostics.
-6. The installer extracts the browser extension and copies the unpacked
+6. Run `%LOCALAPPDATA%\LocalTrace\App\scripts\check-localtrace.ps1` to
+   distinguish a missing winprobe process from a running probe that has not
+   posted `windows_probe` events yet.
+7. The installer extracts the browser extension and copies the unpacked
    extension directory to the clipboard.
-7. In Chrome or Edge extension developer tooling, use Load unpacked and select
+8. In Chrome or Edge extension developer tooling, use Load unpacked and select
    the prepared extension directory.
-8. Confirm the extension health check reports OK.
+9. Confirm the extension health check reports OK.
 
 ## Non-Goals
 

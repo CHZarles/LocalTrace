@@ -21,10 +21,12 @@ const STATE = {
   lastFocusDomain: null,
   lastFocusTabId: null,
   lastFocusWindowId: null,
+  lastFocusTitle: null,
   lastFocusSentAtMs: 0,
   lastAudioDomain: null,
   lastAudioTabId: null,
   lastAudioWindowId: null,
+  lastAudioTitle: null,
   lastAudioSentAtMs: 0,
   lastAttemptAtMs: 0,
   lastOkAtMs: 0,
@@ -82,12 +84,14 @@ function migrateLegacyActivityState() {
     STATE.lastAudioDomain = STATE.lastDomain;
     STATE.lastAudioTabId = STATE.lastTabId;
     STATE.lastAudioWindowId = STATE.lastWindowId;
+    STATE.lastAudioTitle = null;
     STATE.lastAudioSentAtMs = STATE.lastSentAtMs;
   }
   if (STATE.lastActivity === "focus" && !STATE.lastFocusDomain) {
     STATE.lastFocusDomain = STATE.lastDomain;
     STATE.lastFocusTabId = STATE.lastTabId;
     STATE.lastFocusWindowId = STATE.lastWindowId;
+    STATE.lastFocusTitle = null;
     STATE.lastFocusSentAtMs = STATE.lastSentAtMs;
   }
 }
@@ -287,8 +291,13 @@ async function ensureHeartbeatAlarm() {
   }
 }
 
-function eventKey(activity, domain, tab) {
-  return `${activity}:${domain}:${tab.windowId}:${tab.id}`;
+function titleForActivityState(tab, settings) {
+  if (settings.sendTitle === false) return null;
+  return typeof tab.title === "string" && tab.title.trim() ? tab.title : null;
+}
+
+function eventKey(activity, domain, tab, title) {
+  return `${activity}:${domain}:${tab.windowId}:${tab.id}:${title || ""}`;
 }
 
 async function sendEvent(settings, event, updateState) {
@@ -333,6 +342,7 @@ async function maybeEmitAudioStop(settings, reason) {
     STATE.lastAudioDomain = null;
     STATE.lastAudioTabId = null;
     STATE.lastAudioWindowId = null;
+    STATE.lastAudioTitle = null;
     STATE.lastAudioSentAtMs = 0;
     if (STATE.lastActivity === "audio") {
       STATE.lastDomain = null;
@@ -363,6 +373,7 @@ function activityState(activity) {
       domain: STATE.lastAudioDomain,
       tabId: STATE.lastAudioTabId,
       windowId: STATE.lastAudioWindowId,
+      title: STATE.lastAudioTitle,
       sentAtMs: STATE.lastAudioSentAtMs
     };
   }
@@ -370,20 +381,23 @@ function activityState(activity) {
     domain: STATE.lastFocusDomain,
     tabId: STATE.lastFocusTabId,
     windowId: STATE.lastFocusWindowId,
+    title: STATE.lastFocusTitle,
     sentAtMs: STATE.lastFocusSentAtMs
   };
 }
 
-function recordActivityState(activity, domain, tab, sentAtMs) {
+function recordActivityState(activity, domain, tab, title, sentAtMs) {
   if (activity === "audio") {
     STATE.lastAudioDomain = domain;
     STATE.lastAudioTabId = tab.id;
     STATE.lastAudioWindowId = tab.windowId;
+    STATE.lastAudioTitle = title;
     STATE.lastAudioSentAtMs = sentAtMs;
   } else {
     STATE.lastFocusDomain = domain;
     STATE.lastFocusTabId = tab.id;
     STATE.lastFocusWindowId = tab.windowId;
+    STATE.lastFocusTitle = title;
     STATE.lastFocusSentAtMs = sentAtMs;
   }
 
@@ -402,10 +416,12 @@ async function maybeEmitTabActivity(settings, tab, activity, force) {
   if (!domain) return;
 
   const last = activityState(activity);
+  const title = titleForActivityState(tab, settings);
   const changed =
     domain !== last.domain ||
     tab.id !== last.tabId ||
-    tab.windowId !== last.windowId;
+    tab.windowId !== last.windowId ||
+    title !== last.title;
 
   const heartbeatSeconds =
     Number(settings.heartbeatSeconds) || DEFAULT_SETTINGS.heartbeatSeconds;
@@ -413,7 +429,7 @@ async function maybeEmitTabActivity(settings, tab, activity, force) {
 
   if (!force && !changed && !heartbeatDue) return;
 
-  const key = eventKey(activity, domain, tab);
+  const key = eventKey(activity, domain, tab, title);
   const event = buildTabActiveEvent({
     observedAt: nowIso(),
     seq: reserveSeq(STATE, key),
@@ -425,7 +441,7 @@ async function maybeEmitTabActivity(settings, tab, activity, force) {
   if (!event) return;
 
   await sendEvent(settings, event, (sentAtMs) => {
-    recordActivityState(activity, domain, tab, sentAtMs);
+    recordActivityState(activity, domain, tab, title, sentAtMs);
   });
 }
 
