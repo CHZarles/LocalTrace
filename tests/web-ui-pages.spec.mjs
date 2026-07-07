@@ -512,7 +512,7 @@ test("mobile dashboard has single-column bottom split", async ({ page }) => {
   }
 });
 
-test("timeline shows three lanes (focus / audio / events)", async ({ page }) => {
+test("timeline renders app-typed swimlanes with overlaid audio", async ({ page }) => {
   const server = await startWebUiServer({
     events: [
       {
@@ -528,6 +528,16 @@ test("timeline shows three lanes (focus / audio / events)", async ({ page }) => 
       },
       {
         id: 2,
+        observed_at: "2026-07-05T09:30:00.000Z",
+        received_at: "2026-07-05T09:30:00.000Z",
+        source: "windows_probe",
+        kind: "app_active",
+        entity_type: "app",
+        entity: "Slack.exe",
+        payload: { activity: "focus" }
+      },
+      {
+        id: 3,
         observed_at: "2026-07-05T10:00:00.000Z",
         received_at: "2026-07-05T10:00:00.000Z",
         source: "windows_probe",
@@ -537,15 +547,15 @@ test("timeline shows three lanes (focus / audio / events)", async ({ page }) => 
         payload: { activity: "focus" }
       },
       {
-        id: 3,
-        observed_at: "2026-07-05T11:00:00.000Z",
-        received_at: "2026-07-05T11:00:00.000Z",
-        source: "browser_extension",
-        kind: "tab_audio",
-        entity_type: "domain",
-        entity: "youtube.com",
-        title: "Live set",
-        payload: { activity: "audio", browser: "chrome" }
+        id: 4,
+        observed_at: "2026-07-05T10:15:00.000Z",
+        received_at: "2026-07-05T10:15:00.000Z",
+        source: "windows_probe",
+        kind: "app_audio",
+        entity_type: "app",
+        entity: "Code.exe",
+        title: "Build sound",
+        payload: { activity: "audio" }
       }
     ]
   });
@@ -566,14 +576,16 @@ test("timeline shows three lanes (focus / audio / events)", async ({ page }) => 
     await page.goto(server.url);
 
     const lanes = page.locator("#timelineLanes .timeline-lane");
-    await expect(lanes).toHaveCount(3);
-    // lane 1: Focus, lane 2: Audio, lane 3: Events
-    const labels = await lanes.locator(".timeline-lane-label").allTextContents();
-    expect(labels.map((l) => l.trim().toLowerCase())).toEqual(["focus", "audio", "events"]);
-    // Focus lane has 2 focus bars (the two app_active events)
-    await expect(lanes.nth(0).locator(".timeline-bar-focus")).toHaveCount(2);
-    // Audio lane has 1 audio bar
-    await expect(lanes.nth(1).locator(".timeline-bar-audio")).toHaveCount(1);
+    await expect(lanes).toHaveCount(2);
+    const labels = await lanes.locator(".lane-name").allTextContents();
+    expect(labels.map((l) => l.trim())).toEqual(["Code.exe", "Slack.exe"]);
+    await expect(lanes.nth(0).locator(".timeline-bar.focus")).toHaveCount(2);
+    await expect(lanes.nth(0).locator(".timeline-bar.audio")).toHaveCount(1);
+    await expect(lanes.nth(1).locator(".timeline-bar.focus")).toHaveCount(1);
+    await expect(lanes.nth(1).locator(".timeline-bar.audio")).toHaveCount(0);
+    await expect(page.locator("#timelineStats")).toContainText(
+      "2 apps · 4 events · 3 switches"
+    );
   } finally {
     await server.close();
   }
