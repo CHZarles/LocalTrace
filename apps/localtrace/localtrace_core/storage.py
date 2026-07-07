@@ -28,8 +28,12 @@ def initialize_database(db_path: Path) -> None:
 
             CREATE INDEX IF NOT EXISTS idx_events_observed_at
               ON events(observed_at);
+            CREATE INDEX IF NOT EXISTS idx_events_received_at
+              ON events(received_at);
             CREATE INDEX IF NOT EXISTS idx_events_source_kind_observed_at
               ON events(source, kind, observed_at);
+            CREATE INDEX IF NOT EXISTS idx_events_source_received_at_id
+              ON events(source, received_at DESC, id DESC);
 
             CREATE TABLE IF NOT EXISTS privacy_rules (
               id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -166,14 +170,18 @@ def latest_events_by_source(db_path: Path) -> dict[str, dict[str, str]]:
         rows = conn.execute(
             """
             SELECT source, observed_at, received_at
-            FROM events AS event
-            WHERE id = (
-              SELECT id
-              FROM events AS latest
-              WHERE latest.source = event.source
-              ORDER BY latest.received_at DESC, latest.id DESC
-              LIMIT 1
+            FROM (
+              SELECT
+                source,
+                observed_at,
+                received_at,
+                ROW_NUMBER() OVER (
+                  PARTITION BY source
+                  ORDER BY received_at DESC, id DESC
+                ) AS row_number
+              FROM events
             )
+            WHERE row_number = 1
             ORDER BY source ASC
             """
         ).fetchall()

@@ -47,6 +47,20 @@ def test_schema_initialization_is_idempotent(tmp_path: Path) -> None:
     assert {"events", "privacy_rules"}.issubset(table_names(db_path))
 
 
+def test_schema_indexes_health_queries(tmp_path: Path) -> None:
+    db_path = tmp_path / "localtrace.db"
+
+    initialize_database(db_path)
+
+    with sqlite3.connect(db_path) as conn:
+        indexes = {
+            row[1] for row in conn.execute("PRAGMA index_list(events)").fetchall()
+        }
+
+    assert "idx_events_received_at" in indexes
+    assert "idx_events_source_received_at_id" in indexes
+
+
 def test_latest_events_by_source_returns_timestamps_from_same_latest_row(
     tmp_path: Path,
 ) -> None:
