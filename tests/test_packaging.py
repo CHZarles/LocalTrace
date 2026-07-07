@@ -261,6 +261,8 @@ def test_install_script_starts_core_and_winprobe_after_install() -> None:
     assert "function Start-LocalTraceProcess" in script
     assert "Get-Process -Name $ProcessName" in script
     assert "Start-Process -FilePath $ExecutablePath" in script
+    assert "$ProcessName:" not in script
+    assert "Started ${ProcessName}: $ExecutablePath" in script
     assert (
         'Start-LocalTraceProcess -ProcessName "localtrace" -ExecutablePath $coreExe'
     ) in script

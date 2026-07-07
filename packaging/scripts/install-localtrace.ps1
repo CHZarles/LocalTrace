@@ -93,7 +93,7 @@ function Start-LocalTraceProcess {
   }
 
   Start-Process -FilePath $ExecutablePath -WorkingDirectory (Split-Path -Parent $ExecutablePath)
-  Write-Host "Started $ProcessName: $ExecutablePath"
+  Write-Host "Started ${ProcessName}: $ExecutablePath"
 }
 
 $normalizedReleaseRoot = Get-NormalizedPath -Path $ReleaseRoot
