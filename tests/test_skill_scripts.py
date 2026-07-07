@@ -604,6 +604,42 @@ def test_skill_installer_extracts_browser_extension_zip(tmp_path: Path) -> None:
     assert (extension_dir / "service_worker.js").exists()
 
 
+def test_skill_installer_copies_prepared_extension_path_to_clipboard() -> None:
+    installer = load_install_module()
+    calls: list[dict[str, Any]] = []
+
+    def runner(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        calls.append({"command": command, **kwargs})
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    result = installer.copy_browser_extension_path_to_clipboard(
+        {
+            "prepared": True,
+            "unpacked_dir": (
+                r"C:\Users\Charles\AppData\Local\LocalTrace\App\extension"
+                r"\localtrace-extension"
+            ),
+        },
+        platform="nt",
+        runner=runner,
+    )
+
+    assert result["copied"] is True
+    assert calls[0]["command"] == ["clip.exe"]
+    assert calls[0]["input"].endswith(r"extension\localtrace-extension")
+    assert calls[0]["stdout"] == subprocess.DEVNULL
+    guidance = installer.browser_extension_guidance(
+        {
+            "prepared": True,
+            "unpacked_dir": calls[0]["input"],
+            "source_kind": "extension_zip",
+            "source": "release",
+            "clipboard": result,
+        }
+    )
+    assert "插件目录已复制到剪贴板" in guidance["agent_message_zh"]
+
+
 def test_powershell_installer_is_available_for_windows_users() -> None:
     installer = SKILL_DIR / "install.ps1"
 
@@ -725,6 +761,86 @@ def test_skill_installer_reports_missing_windows_runtime(tmp_path: Path) -> None
     assert result["winprobe"]["exists"] is False
 
 
+def test_skill_installer_installs_missing_runtime_from_release_zip(
+    tmp_path: Path,
+) -> None:
+    installer = load_install_module()
+    source = tmp_path / "repo" / "skill"
+    source.mkdir(parents=True)
+    app_dir = tmp_path / "LocalTrace" / "App"
+    release_zip = tmp_path / "LocalTrace-windows.zip"
+    write_runtime_release_zip(release_zip)
+    started: list[Path] = []
+    registered: list[Path] = []
+
+    result = installer.ensure_installed_runtime(
+        source,
+        app_dir,
+        platform="nt",
+        runtime_zip=release_zip,
+        process_checker=lambda _name: False,
+        starter=lambda path: started.append(path),
+        autostart_registrar=lambda path: registered.append(path),
+    )
+
+    assert result["ready_for_app_capture"] is True
+    assert result["install"]["installed"] is True
+    assert result["install"]["source_kind"] == "runtime_zip"
+    assert (app_dir / "localtrace.exe").read_text(encoding="utf-8") == "core"
+    assert (app_dir / "localtrace-winprobe.exe").read_text(encoding="utf-8") == "probe"
+    assert started == [
+        app_dir / "localtrace.exe",
+        app_dir / "localtrace-winprobe.exe",
+    ]
+    assert registered == [app_dir]
+
+
+def test_skill_installer_downloads_missing_runtime_when_release_zip_is_absent(
+    tmp_path: Path,
+) -> None:
+    installer = load_install_module()
+    source = tmp_path / "repo" / "skill"
+    source.mkdir(parents=True)
+    app_dir = tmp_path / "LocalTrace" / "App"
+    download_url = "https://example.test/LocalTrace-windows.zip"
+
+    def downloader(url: str, destination: Path) -> None:
+        assert url == download_url
+        write_runtime_release_zip(destination)
+
+    result = installer.install_runtime_package(
+        source,
+        app_dir,
+        download_url=download_url,
+        platform="nt",
+        downloader=downloader,
+        autostart_registrar=lambda _path: None,
+    )
+
+    assert result["installed"] is True
+    assert result["source_kind"] == "downloaded_runtime_zip"
+    assert result["source"] == download_url
+    assert (app_dir / "localtrace.exe").read_text(encoding="utf-8") == "core"
+
+
+def test_skill_installer_refuses_runtime_zip_path_traversal(tmp_path: Path) -> None:
+    installer = load_install_module()
+    release_zip = tmp_path / "LocalTrace-windows.zip"
+    with zipfile.ZipFile(release_zip, "w") as archive:
+        archive.writestr("../localtrace.exe", "bad")
+
+    result = installer.install_runtime_package(
+        tmp_path / "repo" / "skill",
+        tmp_path / "App",
+        runtime_zip=release_zip,
+        platform="nt",
+        autostart_registrar=lambda _path: None,
+    )
+
+    assert result["installed"] is False
+    assert result["reason"].startswith("Refusing to extract outside")
+
+
 def test_skill_docs_show_windows_agent_install_and_invocation() -> None:
     skill_readme = (SKILL_DIR / "README.md").read_text(encoding="utf-8")
     skill_file = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
@@ -749,6 +865,8 @@ def test_skill_docs_show_windows_agent_install_and_invocation() -> None:
     assert "安装入口只有一个" in project_readme
     assert "Windows 运行时" in project_readme
     assert "runtime.ready_for_app_capture" in project_readme
+    assert "runtime.install.reason" in project_readme
+    assert "安装器会自动获取并安装缺失的 Windows 运行时" in project_readme
     assert "应用数据" in project_readme
     assert "安装完成后，agent 必须马上输出浏览器插件加载信息" in project_readme
     assert "马上输出浏览器插件解压路径" in project_readme
@@ -793,6 +911,7 @@ def test_skill_markdown_is_concise_and_agent_oriented() -> None:
     assert "localtrace-winprobe.exe" in text
     assert "Do not ask the user to run commands manually" in text
     assert "After installation, immediately relay" in text
+    assert "runtime.install.reason" in text
     assert "must_tell_user_zh" in text
     assert "browser_extension.unpacked_dir" in text
     assert "browser_extension.chrome_url" in text
@@ -827,6 +946,17 @@ def load_install_module() -> Any:
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def write_runtime_release_zip(path: Path) -> None:
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("LocalTrace/localtrace.exe", "core")
+        archive.writestr("LocalTrace/localtrace-winprobe.exe", "probe")
+        archive.writestr("LocalTrace/manifest.json", "{}")
+        archive.writestr("LocalTrace/README.md", "# release")
+        archive.writestr("LocalTrace/web/index.html", "")
+        archive.writestr("LocalTrace/extension/localtrace-extension.zip", "zip")
+        archive.writestr("LocalTrace/scripts/install-localtrace.ps1", "")
 
 
 def load_script_module(script_name: str) -> ModuleType:

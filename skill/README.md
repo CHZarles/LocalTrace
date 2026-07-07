@@ -6,8 +6,8 @@ LocalTrace HTTP JSON API.
 ## Install
 
 This skill is documented for a Windows agent running beside the LocalTrace
-runtime. `localtrace.exe` must be installed and `localtrace-winprobe.exe` must be
-available for capture.
+runtime. The installer installs the skill, prepares the browser extension, and
+installs a missing Windows runtime automatically.
 
 From the repository root, run one PowerShell command:
 
@@ -35,9 +35,13 @@ They also create the direct command wrapper:
 
 The skill has no third-party runtime dependencies. It only needs a Python
 interpreter and a running LocalTrace core at `http://127.0.0.1:8765`.
-During install, the installer also tries to start the installed Windows runtime
-from `%LOCALAPPDATA%\LocalTrace\App` so app capture can begin immediately. If
-the runtime package is missing, the installer reports that in its JSON output.
+During install, the installer looks for `localtrace.exe` and
+`localtrace-winprobe.exe` in `%LOCALAPPDATA%\LocalTrace\App`. If they are
+missing, it uses a local `LocalTrace-windows.zip` when present, otherwise it
+downloads the latest release zip, installs it into that app directory, registers
+current-user startup entries, and starts both background processes. If automatic
+runtime install or startup fails, the JSON output includes `runtime.reason` and
+`runtime.install.reason`.
 
 ## Commands
 

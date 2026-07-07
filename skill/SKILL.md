@@ -11,8 +11,7 @@ the local HTTP API; do not inspect storage or runtime internals.
 
 ## Quick start
 
-Assume the agent is running on Windows with `localtrace.exe` installed,
-`localtrace-winprobe.exe` available for capture, and the core listening at:
+Assume the agent is running on Windows and should talk to the core at:
 
 ```text
 http://127.0.0.1:8765
@@ -34,9 +33,11 @@ After installation, immediately relay `must_tell_user_zh` from the installer
 JSON. Also include `browser_extension.unpacked_dir`,
 `browser_extension.chrome_url`, and `browser_extension.edge_url` if present.
 If `must_tell_user_zh` is absent, use `browser_extension.agent_message_zh`.
-Tell the user only browser "Load unpacked" is manual; if
-`runtime.ready_for_app_capture` is false, say Windows app capture also needs the
-runtime package and `localtrace-winprobe.exe`.
+Tell the user only browser "Load unpacked" is manual. The installer attempts to
+download, install, autostart, and start missing runtime files (`localtrace.exe`,
+`localtrace-winprobe.exe`) by itself. If `runtime.ready_for_app_capture` is
+false, report `runtime.reason` plus `runtime.install.reason`; do not ask for
+manual runtime install unless automatic install failed and no retry remains.
 
 Do not ask the user to run commands manually when this skill applies. Run the
 smallest answering subcommand and summarize the JSON result.
@@ -95,6 +96,5 @@ and cloud endpoints are invalid.
 
 ## Bundled files
 
-- `install.ps1`: Windows one-command installer.
-- `install.py`: copies the skill, installs `requirements.txt`, creates wrapper.
+- `install.ps1` / `install.py`: installer and runtime/extension preparer.
 - `scripts/localtrace.py` and `localtrace_*.py`: HTTP JSON query tools.

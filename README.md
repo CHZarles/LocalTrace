@@ -12,12 +12,12 @@ LocalTrace 是给 Windows agent 使用的本地活动上下文工具。它记录
 >
 > 1. 先下载或解压完整仓库，不要只下载 skill 目录。
 > 2. 安装入口只有一个：使用仓库 skill 目录里的安装器，不要让我手动运行命令，也不要让我复制执行任何安装命令。
-> 3. 安装器会尝试启动已安装的 Windows 运行时；如果安装结果里 `runtime.ready_for_app_capture` 不是 `true`，请直接告诉我：当前不能采集新的 Windows 应用数据，需要先安装 `LocalTrace-windows.zip` 运行时。
+> 3. 安装器会自动安装缺失的 Windows 运行时，并在后台启动采集进程；如果安装结果里 `runtime.ready_for_app_capture` 不是 `true`，请直接告诉我 `runtime.reason` 和 `runtime.install.reason`，说明当前还不能采集新的 Windows 应用数据。
 > 4. 安装器会自动解压浏览器插件，并把插件目录复制到剪贴板；如果安装结果里 `browser_extension.prepared` 不是 `true`，请直接告诉我失败原因。
 > 5. 安装完成后，马上输出浏览器插件解压路径、Chrome 扩展页地址、Edge 扩展页地址，并把这些信息原样告诉我。
 > 6. 然后检查 LocalTrace Skill 是否已经可用，检查 health 里的 `windows_probe` 是否有最近时间，并打开 LocalTrace Web UI。
 
-安装 Skill 不等于安装 Windows 运行时。Skill 负责让 agent 查询数据；Windows 运行时负责采集应用数据。如果 `runtime.ready_for_app_capture` 不是 `true`，先安装最新的 `LocalTrace-windows.zip`。
+安装 Skill 不等于已经有可采集的应用数据。Skill 负责让 agent 查询数据；Windows 运行时负责采集应用数据。安装器会自动获取并安装缺失的 Windows 运行时；是否可以采集应用数据，以 `runtime.ready_for_app_capture` 和 health 里的 `windows_probe` 最近时间为准。
 
 安装完成后，agent 必须马上输出浏览器插件加载信息：插件解压路径、Chrome 扩展页地址、Edge 扩展页地址。用户只需要打开 chrome 或者 edge 浏览器加载插件。
 
@@ -89,7 +89,7 @@ LocalTrace 不记录网页正文，不截图，不记录键盘输入，不上传
 
 LocalTrace Skill 负责让 agent 查询活动记录；Windows 运行时负责真正采集和保存事件。
 
-发布包是 `LocalTrace-windows.zip`。解压后，使用包内安装器安装 Windows 运行时。
+发布包是 `LocalTrace-windows.zip`。普通用户通过 Skill 安装器自动获取和安装；开发者也可以解压后使用包内安装器安装 Windows 运行时。
 
 ## 开发者文档
 
