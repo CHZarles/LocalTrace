@@ -138,6 +138,26 @@ def test_extension_zip_contains_only_extension_runtime_files(tmp_path: Path) -> 
     }
 
 
+def test_release_and_extension_versions_follow_pyproject(tmp_path: Path) -> None:
+    pyproject = tomllib.loads((LOCALTRACE_ROOT / "pyproject.toml").read_text())
+    project_version = pyproject["project"]["version"]
+    dist_dir = tmp_path / "dist"
+    result = run_packager("--dist-dir", str(dist_dir), "--skip-exe-check")
+
+    assert result.returncode == 0, result.stderr
+    with zipfile.ZipFile(dist_dir / "LocalTrace-windows.zip") as release:
+        release_manifest = json.loads(release.read("LocalTrace/manifest.json"))
+        extension_bytes = release.read("LocalTrace/extension/localtrace-extension.zip")
+
+    extension_zip = tmp_path / "extension.zip"
+    extension_zip.write_bytes(extension_bytes)
+    with zipfile.ZipFile(extension_zip) as archive:
+        extension_manifest = json.loads(archive.read("manifest.json"))
+
+    assert release_manifest["version"] == project_version
+    assert extension_manifest["version"] == project_version
+
+
 def test_install_script_uses_hkcu_run_and_user_local_appdata() -> None:
     script = (
         LOCALTRACE_ROOT / "packaging" / "scripts" / "install-localtrace.ps1"
