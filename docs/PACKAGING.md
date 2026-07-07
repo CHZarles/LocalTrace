@@ -121,7 +121,8 @@ The `LocalTrace` value points to `localtrace.exe`; the `LocalTraceWinprobe`
 value points to `localtrace-winprobe.exe`. The script does not use HKLM and does
 not request elevation. After staging the files, it starts both `localtrace.exe`
 and `localtrace-winprobe.exe` so app capture can begin without waiting for the
-next login.
+next login. The packaged executables are built without console windows, and the
+installer starts them hidden.
 
 ## Uninstall
 

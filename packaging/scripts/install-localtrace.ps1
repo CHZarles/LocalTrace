@@ -92,7 +92,7 @@ function Start-LocalTraceProcess {
     return
   }
 
-  Start-Process -FilePath $ExecutablePath -WorkingDirectory (Split-Path -Parent $ExecutablePath)
+  Start-Process -FilePath $ExecutablePath -WorkingDirectory (Split-Path -Parent $ExecutablePath) -WindowStyle Hidden
   Write-Host "Started ${ProcessName}: $ExecutablePath"
 }
 

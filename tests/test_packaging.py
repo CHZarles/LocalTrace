@@ -204,6 +204,14 @@ def test_windows_build_script_invokes_pyinstaller_for_both_exes() -> None:
     assert "Start-Process -Verb RunAs" not in script
 
 
+def test_windows_build_script_builds_background_exes_without_consoles() -> None:
+    script = (LOCALTRACE_ROOT / "packaging" / "build-windows.ps1").read_text(
+        encoding="utf-8"
+    )
+
+    assert script.count('"--noconsole"') == 2
+
+
 def test_windows_build_script_bundles_uiautomation_for_winprobe() -> None:
     script = (LOCALTRACE_ROOT / "packaging" / "build-windows.ps1").read_text(
         encoding="utf-8"
@@ -261,6 +269,7 @@ def test_install_script_starts_core_and_winprobe_after_install() -> None:
     assert "function Start-LocalTraceProcess" in script
     assert "Get-Process -Name $ProcessName" in script
     assert "Start-Process -FilePath $ExecutablePath" in script
+    assert "-WindowStyle Hidden" in script
     assert "$ProcessName:" not in script
     assert "Started ${ProcessName}: $ExecutablePath" in script
     assert (
