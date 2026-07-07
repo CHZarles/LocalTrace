@@ -110,14 +110,16 @@ The default install directory is:
 %LOCALAPPDATA%\LocalTrace\App
 ```
 
-The install script registers current-user autostart at:
+The install script registers current-user autostart entries for both the core
+and Windows probe at:
 
 ```text
 HKCU\Software\Microsoft\Windows\CurrentVersion\Run
 ```
 
-The value points to `localtrace.exe`. The script does not use HKLM and does not
-request elevation.
+The `LocalTrace` value points to `localtrace.exe`; the `LocalTraceWinprobe`
+value points to `localtrace-winprobe.exe`. The script does not use HKLM and does
+not request elevation.
 
 ## Uninstall
 
@@ -127,9 +129,9 @@ Run:
 powershell -ExecutionPolicy Bypass -File .\scripts\uninstall-localtrace.ps1
 ```
 
-The uninstall script removes the HKCU Run value and removes the staged app files
-under `%LOCALAPPDATA%\LocalTrace\App`. It does not delete captured data such as
-`%LOCALAPPDATA%\LocalTrace\localtrace.db`.
+The uninstall script removes both HKCU Run values and removes the staged app
+files under `%LOCALAPPDATA%\LocalTrace\App`. It does not delete captured data
+such as `%LOCALAPPDATA%\LocalTrace\localtrace.db`.
 
 ## Manual Smoke
 

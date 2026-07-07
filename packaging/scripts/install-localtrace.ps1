@@ -6,7 +6,8 @@ param(
 $ErrorActionPreference = "Stop"
 
 $runKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
-$runName = "LocalTrace"
+$coreRunName = "LocalTrace"
+$winprobeRunName = "LocalTraceWinprobe"
 
 if ([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
   throw "LOCALAPPDATA is not set."
@@ -94,6 +95,7 @@ $ReleaseRoot = $normalizedReleaseRoot
 $InstallDir = $normalizedInstallDir
 
 $coreExe = Join-Path $InstallDir "localtrace.exe"
+$winprobeExe = Join-Path $InstallDir "localtrace-winprobe.exe"
 
 $requiredItems = @(
   "localtrace.exe",
@@ -122,10 +124,13 @@ foreach ($item in $requiredItems) {
 }
 
 New-Item -Path $runKey -Force | Out-Null
-Set-ItemProperty -Path $runKey -Name $runName -Value "`"$coreExe`""
+Set-ItemProperty -Path $runKey -Name $coreRunName -Value "`"$coreExe`""
+Set-ItemProperty -Path $runKey -Name $winprobeRunName -Value "`"$winprobeExe`""
 
 Prepare-BrowserExtension -InstallDir $InstallDir
 
 Write-Host "LocalTrace installed to: $InstallDir"
-Write-Host "Autostart registered at: $runKey\$runName"
+Write-Host "Autostart registered at: $runKey\$coreRunName"
+Write-Host "Autostart registered at: $runKey\$winprobeRunName"
 Write-Host "Start manually with: $coreExe"
+Write-Host "Start app probe manually with: $winprobeExe"

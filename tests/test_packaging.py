@@ -167,6 +167,8 @@ def test_install_script_uses_hkcu_run_and_user_local_appdata() -> None:
     assert "$env:LOCALAPPDATA" in script
     assert "LocalTrace" in script
     assert "localtrace.exe" in script
+    assert "LocalTraceWinprobe" in script
+    assert "localtrace-winprobe.exe" in script
     assert "Start-Process -Verb RunAs" not in script
     assert "HKLM:" not in script
 
@@ -178,6 +180,7 @@ def test_uninstall_script_removes_hkcu_run_and_localtrace_install_dir() -> None:
 
     assert "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run" in script
     assert "Remove-ItemProperty" in script
+    assert "LocalTraceWinprobe" in script
     assert "$env:LOCALAPPDATA" in script
     assert "Remove-Item" in script
     assert "Start-Process -Verb RunAs" not in script
@@ -333,6 +336,7 @@ def test_packaging_docs_are_in_mkdocs_nav() -> None:
     assert "HKCU" in docs
     assert "localtrace.exe" in docs
     assert "localtrace-winprobe.exe" in docs
+    assert "LocalTraceWinprobe" in docs
     assert "LocalTrace-windows.zip" in docs
     assert "check-localtrace.ps1" in docs
     assert "The installer extracts the browser extension" in docs
