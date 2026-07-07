@@ -349,7 +349,7 @@ def test_http_routes_expose_web_settings_and_local_json_apis(tmp_path: Path) -> 
         assert "icon-rail-btn" not in html
         assert 'data-rail="' not in html
         assert "eventsTable" not in html
-        assert 'data-section=' not in html
+        assert "data-section=" not in html
         assert "data-view=" not in html
         assert "Planner" not in html
         assert "Review" not in html
