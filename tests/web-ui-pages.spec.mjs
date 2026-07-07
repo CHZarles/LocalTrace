@@ -105,122 +105,20 @@ async function startWebUiServer({
   };
 }
 
-test("hero number renders serif display value", async ({ page }) => {
-  const server = await startWebUiServer({
-    events: [
-      {
-        id: 1,
-        observed_at: new Date().toISOString(),
-        received_at: new Date().toISOString(),
-        source: "windows_probe",
-        kind: "app_active",
-        entity_type: "app",
-        entity: "Code.exe",
-        payload: { activity: "focus" }
-      }
-    ]
-  });
-  try {
-    await page.goto(server.url);
-    const heroNum = page.locator("#heroNumber");
-    await expect(heroNum).toBeVisible();
-    const family = await heroNum.evaluate((el) => getComputedStyle(el).fontFamily);
-    expect(family.toLowerCase()).not.toContain("mono");
-    expect(family.toLowerCase()).toContain("serif");
-    const size = await heroNum.evaluate((el) => getComputedStyle(el).fontSize);
-    expect(parseInt(size, 10)).toBeGreaterThanOrEqual(200);
-  } finally {
-    await server.close();
-  }
-});
-
-test("hero eyebrow has copper underline that grows", async ({ page }) => {
+test("metrics and settings are separate pages", async ({ page }) => {
   const server = await startWebUiServer();
   try {
     await page.goto(server.url);
-    const eyebrow = page.locator(".hero-eyebrow");
-    await expect(eyebrow).toBeVisible();
-    const color = await eyebrow.evaluate((el) => getComputedStyle(el).color);
-    // copper ~ #a8743a → rgb(168, 116, 58)
-    expect(color).toBe("rgb(168, 116, 58)");
-    // ::after element exists with copper background and growing underline animation
-    const after = await eyebrow.evaluate((el) => {
-      const s = getComputedStyle(el, "::after");
-      return { bg: s.backgroundColor, anim: s.animationName, height: s.height };
-    });
-    expect(after.bg).toBe("rgb(168, 116, 58)");
-    expect(after.height).toBe("3px");
-    expect(after.anim).toContain("underline");
-  } finally {
-    await server.close();
-  }
-});
 
-test("data grid renders 8 tiles", async ({ page }) => {
-  const server = await startWebUiServer({
-    events: [
-      {
-        id: 1,
-        observed_at: new Date().toISOString(),
-        received_at: new Date().toISOString(),
-        source: "windows_probe",
-        kind: "app_active",
-        entity_type: "app",
-        entity: "Code.exe",
-        payload: { activity: "focus" }
-      }
-    ]
-  });
-  try {
-    await page.goto(server.url);
-    const grid = page.locator("#dataGrid");
-    await expect(grid).toBeVisible();
-    const tiles = page.locator(".data-tile");
-    await expect(tiles).toHaveCount(8);
-    const labels = await page
-      .locator(".data-tile-label")
-      .allTextContents();
-    expect(labels.map((l) => l.trim().toLowerCase())).toEqual([
-      "today focus",
-      "today audio",
-      "today switches",
-      "today events",
-      "top app",
-      "top site",
-      "peak",
-      "avg focus"
-    ]);
-  } finally {
-    await server.close();
-  }
-});
+    await expect(page.locator("#metricsView")).toBeVisible();
+    await expect(page.locator("#settingsPanel")).toBeHidden();
+    await expect(page.locator("#metricsView #healthMetrics")).toHaveCount(0);
 
-test("command bar shows summary line", async ({ page }) => {
-  const server = await startWebUiServer({
-    events: [
-      {
-        id: 1,
-        observed_at: new Date().toISOString(),
-        received_at: new Date().toISOString(),
-        source: "windows_probe",
-        kind: "app_active",
-        entity_type: "app",
-        entity: "Code.exe",
-        payload: { activity: "focus" }
-      }
-    ]
-  });
-  try {
-    await page.goto(server.url);
-    const bar = page.locator("#commandBar");
-    await expect(bar).toBeVisible();
-    await expect(bar).toContainText(/localtrace/);
-    await expect(bar).toContainText(/focus/);
-    await expect(bar).toContainText(/audio/);
-    await expect(bar).toContainText(/switches/);
-    await expect(bar).toContainText(/events/);
-    await expect(bar).toContainText(/apps/);
-    await expect(bar).toContainText(/sites/);
+    await page.getByRole("button", { name: "Settings" }).click();
+
+    await expect(page.locator("#settingsPanel")).toBeVisible();
+    await expect(page.locator("#metricsView")).toBeHidden();
+    await expect(page.locator("#settingsPanel #healthMetrics")).toHaveCount(1);
   } finally {
     await server.close();
   }
@@ -253,7 +151,10 @@ test("stale browser audio is not shown as current background audio", async ({
         constructor(...args) {
           super(...(args.length ? args : [fixedNow]));
         }
-        static now() { return fixedNow; }
+
+        static now() {
+          return fixedNow;
+        }
       }
       FixedDate.UTC = RealDate.UTC;
       FixedDate.parse = RealDate.parse;
@@ -261,8 +162,8 @@ test("stale browser audio is not shown as current background audio", async ({
     });
     await page.goto(server.url);
 
-    await expect(page.locator("#nowList")).toContainText("No audio");
-    await expect(page.locator("#nowList")).not.toContainText(staleTitle);
+    await expect(page.locator("#nowAudio")).toContainText("No audio activity");
+    await expect(page.locator("#nowAudio")).not.toContainText(staleTitle);
   } finally {
     await server.close();
   }
@@ -307,7 +208,10 @@ test("stale browser audio is hidden even when idle cutoff is long", async ({
         constructor(...args) {
           super(...(args.length ? args : [fixedNow]));
         }
-        static now() { return fixedNow; }
+
+        static now() {
+          return fixedNow;
+        }
       }
       FixedDate.UTC = RealDate.UTC;
       FixedDate.parse = RealDate.parse;
@@ -315,25 +219,20 @@ test("stale browser audio is hidden even when idle cutoff is long", async ({
     });
     await page.goto(server.url);
 
-    await expect(page.locator("#nowList")).toContainText("No audio");
-    await expect(page.locator("#nowList")).not.toContainText(staleTitle);
+    await expect(page.locator("#nowAudio")).toContainText("No audio activity");
+    await expect(page.locator("#nowAudio")).not.toContainText(staleTitle);
   } finally {
     await server.close();
   }
 });
 
 test("recent flow renders latest events in descending order", async ({ page }) => {
-  // Use today's date (via addInitScript) so today's filter surfaces the events
-  const today = new Date();
-  function iso(offsetMs) {
-    return new Date(today.getTime() - offsetMs).toISOString();
-  }
   const server = await startWebUiServer({
     events: [
       {
         id: 1,
-        observed_at: iso(60 * 60 * 1000),
-        received_at: iso(60 * 60 * 1000),
+        observed_at: "2026-07-03T09:00:00.000Z",
+        received_at: "2026-07-03T09:00:00.000Z",
         source: "windows_probe",
         kind: "app_active",
         entity_type: "app",
@@ -343,8 +242,8 @@ test("recent flow renders latest events in descending order", async ({ page }) =
       },
       {
         id: 3,
-        observed_at: iso(53 * 60 * 1000),
-        received_at: iso(53 * 60 * 1000),
+        observed_at: "2026-07-03T09:07:00.000Z",
+        received_at: "2026-07-03T09:07:00.000Z",
         source: "windows_probe",
         kind: "app_audio_stop",
         entity_type: "app",
@@ -354,8 +253,8 @@ test("recent flow renders latest events in descending order", async ({ page }) =
       },
       {
         id: 2,
-        observed_at: iso(55 * 60 * 1000),
-        received_at: iso(55 * 60 * 1000),
+        observed_at: "2026-07-03T09:05:00.000Z",
+        received_at: "2026-07-03T09:05:00.000Z",
         source: "browser_extension",
         kind: "tab_active",
         entity_type: "domain",
@@ -365,8 +264,8 @@ test("recent flow renders latest events in descending order", async ({ page }) =
       },
       {
         id: 4,
-        observed_at: iso(51 * 60 * 1000),
-        received_at: iso(51 * 60 * 1000),
+        observed_at: "2026-07-03T09:09:00.000Z",
+        received_at: "2026-07-03T09:09:00.000Z",
         source: "browser_extension",
         kind: "tab_active",
         entity_type: "domain",
@@ -379,13 +278,15 @@ test("recent flow renders latest events in descending order", async ({ page }) =
   try {
     await page.goto(server.url);
 
-    const rows = page.locator("#flowList .flow-row");
+    const rows = page.locator("#flowList .flow-item");
     await expect(rows).toHaveCount(4);
-    const cells = await rows.allTextContents();
-    expect(cells[0]).toContain("youtube.com");
-    expect(cells[1]).toContain("Spotify.exe");
-    expect(cells[2]).toContain("docs.python.org");
-    expect(cells[3]).toContain("Code.exe");
+    await expect(rows.nth(0)).toContainText("youtube.com");
+    await expect(rows.nth(0)).toContainText("Tab audio");
+    await expect(rows.nth(1)).toContainText("Spotify.exe");
+    await expect(rows.nth(1)).toContainText("Audio stopped");
+    await expect(rows.nth(1)).toContainText("windows_probe");
+    await expect(rows.nth(2)).toContainText("docs.python.org");
+    await expect(rows.nth(3)).toContainText("Code.exe");
   } finally {
     await server.close();
   }
@@ -432,19 +333,25 @@ test("health and recent flow expose freshness and receive lag", async ({
         constructor(...args) {
           super(...(args.length ? args : [fixedNow]));
         }
-        static now() { return fixedNow; }
+
+        static now() {
+          return fixedNow;
+        }
       }
       FixedDate.UTC = RealDate.UTC;
       FixedDate.parse = RealDate.parse;
       globalThis.Date = FixedDate;
     });
     await page.goto(server.url);
+    await page.getByRole("button", { name: "Settings" }).click();
 
-    await expect(page.locator("#commandBar")).toContainText("UI refreshed <1s ago");
-    await expect(page.locator("#healthPills")).toContainText("winprobe not seen");
-    await expect(page.locator("#healthPills")).toContainText("browser stale 16m ago");
-    await expect(page.locator("#healthPills")).toContainText("lag 2m");
-    await expect(page.locator("#flowList .flow-row").first()).toContainText(
+    await expect(page.locator("#statusLine")).toContainText("UI refreshed <1s ago");
+    await expect(page.locator("#healthMetrics")).toContainText(
+      "windows_probe not seen"
+    );
+    await expect(page.locator("#healthMetrics")).toContainText("stale 16m ago");
+    await expect(page.locator("#healthMetrics")).toContainText("lag 2m");
+    await expect(page.locator("#flowList .flow-item").first()).toContainText(
       "receive lag 2m"
     );
   } finally {
@@ -467,7 +374,7 @@ test("metrics auto-refresh updates recent flow without overlapping requests", as
   });
   try {
     await page.goto(server.url);
-    await expect(page.locator("#flowList .flow-row")).toHaveCount(0);
+    await expect(page.locator("#flowList .flow-item")).toHaveCount(0);
 
     eventState.push({
       id: 1,
@@ -481,7 +388,7 @@ test("metrics auto-refresh updates recent flow without overlapping requests", as
       payload: { activity: "focus" }
     });
 
-    await expect(page.locator("#flowList .flow-row").first()).toContainText(
+    await expect(page.locator("#flowList .flow-item").first()).toContainText(
       "Code.exe",
       { timeout: 4000 }
     );
@@ -496,14 +403,18 @@ test("metrics auto-refresh updates recent flow without overlapping requests", as
   }
 });
 
-test("mobile dashboard has single-column bottom split", async ({ page }) => {
+test("mobile metrics use a single-column layout", async ({ page }) => {
   const server = await startWebUiServer();
   try {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(server.url);
 
-    await expect(page.locator(".bottom-row")).toBeVisible();
-    await expect(page.locator(".bottom-row")).toHaveCSS(
+    await expect(page.locator("#metricsView")).toBeVisible();
+    await expect(page.locator(".now-list")).toHaveCSS(
+      "grid-template-columns",
+      /^(?!.*\s).+$/
+    );
+    await expect(page.locator(".workbench-grid")).toHaveCSS(
       "grid-template-columns",
       /^(?!.*\s).+$/
     );
@@ -512,80 +423,22 @@ test("mobile dashboard has single-column bottom split", async ({ page }) => {
   }
 });
 
-test("timeline renders app-typed swimlanes with overlaid audio", async ({ page }) => {
-  const server = await startWebUiServer({
-    events: [
-      {
-        id: 1,
-        observed_at: "2026-07-05T09:00:00.000Z",
-        received_at: "2026-07-05T09:00:00.000Z",
-        source: "windows_probe",
-        kind: "app_active",
-        entity_type: "app",
-        entity: "Code.exe",
-        title: "VS Code",
-        payload: { activity: "focus" }
-      },
-      {
-        id: 2,
-        observed_at: "2026-07-05T09:30:00.000Z",
-        received_at: "2026-07-05T09:30:00.000Z",
-        source: "windows_probe",
-        kind: "app_active",
-        entity_type: "app",
-        entity: "Slack.exe",
-        payload: { activity: "focus" }
-      },
-      {
-        id: 3,
-        observed_at: "2026-07-05T10:00:00.000Z",
-        received_at: "2026-07-05T10:00:00.000Z",
-        source: "windows_probe",
-        kind: "app_active",
-        entity_type: "app",
-        entity: "Code.exe",
-        payload: { activity: "focus" }
-      },
-      {
-        id: 4,
-        observed_at: "2026-07-05T10:15:00.000Z",
-        received_at: "2026-07-05T10:15:00.000Z",
-        source: "windows_probe",
-        kind: "app_audio",
-        entity_type: "app",
-        entity: "Code.exe",
-        title: "Build sound",
-        payload: { activity: "audio" }
-      }
-    ]
-  });
+test("mobile timeline keeps axis labels readable", async ({ page }) => {
+  const server = await startWebUiServer();
   try {
-    await page.addInitScript(() => {
-      const fixedNow = new Date("2026-07-05T12:00:00.000Z").valueOf();
-      const RealDate = Date;
-      class FixedDate extends RealDate {
-        constructor(...args) {
-          super(...(args.length ? args : [fixedNow]));
-        }
-        static now() { return fixedNow; }
-      }
-      FixedDate.UTC = RealDate.UTC;
-      FixedDate.parse = RealDate.parse;
-      globalThis.Date = FixedDate;
-    });
+    await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(server.url);
 
-    const lanes = page.locator("#timelineLanes .timeline-lane");
-    await expect(lanes).toHaveCount(2);
-    const labels = await lanes.locator(".lane-name").allTextContents();
-    expect(labels.map((l) => l.trim())).toEqual(["Code.exe", "Slack.exe"]);
-    await expect(lanes.nth(0).locator(".timeline-bar.focus")).toHaveCount(2);
-    await expect(lanes.nth(0).locator(".timeline-bar.audio")).toHaveCount(1);
-    await expect(lanes.nth(1).locator(".timeline-bar.focus")).toHaveCount(1);
-    await expect(lanes.nth(1).locator(".timeline-bar.audio")).toHaveCount(0);
-    await expect(page.locator("#timelineStats")).toContainText(
-      "2 apps · 4 events · 3 switches"
+    await expect(page.locator("#metricsView")).toBeVisible();
+    const hasOverlap = await page.locator(".timeline-axis span").evaluateAll(
+      (ticks) => ticks.some((tick, index) => {
+        if (index === 0) return false;
+        const previous = ticks[index - 1].getBoundingClientRect();
+        const current = tick.getBoundingClientRect();
+        return current.left < previous.right + 2;
+      })
     );
+    expect(hasOverlap).toBe(false);
   } finally {
     await server.close();
   }

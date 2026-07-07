@@ -3,66 +3,271 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>LocalTrace — Today, you focused</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;1,9..144,300;1,9..144,400&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="/web/styles.css?v=20260707-latency-lanes" />
+    <title>LocalTrace</title>
+    <link rel="stylesheet" href="/web/styles.css?v=20260707-practical-ui" />
   </head>
   <body>
-    <div class="layout">
-      <header class="topbar">
-        <div class="brand"><span class="brand-dot"></span><em>LocalTrace</em></div>
-        <div class="live">
-          <span class="live-dot"></span>
-          <span class="live-meta">TODAY · 5 July 2026 · LIVE</span>
-        </div>
-      </header>
-
-      <section class="hero">
-        <div class="hero-eyebrow">TODAY</div>
-        <div class="hero-headline-italic">Today, you focused</div>
-        <div class="hero-number" id="heroNumber">0:00</div>
-        <div class="hero-annotation" id="heroAnnotation">— a quieter day</div>
-        <div class="hero-meta" id="heroMeta">Waiting for activity</div>
-      </section>
-
-      <div class="data-grid" id="dataGrid"></div>
-
-      <section class="timeline">
-        <div class="timeline-head">
+    <svg class="icon-sprite" aria-hidden="true">
+      <symbol id="icon-activity" viewBox="0 0 24 24">
+        <path d="M3 12h4l2.3-7 5.4 14 2.3-7h4" />
+      </symbol>
+      <symbol id="icon-settings" viewBox="0 0 24 24">
+        <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" />
+        <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.3a2 2 0 1 1-4 0V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.4 7a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6V3a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1A2 2 0 1 1 20 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.8 1Z" />
+      </symbol>
+      <symbol id="icon-refresh" viewBox="0 0 24 24">
+        <path d="M21 12a9 9 0 0 1-15.2 6.5" />
+        <path d="M3 12A9 9 0 0 1 18.2 5.5" />
+        <path d="M18 2v4h4" />
+        <path d="M6 22v-4H2" />
+      </symbol>
+      <symbol id="icon-pause" viewBox="0 0 24 24">
+        <path d="M8 5v14" />
+        <path d="M16 5v14" />
+      </symbol>
+      <symbol id="icon-play" viewBox="0 0 24 24">
+        <path d="m8 5 11 7-11 7Z" />
+      </symbol>
+    </svg>
+    <div class="app-shell">
+      <aside class="nav-rail">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">LT</div>
           <div>
-            <span class="timeline-eyebrow">TIMELINE</span>
-            <span class="timeline-range">last 12 hours</span>
+            <h1>LocalTrace</h1>
+            <p id="statusLine">Loading</p>
           </div>
-          <div class="timeline-stats" id="timelineStats"></div>
         </div>
-        <div class="timeline-axis" id="timelineAxis"></div>
-        <div class="timeline-lanes" id="timelineLanes"></div>
-      </section>
+        <nav class="nav-list" aria-label="Primary">
+          <button class="nav-item active" type="button" data-section="metricsView">
+            <svg class="icon" aria-hidden="true"><use href="#icon-activity"></use></svg>
+            <span>Metrics</span>
+          </button>
+          <button class="nav-item" type="button" data-section="settingsPanel">
+            <svg class="icon" aria-hidden="true"><use href="#icon-settings"></use></svg>
+            <span>Settings</span>
+          </button>
+        </nav>
+        <button id="refreshButton" class="secondary nav-refresh" type="button">
+          <svg class="button-icon" aria-hidden="true"><use href="#icon-refresh"></use></svg>
+          Refresh
+        </button>
+      </aside>
 
-      <div class="bottom-row">
-        <article class="panel right-now">
-          <h3 class="panel-title">Right now</h3>
-          <div class="now-list" id="nowList"></div>
-        </article>
-        <article class="panel recent-flow">
-          <h3 class="panel-title">Recent flow</h3>
-          <div class="flow-list" id="flowList"></div>
-        </article>
-        <article class="panel health">
-          <h3 class="panel-title">Health</h3>
-          <div class="health-pills" id="healthPills"></div>
-          <p class="health-blurb" id="healthBlurb">— lowest this week</p>
-        </article>
+      <div class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Local capture</p>
+            <h2 id="pageTitle">Today</h2>
+          </div>
+          <div class="top-actions">
+            <span id="trackingPill" class="status-pill">Tracking</span>
+            <button id="pauseButton" class="secondary" type="button">
+              <svg class="button-icon" aria-hidden="true"><use href="#icon-pause"></use></svg>
+              Pause
+            </button>
+            <button id="resumeButton" class="secondary" type="button">
+              <svg class="button-icon" aria-hidden="true"><use href="#icon-play"></use></svg>
+              Resume
+            </button>
+          </div>
+        </header>
+
+        <main>
+          <section id="metricsView" class="view active">
+            <div class="hero-grid">
+              <article class="card now-card">
+                <div class="section-heading">
+                  <div>
+                    <h3>Now</h3>
+                    <p class="section-note">Current focus and media</p>
+                  </div>
+                  <span id="nowFreshness" class="status-pill muted">Waiting</span>
+                </div>
+                <div class="now-list">
+                  <div class="now-row" id="nowFocus"></div>
+                  <div class="now-row" id="nowTab"></div>
+                  <div class="now-row" id="nowAudio"></div>
+                </div>
+              </article>
+
+              <article class="card summary-card">
+                <div class="section-heading">
+                  <div>
+                    <h3>Today summary</h3>
+                    <p class="section-note" id="summaryMeta">Today so far</p>
+                  </div>
+                </div>
+                <div class="metric-grid">
+                  <div>
+                    <span>Focus</span>
+                    <strong id="focusTotal">0m</strong>
+                  </div>
+                  <div>
+                    <span>Audio</span>
+                    <strong id="audioTotal">0m</strong>
+                  </div>
+                  <div>
+                    <span>Switches</span>
+                    <strong id="focusSwitches">0</strong>
+                  </div>
+                  <div>
+                    <span>Events</span>
+                    <strong id="todayEventsCount">0</strong>
+                  </div>
+                </div>
+              </article>
+            </div>
+
+            <div class="workbench-grid">
+              <div class="main-stack">
+                <article class="card timeline-card">
+                  <div class="section-heading wrap">
+                    <div>
+                      <h3>Timeline</h3>
+                      <p class="section-note" id="timelineMeta">Top lanes from today</p>
+                    </div>
+                    <div class="legend">
+                      <span><i class="legend-focus"></i>Focus</span>
+                      <span><i class="legend-audio"></i>Audio</span>
+                    </div>
+                  </div>
+                  <p class="empty-state" id="timelineEmpty" hidden>No timeline activity yet.</p>
+                  <div class="timeline-grid" id="timelineGrid">
+                    <div class="timeline-label-spacer"></div>
+                    <div class="timeline-axis" id="timelineAxis"></div>
+                    <div class="timeline-lanes" id="timelineLanes"></div>
+                  </div>
+                </article>
+
+                <article class="card">
+                  <div class="section-heading">
+                    <div>
+                      <h3>Recent flow</h3>
+                      <p class="section-note" id="flowMeta">Latest captured activity</p>
+                    </div>
+                  </div>
+                  <p class="empty-state" id="flowEmpty" hidden>No recent activity yet.</p>
+                  <div class="flow-list" id="flowList"></div>
+                </article>
+              </div>
+
+              <aside class="side-stack">
+                <article class="card">
+                  <div class="section-heading wrap">
+                    <div>
+                      <h3>Today Top</h3>
+                      <p class="section-note" id="topMeta">No activity yet</p>
+                    </div>
+                    <div class="segmented" role="group" aria-label="Top filter">
+                      <button class="segment active" type="button" data-filter="all">All</button>
+                      <button class="segment" type="button" data-filter="app">Apps</button>
+                      <button class="segment" type="button" data-filter="domain">Web</button>
+                    </div>
+                  </div>
+                  <div class="top-list" id="topList"></div>
+                </article>
+              </aside>
+            </div>
+
+          </section>
+
+          <section id="settingsPanel" class="view">
+            <div class="settings-layout">
+              <article class="card">
+                <div class="section-heading">
+                  <h3>Health</h3>
+                </div>
+                <dl class="metrics" id="healthMetrics"></dl>
+              </article>
+
+              <article class="card">
+                <div class="section-heading">
+                  <h3>Core settings</h3>
+                  <button id="saveSettings" type="button">Save</button>
+                </div>
+                <form id="settingsForm" class="settings-grid">
+                  <label>
+                    <span>Port</span>
+                    <input id="apiPort" name="apiPort" type="number" min="1" max="65535" />
+                  </label>
+                  <label>
+                    <span>Poll ms</span>
+                    <input id="pollMs" name="pollMs" type="number" min="100" step="100" />
+                  </label>
+                  <label>
+                    <span>Heartbeat sec</span>
+                    <input id="heartbeatSeconds" name="heartbeatSeconds" type="number" min="1" />
+                  </label>
+                  <label>
+                    <span>Idle cutoff sec</span>
+                    <input id="idleCutoffSeconds" name="idleCutoffSeconds" type="number" min="1" />
+                  </label>
+                  <label class="toggle">
+                    <span>Store titles</span>
+                    <input id="storeTitles" name="storeTitles" type="checkbox" />
+                  </label>
+                  <label class="toggle">
+                    <span>Store exe path</span>
+                    <input id="storeExePath" name="storeExePath" type="checkbox" />
+                  </label>
+                  <label class="toggle">
+                    <span>Track browser</span>
+                    <input id="trackBrowser" name="trackBrowser" type="checkbox" />
+                  </label>
+                  <label class="toggle">
+                    <span>Track audio</span>
+                    <input id="trackAudio" name="trackAudio" type="checkbox" />
+                  </label>
+                </form>
+              </article>
+
+              <article class="card">
+                <div class="section-heading">
+                  <h3>Privacy</h3>
+                  <button id="addRule" type="button">Add Rule</button>
+                </div>
+                <form id="ruleForm" class="rule-form">
+                  <label>
+                    <span>Entity</span>
+                    <select id="ruleEntityType" name="ruleEntityType">
+                      <option value="domain">domain</option>
+                      <option value="app">app</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Pattern</span>
+                    <input id="rulePattern" name="rulePattern" type="text" autocomplete="off" />
+                  </label>
+                  <label>
+                    <span>Action</span>
+                    <select id="ruleAction" name="ruleAction">
+                      <option value="mask">mask</option>
+                      <option value="drop">drop</option>
+                    </select>
+                  </label>
+                </form>
+                <div class="table-wrap">
+                  <table class="rules-table">
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>Entity</th>
+                        <th>Pattern</th>
+                        <th>Action</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody id="rulesTable"></tbody>
+                  </table>
+                </div>
+              </article>
+            </div>
+          </section>
+        </main>
       </div>
-
-      <footer class="command-bar" id="commandBar"></footer>
     </div>
 
-    <script type="module" src="/web/app.js?v=20260707-latency-lanes"></script>
+    <script type="module" src="/web/app.js?v=20260707-practical-ui"></script>
   </body>
 </html>

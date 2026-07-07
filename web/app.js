@@ -1,6 +1,10 @@
 const state = {
+  activeSection: "metricsView",
+  topFilter: "all",
   events: [],
   settings: null,
+  rules: [],
+  tracking: { paused: false },
   health: null,
   lastRefreshAt: null,
   refreshInFlight: false,
@@ -10,6 +14,11 @@ const state = {
 const $ = (id) => document.getElementById(id);
 const METRICS_AUTO_REFRESH_MS = 2500;
 const SOURCE_STALE_SECONDS = 300;
+
+const SECTION_TITLES = {
+  metricsView: "Metrics",
+  settingsPanel: "Settings"
+};
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -23,456 +32,108 @@ async function api(path, options = {}) {
   return body;
 }
 
-async function loadAll() {
+async function loadAll({ showBusy = false } = {}) {
   if (state.refreshInFlight) return;
   state.refreshInFlight = true;
+  if (showBusy) setBusy(true);
   try {
-    const [health, events, settings] = await Promise.all([
+    const [health, events, settings, privacy, tracking] = await Promise.all([
       api("/health"),
       api("/events?limit=500&order=desc"),
-      api("/settings")
+      api("/settings"),
+      api("/privacy/rules"),
+      api("/tracking/status")
     ]);
     state.health = health;
     state.events = events.events || [];
     state.settings = settings.settings;
+    state.rules = privacy.rules;
+    state.tracking = tracking;
     state.lastRefreshAt = new Date();
-    const m = buildModel(state.events, state.settings, state.health);
-    renderHero(m);
-    renderDataGrid(m);
-    renderTimeline(m);
-    renderNow(m);
-    renderRecentFlow(m);
-    renderHealth(m);
-    renderCommandBar(m);
-    renderTopBar(m);
+    renderAll();
+    setStatus(`Ready - UI refreshed ${formatAgeSince(state.lastRefreshAt, new Date())}`);
   } catch (error) {
     setStatus(error.message);
-    console.error(error);
   } finally {
     state.refreshInFlight = false;
+    if (showBusy) setBusy(false);
   }
 }
 
-/* ====== Model ====== */
+function renderAll() {
+  renderShell();
+  renderToday();
+  renderFlow(state.events);
+  renderHealth(state.health);
+  renderSettings(state.settings);
+  renderRules(state.rules);
+  renderTracking(state.tracking);
+}
 
-function buildModel(events, settings, health) {
+function renderShell() {
+  for (const button of document.querySelectorAll(".nav-item")) {
+    const active = button.dataset.section === state.activeSection;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-current", active ? "page" : "false");
+  }
+  for (const section of document.querySelectorAll(".view")) {
+    section.classList.toggle("active", section.id === state.activeSection);
+  }
+  $("pageTitle").textContent = SECTION_TITLES[state.activeSection] || "Metrics";
+}
+
+function renderToday() {
+  const model = buildTodayModel(state.events, state.settings);
+  renderNow(model);
+  renderSummary(model);
+  renderTop(model);
+  renderTimeline(model);
+}
+
+function buildTodayModel(events, settings) {
   const now = new Date();
-  const todayEvents = (events || [])
-    .filter((e) => isSameLocalDay(parseDate(e.observed_at), now))
+  const todayEvents = events
+    .filter((event) => isSameLocalDay(parseDate(event.observed_at), now))
     .sort(compareEventsDesc);
   const ascending = [...todayEvents].sort(compareEventsAsc);
-  const idleSeconds = settings?.capture?.idle_cutoff_seconds || 300;
+  const idleSeconds =
+    settings?.capture?.idle_cutoff_seconds &&
+    Number.isFinite(settings.capture.idle_cutoff_seconds)
+      ? settings.capture.idle_cutoff_seconds
+      : 300;
+  const audioFreshnessSeconds = currentAudioFreshnessSeconds(settings);
+
   const focusSegments = buildFocusSegments(ascending, idleSeconds, now);
   const audioSegments = buildAudioSegments(ascending, idleSeconds, now);
-  const focusSeconds = sumSeconds(focusSegments);
-  const audioSeconds = sumSeconds(audioSegments);
-  const focusSwitches = focusSegments.length;
-  const todayEventsCount = todayEvents.length;
-
-  const heroNumber =
-    focusSeconds >= 60
-      ? formatHm(focusSeconds)
-      : focusSeconds > 0
-        ? `${Math.round(focusSeconds / 60)}m`
-        : "0:00";
-
-  const heroAnnotation =
-    focusSeconds === 0
-      ? "— waiting for activity"
-      : focusSeconds < 60 * 60
-        ? "— a steady start"
-        : focusSeconds < 4 * 60 * 60
-          ? "— a quieter day"
-          : "— a deep day";
-
-  const apps = uniqueEntities(todayEvents, "app", "windows_probe");
-  const sites = uniqueEntities(todayEvents, "domain", "browser_extension");
-  const heroMeta =
-    focusSeconds === 0
-      ? "Once activity starts, it will appear here."
-      : `across ${apps} apps and ${sites} sites. ${focusSwitches} focus switches. ${Math.round(audioSeconds / 60)}m of background audio.`;
-
-  const dataGrid = [
-    {
-      label: "Today focus",
-      value: focusSeconds >= 60 ? formatHm(focusSeconds) : "0m",
-      sub: "hours focused",
-      serif: false
-    },
-    {
-      label: "Today audio",
-      value: `${Math.round(audioSeconds / 60)}m`,
-      sub: "background audio",
-      serif: false
-    },
-    {
-      label: "Today switches",
-      value: String(focusSwitches),
-      sub: "app / tab changes",
-      serif: false
-    },
-    {
-      label: "Today events",
-      value: String(todayEventsCount),
-      sub: "captured events",
-      serif: false
-    },
-    {
-      label: "Top app",
-      value: topEntity(todayEvents, "windows_probe"),
-      sub: "longest focus",
-      serif: true
-    },
-    {
-      label: "Top site",
-      value: topEntity(todayEvents, "browser_extension"),
-      sub: "longest focus",
-      serif: true
-    },
-    {
-      label: "Peak",
-      value: peakHourLabel(focusSegments),
-      sub: "busiest hour",
-      serif: false
-    },
-    {
-      label: "Avg focus",
-      value: avgFocusLabel(focusSegments),
-      sub: "per session",
-      serif: false
-    }
-  ];
-
-  const lanes = buildAppLanes(todayEvents, focusSegments, audioSegments);
-
+  const segments = [...focusSegments, ...audioSegments].sort(
+    (a, b) => a.start - b.start
+  );
+  const topItems = buildTopItems(segments);
   const latestFocus = todayEvents.find(isFocusEvent) || null;
-  const latestTab =
-    todayEvents.find((e) => e.source === "browser_extension" && isFocusEvent(e)) ||
-    null;
-  const latestAudio =
-    todayEvents.find((e) => isAudioStartEvent(e) || isAudioStopEvent(e)) || null;
-
-  const recentFlow = todayEvents.slice(0, 5);
-
-  const sources = health?.sources || {};
-  const healthItems = [
-    { label: "db", ok: health?.database?.exists === true },
-    {
-      label: sourceHealthLabel("browser", sources.browser_extension, now),
-      ok: !!sources.browser_extension?.last_observed_at
-    },
-    {
-      label: sourceHealthLabel("winprobe", sources.windows_probe, now, {
-        missing: "winprobe not seen"
-      }),
-      ok: !!sources.windows_probe?.last_observed_at
-    }
-  ];
+  const latestTab = todayEvents.find(
+    (event) => event.source === "browser_extension" && isFocusEvent(event)
+  );
+  const latestAudio = latestActiveAudioEvent(
+    todayEvents,
+    audioFreshnessSeconds,
+    now
+  );
 
   return {
     now,
     todayEvents,
-    focusSeconds,
-    audioSeconds,
-    focusSwitches,
-    todayEventsCount,
-    heroNumber,
-    heroAnnotation,
-    heroMeta,
-    dataGrid,
-    lanes,
+    focusSegments,
+    audioSegments,
+    segments,
+    topItems,
     latestFocus,
-    latestTab,
+    latestTab: latestTab || null,
     latestAudio,
-    recentFlow,
-    healthItems
+    focusSeconds: sumSeconds(focusSegments),
+    audioSeconds: sumSeconds(audioSegments),
+    focusSwitches: focusSegments.length
   };
 }
-
-/* ====== Renders ====== */
-
-function renderHero(m) {
-  $("heroNumber").textContent = m.heroNumber;
-  $("heroAnnotation").textContent = m.heroAnnotation;
-  $("heroMeta").textContent = m.heroMeta;
-}
-
-function renderDataGrid(m) {
-  const grid = $("dataGrid");
-  grid.replaceChildren();
-  for (let i = 0; i < m.dataGrid.length; i += 1) {
-    const tile = document.createElement("div");
-    tile.className = "data-tile";
-
-    const label = document.createElement("span");
-    label.className = "data-tile-label";
-    label.textContent = m.dataGrid[i].label;
-
-    const value = document.createElement("span");
-    value.className = m.dataGrid[i].serif
-      ? "data-tile-value serif"
-      : "data-tile-value";
-    value.textContent = m.dataGrid[i].value;
-
-    const sub = document.createElement("span");
-    sub.className = "data-tile-sub";
-    sub.textContent = m.dataGrid[i].sub;
-
-    tile.append(label, value, sub);
-    grid.append(tile);
-  }
-}
-
-function renderTimeline(m) {
-  const axis = $("timelineAxis");
-  axis.replaceChildren();
-  for (const t of [2, 6, 10, 14, 18, 22]) {
-    const span = document.createElement("span");
-    span.textContent = String(t).padStart(2, "0");
-    axis.append(span);
-  }
-  const nowLabel = document.createElement("span");
-  nowLabel.className = "now-label";
-  nowLabel.textContent = "NOW";
-  axis.append(nowLabel);
-
-  const lanes = $("timelineLanes");
-  lanes.replaceChildren();
-  for (const lane of m.lanes) {
-    lanes.append(renderTimelineLane(lane));
-  }
-
-  // Add the NOW line overlay to the last track
-  const tracks = lanes.querySelectorAll(".timeline-track");
-  if (tracks.length > 0) {
-    const now = document.createElement("span");
-    now.className = "timeline-now";
-    now.style.right = "0px";
-    tracks[0].append(now);
-  }
-
-  $("timelineStats").textContent =
-    `${m.lanes.length} apps · ${m.todayEventsCount} events · ${m.focusSwitches} switches`;
-}
-
-function renderTimelineLane(lane) {
-  const row = document.createElement("div");
-  row.className = "timeline-lane";
-
-  const label = document.createElement("div");
-  label.className = "timeline-lane-label";
-
-  const avatar = document.createElement("span");
-  avatar.className = "lane-avatar";
-  avatar.dataset.kind = lane.kind;
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("viewBox", "0 0 24 24");
-  svg.setAttribute("aria-hidden", "true");
-  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-  if (lane.kind === "domain") {
-    path.setAttribute("d", "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z M3.6 9h16.8 M3.6 15h16.8 M12 3a13 13 0 0 1 0 18 M12 3a13 13 0 0 0 0 18");
-  } else {
-    path.setAttribute("d", "M4 5h16v11H4Z M8 20h8 M10 16v4 M14 16v4");
-  }
-  svg.append(path);
-  avatar.append(svg);
-
-  const text = document.createElement("div");
-  text.className = "lane-text";
-  const name = document.createElement("span");
-  name.className = "lane-name";
-  name.textContent = lane.label;
-  const dur = document.createElement("span");
-  dur.className = "lane-duration";
-  dur.textContent = formatDuration(lane.totalSeconds);
-  text.append(name, dur);
-
-  label.append(avatar, text);
-
-  const track = document.createElement("div");
-  track.className = "timeline-track";
-  for (const bar of lane.bars) {
-    const block = document.createElement("span");
-    block.className = bar.audio ? "timeline-bar audio" : "timeline-bar focus";
-    block.style.left = `${(bar.start / 1440) * 100}%`;
-    block.style.width = `${Math.max(0.4, ((bar.end - bar.start) / 1440) * 100)}%`;
-    track.append(block);
-  }
-
-  row.append(label, track);
-  return row;
-}
-
-function renderNow(m) {
-  const list = $("nowList");
-  list.replaceChildren();
-  const rows = [
-    { label: "Focus app", event: m.latestFocus, fallback: "No focus" },
-    { label: "Using tab", event: m.latestTab, fallback: "No browser" },
-    { label: "Background audio", event: m.latestAudio, fallback: "No audio" }
-  ];
-  for (const r of rows) {
-    const row = document.createElement("div");
-    row.className = "now-row";
-    if (r.event) row.classList.add("active");
-
-    const meta = document.createElement("span");
-    meta.className = "now-row-label";
-    meta.textContent = r.label;
-
-    const value = document.createElement("div");
-    value.className = "now-row-value";
-
-    if (r.event) {
-      const activity =
-        r.event.payload?.activity === "audio" ? "audio" : "focus";
-      value.append(
-        entityAvatar(r.event.entity_type, r.event.entity, displayEntity(r.event), activity)
-      );
-      const text = document.createElement("div");
-      const t = document.createElement("strong");
-      t.textContent = displayEntity(r.event);
-      const s = document.createElement("span");
-      s.textContent = r.event.title || formatTime(r.event.observed_at);
-      text.append(t, s);
-      value.append(text);
-    } else {
-      const text = document.createElement("div");
-      const t = document.createElement("strong");
-      t.textContent = r.fallback;
-      text.append(t);
-      value.append(text);
-    }
-    row.append(meta, value);
-    list.append(row);
-  }
-}
-
-function renderRecentFlow(m) {
-  const list = $("flowList");
-  list.replaceChildren();
-  for (const ev of m.recentFlow) {
-    const row = document.createElement("div");
-    row.className = "flow-row";
-    row.append(flowCell("time flow-time", formatTime(ev.observed_at)));
-    row.append(flowCell("app flow-app", displayEntity(ev)));
-    row.append(flowCell("event flow-event", flowEventLabel(ev)));
-    row.append(flowCell(`kind flow-kind flow-kind-${kindClass(ev)}`, kindLabel(ev)));
-    list.append(row);
-  }
-}
-
-function flowCell(cls, text) {
-  const span = document.createElement("span");
-  span.className = `flow-cell ${cls}`;
-  span.textContent = text;
-  return span;
-}
-
-function eventLabel(ev) {
-  if (ev.payload?.activity === "audio") return "audio start";
-  if (ev.kind === "app_audio_stop" || ev.kind === "tab_audio_stop") {
-    return "audio stop";
-  }
-  if (ev.kind === "app_active" || ev.kind === "tab_active") return "started";
-  return ev.kind || "event";
-}
-
-function flowEventLabel(ev) {
-  const lag = receiveLagSeconds(ev);
-  if (lag === null) return eventLabel(ev);
-  return `${eventLabel(ev)} · receive lag ${formatCompactDuration(lag)}`;
-}
-
-function kindLabel(ev) {
-  if (ev.kind === "app_active" || ev.kind === "tab_active") return "focus";
-  if (typeof ev.kind === "string" && ev.kind.includes("audio")) return "audio";
-  return "switch";
-}
-
-function kindClass(ev) {
-  if (ev.kind === "app_active" || ev.kind === "tab_active") return "focus";
-  if (typeof ev.kind === "string" && ev.kind.includes("audio")) return "audio";
-  return "switch";
-}
-
-function renderHealth(m) {
-  const pills = $("healthPills");
-  pills.replaceChildren();
-  if (state.lastRefreshAt) {
-    const pill = document.createElement("span");
-    pill.className = "health-pill ok";
-    pill.textContent = `● ui ${formatAgeSince(state.lastRefreshAt, new Date())}`;
-    pills.append(pill);
-  }
-  for (const h of m.healthItems) {
-    const pill = document.createElement("span");
-    pill.className = `health-pill ${h.ok ? "ok" : "down"}`;
-    pill.textContent = `${h.ok ? "●" : "○"} ${h.label}`;
-    pills.append(pill);
-  }
-  const blurb =
-    m.focusSwitches < 30
-      ? `${m.focusSwitches} switches — lowest this week`
-      : `${m.focusSwitches} switches — a busy day`;
-  $("healthBlurb").textContent = blurb;
-}
-
-function renderCommandBar(m) {
-  const bar = $("commandBar");
-  const focusText = m.focusSeconds >= 60 ? formatHm(m.focusSeconds) : "0m";
-  const audioText = `${Math.round(m.audioSeconds / 60)}m`;
-  const apps = uniqueEntities(m.todayEvents, "app", "windows_probe");
-  const sites = uniqueEntities(m.todayEvents, "domain", "browser_extension");
-  const uiText = state.lastRefreshAt
-    ? ` · UI refreshed ${formatAgeSince(state.lastRefreshAt, new Date())}`
-    : "";
-  bar.textContent =
-    `localtrace · today · focus ${focusText} · audio ${audioText} · ` +
-    `${m.focusSwitches} switches · ${m.todayEventsCount} events · ` +
-    `${apps} apps · ${sites} sites${uiText}`;
-}
-
-function renderTopBar(m) {
-  const live = document.querySelector(".topbar .live-meta");
-  if (!live) return;
-  const dateText = new Intl.DateTimeFormat(undefined, {
-    day: "numeric",
-    month: "long",
-    year: "numeric"
-  }).format(m.now);
-  live.textContent = `TODAY · ${dateText} · LIVE`;
-}
-
-function buildAppLanes(todayEvents, focusSegments, audioSegments) {
-  const byEntity = new Map();
-  for (const seg of focusSegments) {
-    const key = `${seg.kind}:${seg.entity}`;
-    if (!byEntity.has(key)) {
-      byEntity.set(key, {
-        kind: seg.kind,
-        entity: seg.entity,
-        label: seg.label,
-        totalSeconds: 0,
-        bars: []
-      });
-    }
-    const lane = byEntity.get(key);
-    lane.totalSeconds += seg.seconds;
-    lane.bars.push({ start: minuteOfDay(seg.start), end: minuteOfDay(seg.end), audio: false });
-  }
-  for (const seg of audioSegments) {
-    const key = `${seg.kind}:${seg.entity}`;
-    if (byEntity.has(key)) {
-      byEntity.get(key).bars.push({ start: minuteOfDay(seg.start), end: minuteOfDay(seg.end), audio: true });
-    }
-  }
-  return [...byEntity.values()]
-    .sort((a, b) => b.totalSeconds - a.totalSeconds || a.label.localeCompare(b.label))
-    .slice(0, 6);
-}
-
-/* ====== Helpers (kept from the previous app) ====== */
 
 function buildFocusSegments(events, idleSeconds, now) {
   const focusEvents = events.filter(isFocusEvent);
@@ -501,6 +162,14 @@ function buildAudioSegments(events, idleSeconds, now) {
   return segments;
 }
 
+function currentAudioFreshnessSeconds(settings) {
+  const heartbeatSeconds = Number(settings?.capture?.heartbeat_seconds);
+  const heartbeat = Number.isFinite(heartbeatSeconds) && heartbeatSeconds > 0
+    ? heartbeatSeconds
+    : 60;
+  return Math.max(90, heartbeat * 3);
+}
+
 function segmentFromEvent(event, start, next, idleSeconds, audio) {
   if (!start || !next) return [];
   const maxEnd = new Date(start.getTime() + idleSeconds * 1000);
@@ -523,6 +192,500 @@ function segmentFromEvent(event, start, next, idleSeconds, audio) {
   ];
 }
 
+function buildTopItems(segments) {
+  const map = new Map();
+  for (const segment of segments) {
+    const key = `${segment.kind}:${segment.entity}:${segment.activity}`;
+    const current =
+      map.get(key) ||
+      {
+        kind: segment.kind,
+        entity: segment.entity,
+        label: segment.label,
+        subtitle: segment.subtitle,
+        activity: segment.activity,
+        audio: segment.audio,
+        seconds: 0
+      };
+    current.seconds += segment.seconds;
+    if (!current.subtitle && segment.subtitle) current.subtitle = segment.subtitle;
+    map.set(key, current);
+  }
+  return [...map.values()].sort(
+    (a, b) => b.seconds - a.seconds || a.label.localeCompare(b.label)
+  );
+}
+
+function buildTimelineModel(model) {
+  const lanes = new Map();
+  for (const segment of model.segments) {
+    const key = `${segment.kind}:${segment.entity}`;
+    const lane =
+      lanes.get(key) ||
+      {
+        kind: segment.kind,
+        entity: segment.entity,
+        label: segment.label,
+        subtitle: segment.subtitle,
+        totalSeconds: 0,
+        bars: []
+      };
+    lane.totalSeconds += segment.seconds;
+    lane.bars.push({
+      audio: segment.audio,
+      startMinute: minuteOfDay(segment.start),
+      endMinute: minuteOfDay(segment.end),
+      title: `${segment.label} - ${formatDuration(segment.seconds)}`
+    });
+    lanes.set(key, lane);
+  }
+  return [...lanes.values()]
+    .sort((a, b) => b.totalSeconds - a.totalSeconds || a.label.localeCompare(b.label))
+    .slice(0, 12);
+}
+
+function renderNow(model) {
+  $("nowFreshness").textContent = model.todayEvents.length
+    ? `Updated ${formatTime(model.todayEvents[0].observed_at)}`
+    : "No data";
+  renderNowRow($("nowFocus"), {
+    label: "Focus app",
+    event: model.latestFocus,
+    fallback: "No focus activity"
+  });
+  renderNowRow($("nowTab"), {
+    label: "Using tab",
+    event: model.latestTab,
+    fallback: "No browser activity"
+  });
+  renderNowRow($("nowAudio"), {
+    label: "Background audio",
+    event: model.latestAudio,
+    fallback: "No audio activity"
+  });
+}
+
+function renderNowRow(target, { label, event, fallback }) {
+  target.replaceChildren();
+  const meta = document.createElement("span");
+  meta.className = "row-label";
+  meta.textContent = label;
+  const value = document.createElement("div");
+  value.className = "row-value";
+  if (event) {
+    value.append(
+      entityAvatar(
+        event.entity_type,
+        event.entity,
+        displayEntity(event),
+        event.payload?.activity || "focus"
+      )
+    );
+    const text = document.createElement("div");
+    const title = document.createElement("strong");
+    const sub = document.createElement("span");
+    title.textContent = displayEntity(event);
+    sub.textContent = event.title || formatTime(event.observed_at);
+    text.append(title, sub);
+    value.append(text);
+  } else {
+    value.textContent = fallback;
+  }
+  target.append(meta, value);
+}
+
+function renderSummary(model) {
+  $("focusTotal").textContent = formatDuration(model.focusSeconds);
+  $("audioTotal").textContent = formatDuration(model.audioSeconds);
+  $("focusSwitches").textContent = String(model.focusSwitches);
+  $("todayEventsCount").textContent = String(model.todayEvents.length);
+  $("summaryMeta").textContent = model.todayEvents.length
+    ? `${model.focusSegments.length} focus segments, ${model.audioSegments.length} audio segments`
+    : "Waiting for activity";
+}
+
+function renderTop(model) {
+  for (const button of document.querySelectorAll(".segment")) {
+    button.classList.toggle("active", button.dataset.filter === state.topFilter);
+  }
+  const items = model.topItems
+    .filter((item) => state.topFilter === "all" || item.kind === state.topFilter)
+    .slice(0, 8);
+  const maxSeconds = Math.max(1, ...items.map((item) => item.seconds));
+  $("topMeta").textContent = items.length
+    ? `${items.length} lanes by observed duration`
+    : "No activity yet";
+  $("topList").replaceChildren(
+    ...items.map((item, index) => renderTopItem(item, index, maxSeconds))
+  );
+}
+
+function renderTopItem(item, index, maxSeconds) {
+  const row = document.createElement("div");
+  row.className = "top-item";
+  const rank = document.createElement("span");
+  rank.className = "rank";
+  rank.textContent = String(index + 1).padStart(2, "0");
+  const body = document.createElement("div");
+  body.className = "top-body";
+  const title = document.createElement("strong");
+  const sub = document.createElement("span");
+  title.textContent = item.label;
+  sub.textContent = `${item.kind} - ${item.audio ? "audio" : "focus"}`;
+  const duration = document.createElement("b");
+  duration.textContent = formatDuration(item.seconds);
+  const meter = document.createElement("span");
+  meter.className = item.audio ? "top-meter audio" : "top-meter focus";
+  meter.style.width = `${Math.max(4, (item.seconds / maxSeconds) * 100)}%`;
+  body.append(title, sub);
+  row.append(
+    rank,
+    entityAvatar(item.kind, item.entity, item.label, item.activity),
+    body,
+    duration,
+    meter
+  );
+  return row;
+}
+
+function renderTimeline(model) {
+  const lanes = buildTimelineModel(model);
+  $("timelineEmpty").hidden = lanes.length !== 0;
+  $("timelineGrid").hidden = lanes.length === 0;
+  $("timelineMeta").textContent = lanes.length
+    ? `${lanes.length} top lanes from today`
+    : "No timeline activity yet";
+  $("timelineAxis").replaceChildren(...renderAxisTicks());
+  $("timelineLanes").replaceChildren(...lanes.map(renderTimelineLane));
+}
+
+function renderAxisTicks() {
+  return [0, 360, 720, 1080, 1440].map((minute) => {
+    const tick = document.createElement("span");
+    if (minute === 1440) tick.className = "end";
+    tick.style.left = `${(minute / 1440) * 100}%`;
+    tick.textContent = minute === 1440 ? "24:00" : `${String(minute / 60).padStart(2, "0")}:00`;
+    return tick;
+  });
+}
+
+function renderTimelineLane(lane) {
+  const row = document.createElement("div");
+  row.className = "timeline-row";
+  const label = document.createElement("div");
+  label.className = "timeline-lane-label";
+  const text = document.createElement("div");
+  const title = document.createElement("strong");
+  const sub = document.createElement("span");
+  title.textContent = lane.label;
+  sub.textContent = formatDuration(lane.totalSeconds);
+  text.append(title, sub);
+  label.append(entityAvatar(lane.kind, lane.entity, lane.label), text);
+
+  const track = document.createElement("div");
+  track.className = "timeline-track";
+  for (const bar of lane.bars) {
+    const item = document.createElement("span");
+    item.className = bar.audio ? "timeline-bar audio" : "timeline-bar focus";
+    item.title = bar.title;
+    item.style.left = `${(bar.startMinute / 1440) * 100}%`;
+    item.style.width = `${Math.max(0.3, ((bar.endMinute - bar.startMinute) / 1440) * 100)}%`;
+    track.append(item);
+  }
+  row.append(label, track);
+  return row;
+}
+
+function renderFlow(events) {
+  const items = [...events].sort(compareEventsDesc).slice(0, 14);
+  $("flowEmpty").hidden = items.length !== 0;
+  $("flowList").hidden = items.length === 0;
+  $("flowMeta").textContent = items.length
+    ? `${items.length} latest events`
+    : "Latest captured activity";
+  $("flowList").replaceChildren(...items.map(renderFlowItem));
+}
+
+function renderFlowItem(event) {
+  const row = document.createElement("div");
+  row.className = "flow-item";
+
+  const time = document.createElement("time");
+  time.className = "flow-time";
+  time.dateTime = event.observed_at || "";
+  time.textContent = formatFlowTime(event.observed_at);
+
+  const body = document.createElement("div");
+  body.className = "flow-body";
+  const title = document.createElement("strong");
+  const sub = document.createElement("span");
+  const lag = receiveLagSeconds(event);
+  title.textContent = displayEntity(event);
+  sub.textContent = lag === null
+    ? flowSubtitle(event)
+    : `${flowSubtitle(event)} · receive lag ${formatCompactDuration(lag)}`;
+  body.append(title, sub);
+
+  const meta = document.createElement("div");
+  meta.className = "flow-meta";
+  meta.append(
+    flowChip(eventKindLabel(event), flowActivity(event)),
+    flowChip(event.source || "unknown")
+  );
+
+  row.append(
+    time,
+    entityAvatar(
+      event.entity_type,
+      event.entity,
+      displayEntity(event),
+      flowActivity(event)
+    ),
+    body,
+    meta
+  );
+  return row;
+}
+
+function flowChip(text, activity = "focus") {
+  const chip = document.createElement("span");
+  chip.className = "flow-chip";
+  chip.dataset.activity = activity;
+  chip.textContent = text;
+  return chip;
+}
+
+function flowSubtitle(event) {
+  if (event.title) return event.title;
+  if (event.payload?.reason) return `Reason: ${event.payload.reason}`;
+  return event.kind || "";
+}
+
+function flowActivity(event) {
+  return isAudioStartEvent(event) || isAudioStopEvent(event) ? "audio" : "focus";
+}
+
+function eventKindLabel(event) {
+  switch (event.kind) {
+    case "app_active":
+      return "App focus";
+    case "tab_active":
+      return flowActivity(event) === "audio" ? "Tab audio" : "Tab focus";
+    case "app_audio":
+      return "App audio";
+    case "app_audio_stop":
+      return "Audio stopped";
+    case "tab_audio_stop":
+      return "Tab audio stopped";
+    default:
+      return event.kind || "Event";
+  }
+}
+
+function renderHealth(health) {
+  if (!health) return;
+  const source = health.sources || {};
+  const now = new Date();
+  const metrics = [
+    ["Service", health.service || "unknown"],
+    ["Bind", `${health.bind?.host || "127.0.0.1"}:${health.bind?.port || ""}`],
+    ["Database", health.database?.exists ? "exists" : "missing"],
+    ["DB path", health.database?.path || ""],
+    ["Stored events", String(health.events?.recent_count ?? 0)],
+    ["Tracking", health.tracking?.paused ? "paused" : "active"],
+    [
+      "UI refreshed",
+      state.lastRefreshAt ? formatAgeSince(state.lastRefreshAt, now) : "unknown"
+    ],
+    [
+      "Windows probe",
+      sourceHealthLabel("windows_probe", source.windows_probe, now)
+    ],
+    [
+      "Browser extension",
+      sourceHealthLabel("browser_extension", source.browser_extension, now)
+    ]
+  ];
+  $("healthMetrics").replaceChildren(
+    ...metrics.map(([label, value]) => {
+      const item = document.createElement("div");
+      const dt = document.createElement("dt");
+      const dd = document.createElement("dd");
+      dt.textContent = label;
+      dd.textContent = value;
+      item.append(dt, dd);
+      return item;
+    })
+  );
+}
+
+function renderSettings(settings) {
+  if (!settings) return;
+  $("apiPort").value = settings.api.port;
+  $("pollMs").value = settings.capture.poll_ms;
+  $("heartbeatSeconds").value = settings.capture.heartbeat_seconds;
+  $("idleCutoffSeconds").value = settings.capture.idle_cutoff_seconds;
+  $("storeTitles").checked = settings.capture.store_titles;
+  $("storeExePath").checked = settings.capture.store_exe_path;
+  $("trackBrowser").checked = settings.capture.track_browser;
+  $("trackAudio").checked = settings.capture.track_audio;
+}
+
+function renderRules(rules) {
+  const rows = rules.map((rule) => {
+    const tr = document.createElement("tr");
+    tr.append(
+      cell(String(rule.id)),
+      cell(rule.entity_type),
+      cell(rule.pattern),
+      cell(rule.action),
+      actionCell(rule.id)
+    );
+    return tr;
+  });
+  $("rulesTable").replaceChildren(...rows);
+}
+
+function renderTracking(tracking) {
+  $("pauseButton").disabled = tracking.paused;
+  $("resumeButton").disabled = !tracking.paused;
+  $("trackingPill").textContent = tracking.paused ? "Paused" : "Tracking";
+  $("trackingPill").classList.toggle("paused", tracking.paused);
+}
+
+function cell(text) {
+  const td = document.createElement("td");
+  td.textContent = text;
+  return td;
+}
+
+function actionCell(id) {
+  const td = document.createElement("td");
+  const button = document.createElement("button");
+  button.className = "danger";
+  button.type = "button";
+  button.textContent = "Delete";
+  button.addEventListener("click", () => deleteRule(id));
+  td.append(button);
+  return td;
+}
+
+function entityAvatar(kind, entity, label, activity = "focus") {
+  const avatar = document.createElement("span");
+  avatar.className = "entity-avatar";
+  avatar.dataset.kind = kind || "app";
+  avatar.dataset.activity = activity;
+  avatar.style.setProperty("--avatar-hue", String(hashHue(`${kind}:${entity}`)));
+  avatar.append(iconForEntity(kind, activity));
+  return avatar;
+}
+
+function iconForEntity(kind, activity) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-hidden", "true");
+  svg.classList.add("entity-icon");
+  const paths =
+    activity === "audio"
+      ? ["M4 14a8 8 0 0 1 16 0", "M6 14h2v6H6a2 2 0 0 1-2-2v-2a2 2 0 0 1 2-2Z", "M16 14h2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-2v-6Z"]
+      : kind === "domain"
+        ? ["M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z", "M3.6 9h16.8", "M3.6 15h16.8", "M12 3a13 13 0 0 1 0 18", "M12 3a13 13 0 0 0 0 18"]
+        : ["M4 5h16v11H4Z", "M8 20h8", "M10 16v4", "M14 16v4"];
+  for (const d of paths) {
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", d);
+    svg.append(path);
+  }
+  return svg;
+}
+
+function settingsFromForm() {
+  return {
+    api: {
+      port: Number.parseInt($("apiPort").value, 10)
+    },
+    capture: {
+      poll_ms: Number.parseInt($("pollMs").value, 10),
+      heartbeat_seconds: Number.parseInt($("heartbeatSeconds").value, 10),
+      idle_cutoff_seconds: Number.parseInt($("idleCutoffSeconds").value, 10),
+      store_titles: $("storeTitles").checked,
+      store_exe_path: $("storeExePath").checked,
+      track_browser: $("trackBrowser").checked,
+      track_audio: $("trackAudio").checked
+    }
+  };
+}
+
+async function saveSettings() {
+  setBusy(true);
+  try {
+    const body = await api("/settings", {
+      method: "POST",
+      body: JSON.stringify(settingsFromForm())
+    });
+    state.settings = body.settings;
+    renderSettings(body.settings);
+    renderToday();
+    if (body.restart_required?.includes("api.port")) {
+      setStatus("Saved; restart required for port");
+    } else {
+      setStatus("Saved");
+    }
+  } catch (error) {
+    setStatus(error.message);
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function addRule() {
+  const pattern = $("rulePattern").value.trim();
+  if (!pattern) return;
+  setBusy(true);
+  try {
+    await api("/privacy/rules", {
+      method: "POST",
+      body: JSON.stringify({
+        entity_type: $("ruleEntityType").value,
+        pattern,
+        action: $("ruleAction").value
+      })
+    });
+    $("rulePattern").value = "";
+    await loadAll();
+  } catch (error) {
+    setStatus(error.message);
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function deleteRule(id) {
+  setBusy(true);
+  try {
+    await api(`/privacy/rules/${id}`, { method: "DELETE" });
+    await loadAll();
+  } catch (error) {
+    setStatus(error.message);
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function setTracking(path) {
+  setBusy(true);
+  try {
+    const tracking = await api(path, { method: "POST" });
+    state.tracking = tracking;
+    renderTracking(tracking);
+    await loadAll();
+  } catch (error) {
+    setStatus(error.message);
+  } finally {
+    setBusy(false);
+  }
+}
+
 function isFocusEvent(event) {
   if (!event || event.kind?.endsWith("_stop")) return false;
   const activity = event.payload?.activity || "focus";
@@ -532,7 +695,7 @@ function isFocusEvent(event) {
 
 function isAudioStartEvent(event) {
   if (!event || event.kind?.endsWith("_stop")) return false;
-  return event.kind === "app_audio" || event.kind === "tab_audio";
+  return event.kind === "app_audio" || event.payload?.activity === "audio";
 }
 
 function isAudioStopEvent(event) {
@@ -580,6 +743,26 @@ function nextAudioBoundary(audioEvents, index, event, now) {
   return now;
 }
 
+function latestActiveAudioEvent(eventsDesc, idleSeconds, now) {
+  const latestStopByKey = new Map();
+  const maxAgeMs = Math.max(1, Number(idleSeconds) || 300) * 1000;
+  for (const event of eventsDesc) {
+    const observedAt = parseDate(event.observed_at);
+    if (!observedAt) continue;
+    if (now.getTime() - observedAt.getTime() > maxAgeMs) break;
+
+    const key = `${event.source}:${event.entity_type}:${event.entity}`;
+    if (isAudioStopEvent(event) && !latestStopByKey.has(key)) {
+      latestStopByKey.set(key, observedAt);
+      continue;
+    }
+    if (!isAudioStartEvent(event)) continue;
+    const stopAt = latestStopByKey.get(key);
+    if (!stopAt || observedAt > stopAt) return event;
+  }
+  return null;
+}
+
 function parseDate(value) {
   if (!value) return null;
   const date = new Date(value);
@@ -589,7 +772,7 @@ function parseDate(value) {
 function compareEventsAsc(a, b) {
   const ta = parseDate(a.observed_at)?.getTime() ?? 0;
   const tb = parseDate(b.observed_at)?.getTime() ?? 0;
-  return ta - tb || (Number(a.id || 0) - Number(b.id || 0));
+  return ta - tb || Number(a.id || 0) - Number(b.id || 0);
 }
 
 function compareEventsDesc(a, b) {
@@ -605,17 +788,21 @@ function isSameLocalDay(a, b) {
   );
 }
 
+function minuteOfDay(date) {
+  return date.getHours() * 60 + date.getMinutes() + date.getSeconds() / 60;
+}
+
 function sumSeconds(segments) {
   return segments.reduce((sum, item) => sum + item.seconds, 0);
 }
 
-function sourceHealthLabel(label, source, now, options = {}) {
+function sourceHealthLabel(label, source, now) {
   const observedAt = parseDate(source?.last_observed_at);
-  if (!observedAt) return options.missing || `${label} not seen`;
+  if (!observedAt) return `${label} not seen`;
   const ageSeconds = elapsedSeconds(observedAt, now);
   const freshness = ageSeconds > SOURCE_STALE_SECONDS ? "stale" : "fresh";
   const parts = [
-    `${label} ${freshness} ${formatCompactDuration(ageSeconds)} ago`
+    `${freshness} ${formatCompactDuration(ageSeconds)} ago`
   ];
   const lag = receiveLagSeconds({
     observed_at: source.last_observed_at,
@@ -659,6 +846,15 @@ function displayEntity(event) {
   return entity;
 }
 
+function hashHue(input) {
+  let hash = 0x811c9dc5;
+  for (const char of input) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash % 360;
+}
+
 function formatDuration(seconds) {
   if (seconds > 0 && seconds < 60) return "<1m";
   const totalMinutes = Math.max(0, Math.round(seconds / 60));
@@ -668,145 +864,59 @@ function formatDuration(seconds) {
   return minutes ? `${hours}h ${minutes}m` : `${hours}h`;
 }
 
-function formatHm(seconds) {
-  const total = Math.max(0, Math.round(seconds / 60));
-  const h = Math.floor(total / 60);
-  const m = total % 60;
-  return `${h}:${String(m).padStart(2, "0")}`;
-}
-
 function formatTime(value) {
   const date = parseDate(value);
   if (!date) return value || "";
   return new Intl.DateTimeFormat(undefined, {
     hour: "2-digit",
     minute: "2-digit",
-    second: "2-digit",
-    hour12: false
+    second: "2-digit"
   }).format(date);
 }
 
-function minuteOfDay(date) {
-  return date.getHours() * 60 + date.getMinutes();
+function formatFlowTime(value) {
+  const date = parseDate(value);
+  if (!date) return value || "";
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(date);
 }
 
-function hashHue(input) {
-  if (!input) return 0;
-  let h = 0;
-  for (let i = 0; i < input.length; i += 1) {
-    h = (h * 31 + input.charCodeAt(i)) >>> 0;
+function setSection(sectionId) {
+  state.activeSection = sectionId;
+  renderShell();
+  $(sectionId)?.scrollIntoView({ block: "start" });
+}
+
+function setStatus(text) {
+  $("statusLine").textContent = text;
+}
+
+function setBusy(busy) {
+  for (const button of document.querySelectorAll("button")) {
+    button.disabled = busy;
   }
-  return h % 360;
+  if (!busy) renderTracking(state.tracking);
 }
 
-function iconForEntity(kind, activity) {
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("viewBox", "0 0 24 24");
-  svg.setAttribute("aria-hidden", "true");
-  svg.classList.add("entity-icon");
-  let paths;
-  if (activity === "audio") {
-    paths = [
-      "M4 14a8 8 0 0 1 16 0",
-      "M6 14h2v6H6a2 2 0 0 1-2-2v-2a2 2 0 0 1 2-2Z",
-      "M16 14h2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-2v-6Z"
-    ];
-  } else if (kind === "domain") {
-    paths = [
-      "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z",
-      "M3.6 9h16.8",
-      "M3.6 15h16.8",
-      "M12 3a13 13 0 0 1 0 18",
-      "M12 3a13 13 0 0 0 0 18"
-    ];
-  } else {
-    paths = [
-      "M4 5h16v11H4Z",
-      "M8 20h8",
-      "M10 16v4",
-      "M14 16v4"
-    ];
-  }
-  for (const d of paths) {
-    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    path.setAttribute("d", d);
-    svg.append(path);
-  }
-  return svg;
+for (const button of document.querySelectorAll(".nav-item")) {
+  button.addEventListener("click", () => setSection(button.dataset.section));
+}
+for (const button of document.querySelectorAll(".segment")) {
+  button.addEventListener("click", () => {
+    state.topFilter = button.dataset.filter || "all";
+    renderToday();
+  });
 }
 
-function entityAvatar(kind, entity, label, activity = "focus") {
-  const avatar = document.createElement("span");
-  avatar.className = "entity-avatar";
-  avatar.dataset.kind = kind || "app";
-  avatar.dataset.activity = activity;
-  avatar.append(iconForEntity(kind, activity));
-  return avatar;
-}
+$("refreshButton").addEventListener("click", () => loadAll({ showBusy: true }));
+$("saveSettings").addEventListener("click", saveSettings);
+$("addRule").addEventListener("click", addRule);
+$("pauseButton").addEventListener("click", () => setTracking("/tracking/pause"));
+$("resumeButton").addEventListener("click", () => setTracking("/tracking/resume"));
 
-/* ====== Model helpers for the data grid ====== */
-
-function uniqueEntities(events, entityType, source) {
-  const set = new Set();
-  for (const e of events) {
-    if (e.entity_type === entityType && e.source === source && isFocusEvent(e)) {
-      set.add(e.entity);
-    }
-  }
-  return set.size;
-}
-
-function topEntity(events, source) {
-  const counts = new Map();
-  for (const e of events) {
-    if (e.source !== source || !isFocusEvent(e)) continue;
-    counts.set(e.entity, (counts.get(e.entity) || 0) + 1);
-  }
-  let top = "—";
-  let max = 0;
-  for (const [k, v] of counts) {
-    if (v > max) { top = k; max = v; }
-  }
-  return top;
-}
-
-function peakHourLabel(segments) {
-  if (!segments.length) return "—";
-  const byHour = new Array(24).fill(0);
-  for (const s of segments) {
-    const h = s.start.getHours();
-    byHour[h] += s.seconds;
-  }
-  let max = 0;
-  let peakH = 9;
-  for (let h = 0; h < 24; h += 1) {
-    if (byHour[h] > max) { max = byHour[h]; peakH = h; }
-  }
-  if (max === 0) return "—";
-  return `${String(peakH).padStart(2, "0")}:00`;
-}
-
-function avgFocusLabel(segments) {
-  if (!segments.length) return "0m";
-  const total = segments.reduce((sum, s) => sum + s.seconds, 0);
-  const avg = total / segments.length;
-  const mins = Math.round(avg / 60);
-  if (mins < 60) return `${mins}m`;
-  return `${Math.floor(mins / 60)}h ${mins % 60}m`;
-}
-
-/* ====== Status / busy ====== */
-
-function setStatus(message) {
-  const bar = $("commandBar");
-  if (!bar) return;
-  if (message) bar.textContent = `localtrace · ${message}`;
-}
-
-loadAll();
-if (!state.autoRefreshTimer) {
-  state.autoRefreshTimer = window.setInterval(() => {
-    if (document.hidden) return;
-    loadAll();
-  }, METRICS_AUTO_REFRESH_MS);
-}
+loadAll({ showBusy: true });
+state.autoRefreshTimer = window.setInterval(loadAll, METRICS_AUTO_REFRESH_MS);
