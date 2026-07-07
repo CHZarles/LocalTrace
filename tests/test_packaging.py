@@ -253,6 +253,23 @@ def test_install_script_prepares_browser_extension_for_manual_load() -> None:
     assert "Load unpacked extension directory" in script
 
 
+def test_install_script_starts_core_and_winprobe_after_install() -> None:
+    script = (
+        LOCALTRACE_ROOT / "packaging" / "scripts" / "install-localtrace.ps1"
+    ).read_text(encoding="utf-8")
+
+    assert "function Start-LocalTraceProcess" in script
+    assert "Get-Process -Name $ProcessName" in script
+    assert "Start-Process -FilePath $ExecutablePath" in script
+    assert (
+        'Start-LocalTraceProcess -ProcessName "localtrace" -ExecutablePath $coreExe'
+    ) in script
+    assert (
+        'Start-LocalTraceProcess -ProcessName "localtrace-winprobe" '
+        "-ExecutablePath $winprobeExe"
+    ) in script
+
+
 def test_check_script_diagnoses_winprobe_process_and_health_source() -> None:
     script = (
         LOCALTRACE_ROOT / "packaging" / "scripts" / "check-localtrace.ps1"
@@ -337,6 +354,8 @@ def test_packaging_docs_are_in_mkdocs_nav() -> None:
     assert "localtrace.exe" in docs
     assert "localtrace-winprobe.exe" in docs
     assert "LocalTraceWinprobe" in docs
+    assert "starts both `localtrace.exe`" in docs
+    assert "`localtrace-winprobe.exe` so app capture can begin" in docs
     assert "LocalTrace-windows.zip" in docs
     assert "check-localtrace.ps1" in docs
     assert "The installer extracts the browser extension" in docs

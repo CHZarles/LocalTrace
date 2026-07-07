@@ -35,7 +35,9 @@ def main() -> int:
     parser.add_argument("--bin-dir", type=Path, default=default_bin_dir())
     parser.add_argument("--python", type=Path, default=Path(sys.executable))
     parser.add_argument("--browser-extension-dir", type=Path, default=None)
+    parser.add_argument("--runtime-app-dir", type=Path, default=None)
     parser.add_argument("--no-bin", action="store_true")
+    parser.add_argument("--no-runtime-start", action="store_true")
     parser.add_argument("--skip-deps", action="store_true")
     args = parser.parse_args()
 
@@ -63,11 +65,21 @@ def main() -> int:
                 ),
             }
         )
+        runtime = (
+            runtime_start_skipped("disabled")
+            if args.no_runtime_start
+            else start_installed_runtime(
+                args.runtime_app_dir or default_runtime_app_path()
+            )
+        )
     except (OSError, subprocess.CalledProcessError) as exc:
         print_json({"ok": False, "error": str(exc)})
         return 1
 
     browser_extension = browser_extension_guidance(extension_result)
+    must_tell_user_zh = browser_extension[
+        "agent_message_zh"
+    ] + runtime_agent_message_zh(runtime)
     print_json(
         {
             "ok": True,
@@ -77,8 +89,9 @@ def main() -> int:
             "browser_extension_unpacked_dir": browser_extension["unpacked_dir"],
             "chrome_extensions_url": browser_extension["chrome_url"],
             "edge_extensions_url": browser_extension["edge_url"],
-            "must_tell_user_zh": browser_extension["agent_message_zh"],
+            "must_tell_user_zh": must_tell_user_zh,
             "browser_extension": browser_extension,
+            "runtime": runtime,
         }
     )
     return 0
@@ -118,6 +131,13 @@ def default_browser_extension_path() -> Path | None:
     )
 
 
+def default_runtime_app_path() -> Path | None:
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if not local_app_data:
+        return None
+    return Path(local_app_data) / "LocalTrace" / "App"
+
+
 def browser_extension_guidance(extension_result: dict[str, Any]) -> dict[str, Any]:
     unpacked_dir = str(
         extension_result.get("unpacked_dir") or default_browser_extension_dir()
@@ -147,6 +167,124 @@ def browser_extension_guidance(extension_result: dict[str, Any]) -> dict[str, An
             "打开对应浏览器的扩展管理页，开启开发者模式，选择加载已解压的扩展，然后选择上面的目录。"
         ),
     }
+
+
+def runtime_start_skipped(reason: str) -> dict[str, Any]:
+    return {
+        "attempted": False,
+        "ready_for_app_capture": False,
+        "reason": reason,
+        "app_dir": None,
+        "core": None,
+        "winprobe": None,
+    }
+
+
+def start_installed_runtime(
+    app_dir: Path | None,
+    *,
+    platform: str = os.name,
+    process_checker: Callable[[str], bool] | None = None,
+    starter: Callable[[Path], Any] | None = None,
+) -> dict[str, Any]:
+    if platform != "nt":
+        return runtime_start_skipped("non_windows")
+    if app_dir is None:
+        return runtime_start_skipped("runtime_app_dir_unavailable")
+
+    app_dir = app_dir.resolve()
+    core = runtime_process_status("core", app_dir / "localtrace.exe")
+    winprobe = runtime_process_status("winprobe", app_dir / "localtrace-winprobe.exe")
+    result = {
+        "attempted": True,
+        "ready_for_app_capture": False,
+        "reason": None,
+        "app_dir": str(app_dir),
+        "core": core,
+        "winprobe": winprobe,
+    }
+    if not core["exists"] or not winprobe["exists"]:
+        result["reason"] = "missing_runtime"
+        return result
+
+    process_checker = process_checker or is_windows_process_running
+    starter = starter or start_windows_process
+    for process in (core, winprobe):
+        name = str(process["name"])
+        if process_checker(name):
+            process["status"] = "already_running"
+            continue
+        try:
+            starter(Path(str(process["path"])))
+        except OSError as exc:
+            process["status"] = "error"
+            process["error"] = str(exc)
+        else:
+            process["status"] = "started"
+
+    ready_statuses = {"already_running", "started"}
+    result["ready_for_app_capture"] = (
+        core["status"] in ready_statuses and winprobe["status"] in ready_statuses
+    )
+    if not result["ready_for_app_capture"] and result["reason"] is None:
+        result["reason"] = "start_failed"
+    return result
+
+
+def runtime_process_status(label: str, path: Path) -> dict[str, Any]:
+    return {
+        "label": label,
+        "name": path.name,
+        "path": str(path),
+        "exists": path.is_file(),
+        "status": "missing",
+    }
+
+
+def is_windows_process_running(
+    process_name: str,
+    *,
+    runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
+) -> bool:
+    completed = runner(
+        ["tasklist", "/FI", f"IMAGENAME eq {process_name}", "/NH"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    return process_name.lower() in (completed.stdout or "").lower()
+
+
+def start_windows_process(executable: Path) -> None:
+    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(
+        subprocess, "DETACHED_PROCESS", 0
+    )
+    subprocess.Popen(  # noqa: S603
+        [str(executable)],
+        cwd=str(executable.parent),
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        creationflags=creationflags,
+    )
+
+
+def runtime_agent_message_zh(runtime: dict[str, Any]) -> str:
+    if runtime.get("ready_for_app_capture"):
+        return "LocalTrace Windows 运行时和应用采集探针已经启动。"
+    reason = runtime.get("reason")
+    if reason == "non_windows":
+        return (
+            "当前不是 Windows 环境；Windows 应用采集需要在 Windows 上运行 "
+            "localtrace.exe 和 localtrace-winprobe.exe。"
+        )
+    if reason == "missing_runtime":
+        app_dir = runtime.get("app_dir") or "%LOCALAPPDATA%\\LocalTrace\\App"
+        return (
+            "未找到 LocalTrace Windows 运行时，暂时无法采集应用数据。"
+            f"请先安装 LocalTrace-windows.zip 到 {app_dir}。"
+        )
+    return "LocalTrace Windows 运行时未启动；暂时无法采集应用数据。"
 
 
 def prepare_browser_extension(source: Path, unpacked_dir: Path) -> dict[str, Any]:

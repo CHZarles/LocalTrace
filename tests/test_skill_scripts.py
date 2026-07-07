@@ -518,6 +518,12 @@ def test_skill_installer_copies_skill_and_creates_invocation_command(
     assert "插件解压路径" in body["browser_extension"]["agent_message_zh"]
     assert "Chrome" in body["browser_extension"]["agent_message_zh"]
     assert "Edge" in body["browser_extension"]["agent_message_zh"]
+    assert body["runtime"]["ready_for_app_capture"] is False
+    assert body["runtime"]["reason"] in {
+        "non_windows",
+        "runtime_app_dir_unavailable",
+        "missing_runtime",
+    }
     assert (target / "SKILL.md").exists()
     assert (target / "README.md").exists()
     assert (target / "scripts" / "localtrace.py").exists()
@@ -650,6 +656,73 @@ def test_installer_runs_pip_for_declared_runtime_requirements(tmp_path: Path) ->
             str(requirements),
         ]
     ]
+
+
+def test_skill_installer_starts_installed_windows_runtime_when_available(
+    tmp_path: Path,
+) -> None:
+    installer = load_install_module()
+    app_dir = tmp_path / "App"
+    app_dir.mkdir()
+    core = app_dir / "localtrace.exe"
+    winprobe = app_dir / "localtrace-winprobe.exe"
+    core.write_text("", encoding="utf-8")
+    winprobe.write_text("", encoding="utf-8")
+    started: list[Path] = []
+
+    result = installer.start_installed_runtime(
+        app_dir,
+        platform="nt",
+        process_checker=lambda _name: False,
+        starter=lambda path: started.append(path),
+    )
+
+    assert result["ready_for_app_capture"] is True
+    assert result["reason"] is None
+    assert result["core"]["status"] == "started"
+    assert result["winprobe"]["status"] == "started"
+    assert started == [core, winprobe]
+
+
+def test_skill_installer_does_not_start_duplicate_windows_runtime_processes(
+    tmp_path: Path,
+) -> None:
+    installer = load_install_module()
+    app_dir = tmp_path / "App"
+    app_dir.mkdir()
+    core = app_dir / "localtrace.exe"
+    winprobe = app_dir / "localtrace-winprobe.exe"
+    core.write_text("", encoding="utf-8")
+    winprobe.write_text("", encoding="utf-8")
+    started: list[Path] = []
+
+    result = installer.start_installed_runtime(
+        app_dir,
+        platform="nt",
+        process_checker=lambda name: name == "localtrace.exe",
+        starter=lambda path: started.append(path),
+    )
+
+    assert result["ready_for_app_capture"] is True
+    assert result["core"]["status"] == "already_running"
+    assert result["winprobe"]["status"] == "started"
+    assert started == [winprobe]
+
+
+def test_skill_installer_reports_missing_windows_runtime(tmp_path: Path) -> None:
+    installer = load_install_module()
+
+    result = installer.start_installed_runtime(
+        tmp_path / "missing-app",
+        platform="nt",
+        process_checker=lambda _name: False,
+        starter=lambda _path: None,
+    )
+
+    assert result["ready_for_app_capture"] is False
+    assert result["reason"] == "missing_runtime"
+    assert result["core"]["exists"] is False
+    assert result["winprobe"]["exists"] is False
 
 
 def test_skill_docs_show_windows_agent_install_and_invocation() -> None:

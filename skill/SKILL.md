@@ -34,11 +34,12 @@ After installation, immediately relay `must_tell_user_zh` from the installer
 JSON. Also include `browser_extension.unpacked_dir`,
 `browser_extension.chrome_url`, and `browser_extension.edge_url` if present.
 If `must_tell_user_zh` is absent, use `browser_extension.agent_message_zh`.
-Tell the user that only the browser "Load unpacked" step is manual.
+Tell the user only browser "Load unpacked" is manual; if
+`runtime.ready_for_app_capture` is false, say Windows app capture also needs the
+runtime package and `localtrace-winprobe.exe`.
 
 Do not ask the user to run commands manually when this skill applies. Run the
-smallest subcommand that answers the user's question and summarize the JSON
-result.
+smallest answering subcommand and summarize the JSON result.
 
 ## Workflows
 
@@ -96,5 +97,4 @@ and cloud endpoints are invalid.
 
 - `install.ps1`: Windows one-command installer.
 - `install.py`: copies the skill, installs `requirements.txt`, creates wrapper.
-- `scripts/localtrace.py`: dispatcher used by `localtrace-skill.cmd`.
-- `scripts/localtrace_*.py`: deterministic HTTP JSON query tools.
+- `scripts/localtrace.py` and `localtrace_*.py`: HTTP JSON query tools.

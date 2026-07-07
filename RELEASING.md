@@ -66,10 +66,7 @@ Smoke mode creates placeholder `.exe` files and must not be shipped.
 1. Extract `LocalTrace-windows.zip`.
 2. Run `scripts\install-localtrace.ps1` from the extracted `LocalTrace/`
    directory.
-3. Start `%LOCALAPPDATA%\LocalTrace\App\localtrace.exe`.
-4. Open `http://127.0.0.1:8765/`.
-5. Start `%LOCALAPPDATA%\LocalTrace\App\localtrace-winprobe.exe`.
-6. Confirm Health shows recent service and Windows probe timestamps.
-7. Extract `extension\localtrace-extension.zip`.
-8. Load the extracted extension directory in Chrome or Edge.
-9. Confirm the extension health check reports OK.
+3. Open `http://127.0.0.1:8765/`.
+4. Confirm Health shows recent service and Windows probe timestamps.
+5. Load the prepared extension directory in Chrome or Edge.
+6. Confirm the extension health check reports OK.

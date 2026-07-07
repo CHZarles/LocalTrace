@@ -35,6 +35,9 @@ They also create the direct command wrapper:
 
 The skill has no third-party runtime dependencies. It only needs a Python
 interpreter and a running LocalTrace core at `http://127.0.0.1:8765`.
+During install, the installer also tries to start the installed Windows runtime
+from `%LOCALAPPDATA%\LocalTrace\App` so app capture can begin immediately. If
+the runtime package is missing, the installer reports that in its JSON output.
 
 ## Commands
 

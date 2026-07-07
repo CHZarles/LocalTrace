@@ -81,6 +81,21 @@ function Prepare-BrowserExtension {
   }
 }
 
+function Start-LocalTraceProcess {
+  param(
+    [Parameter(Mandatory = $true)][string]$ProcessName,
+    [Parameter(Mandatory = $true)][string]$ExecutablePath
+  )
+
+  if (Get-Process -Name $ProcessName -ErrorAction SilentlyContinue) {
+    Write-Host "$ProcessName is already running."
+    return
+  }
+
+  Start-Process -FilePath $ExecutablePath -WorkingDirectory (Split-Path -Parent $ExecutablePath)
+  Write-Host "Started $ProcessName: $ExecutablePath"
+}
+
 $normalizedReleaseRoot = Get-NormalizedPath -Path $ReleaseRoot
 $normalizedInstallDir = Get-NormalizedPath -Path $InstallDir
 if ($normalizedReleaseRoot -ieq $normalizedInstallDir) {
@@ -128,9 +143,10 @@ Set-ItemProperty -Path $runKey -Name $coreRunName -Value "`"$coreExe`""
 Set-ItemProperty -Path $runKey -Name $winprobeRunName -Value "`"$winprobeExe`""
 
 Prepare-BrowserExtension -InstallDir $InstallDir
+Start-LocalTraceProcess -ProcessName "localtrace" -ExecutablePath $coreExe
+Start-LocalTraceProcess -ProcessName "localtrace-winprobe" -ExecutablePath $winprobeExe
 
 Write-Host "LocalTrace installed to: $InstallDir"
 Write-Host "Autostart registered at: $runKey\$coreRunName"
 Write-Host "Autostart registered at: $runKey\$winprobeRunName"
-Write-Host "Start manually with: $coreExe"
-Write-Host "Start app probe manually with: $winprobeExe"
+Write-Host "Windows app capture should start immediately after install."
