@@ -2,19 +2,22 @@
 
 LocalTrace 是给 Windows agent 使用的本地活动上下文工具。它记录前台应用、浏览器标签页活动和非浏览器音频，把原始事件保存在本机，并提供一个本地 Web UI 查看当天活动。
 
-## 先让 Agent 安装 Skill
+## 先让 Agent 安装 Skill 并检查运行时
 
 可以直接对 agent 说：
 
-> 请从 GitHub 仓库 [CHZarles/LocalTrace](https://github.com/CHZarles/LocalTrace) 安装 LocalTrace Skill。
+> 请从 GitHub 仓库 [CHZarles/LocalTrace](https://github.com/CHZarles/LocalTrace) 安装 LocalTrace Skill，并确认 Windows 运行时已经就绪。
 >
 > 要求：
 >
 > 1. 先下载或解压完整仓库，不要只下载 skill 目录。
 > 2. 安装入口只有一个：使用仓库 skill 目录里的安装器，不要让我手动运行命令，也不要让我复制执行任何安装命令。
-> 3. 安装器会自动解压浏览器插件，并把插件目录复制到剪贴板；如果安装结果里 `browser_extension.prepared` 不是 `true`，请直接告诉我失败原因。
-> 4. 安装完成后，马上输出浏览器插件解压路径、Chrome 扩展页地址、Edge 扩展页地址，并把这些信息原样告诉我。
-> 5. 然后检查 LocalTrace Skill 是否已经可用，并打开 LocalTrace Web UI。
+> 3. 安装器会尝试启动已安装的 Windows 运行时；如果安装结果里 `runtime.ready_for_app_capture` 不是 `true`，请直接告诉我：当前不能采集新的 Windows 应用数据，需要先安装 `LocalTrace-windows.zip` 运行时。
+> 4. 安装器会自动解压浏览器插件，并把插件目录复制到剪贴板；如果安装结果里 `browser_extension.prepared` 不是 `true`，请直接告诉我失败原因。
+> 5. 安装完成后，马上输出浏览器插件解压路径、Chrome 扩展页地址、Edge 扩展页地址，并把这些信息原样告诉我。
+> 6. 然后检查 LocalTrace Skill 是否已经可用，检查 health 里的 `windows_probe` 是否有最近时间，并打开 LocalTrace Web UI。
+
+安装 Skill 不等于安装 Windows 运行时。Skill 负责让 agent 查询数据；Windows 运行时负责采集应用数据。如果 `runtime.ready_for_app_capture` 不是 `true`，先安装最新的 `LocalTrace-windows.zip`。
 
 安装完成后，agent 必须马上输出浏览器插件加载信息：插件解压路径、Chrome 扩展页地址、Edge 扩展页地址。用户只需要打开 chrome 或者 edge 浏览器加载插件。
 

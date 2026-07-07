@@ -747,6 +747,9 @@ def test_skill_docs_show_windows_agent_install_and_invocation() -> None:
     assert "请从 GitHub 仓库" in project_readme
     assert "不要让我手动运行命令" in project_readme
     assert "安装入口只有一个" in project_readme
+    assert "Windows 运行时" in project_readme
+    assert "runtime.ready_for_app_capture" in project_readme
+    assert "应用数据" in project_readme
     assert "安装完成后，agent 必须马上输出浏览器插件加载信息" in project_readme
     assert "马上输出浏览器插件解压路径" in project_readme
     assert "插件解压路径" in project_readme
